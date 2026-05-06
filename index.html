@@ -318,7 +318,7 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
   
   <div id="optionView" style="display:none">
     <button class="add-btn" onclick="document.getElementById('videoUpload').click()">+ Add Video</button>
-    <input type="file" id="videoUpload" accept="video/mp4" multiple style="display:none" onchange="uploadVideo()">
+    <input type="file" id="videoUpload" accept="video/mp4" multiple style="display:none" onchange="uploadVideo();this.value=''">
     <div style="margin-top:16px">
       <div class="sec-label">Current Videos</div>
       <div id="videoManagementList"></div>
@@ -705,7 +705,7 @@ document.getElementById('healthMemo').addEventListener('input',e=>{state.healthM
 function saveDiary(){saveState();const el=document.getElementById('diarySaved');el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200);}
 
 const FEEDS=[{tag:'GLOBAL POLITICS',title:'国連安保理の拒否権とは？',body:'常任理事国（米英仏露中）は1カ国の反対で決議を阻止できる。冷戦期から現在まで国際秩序を大きく左右する。'},{tag:'FINANCE',title:'Rule of 72 — 複利の法則',body:'「72 ÷ 年利率 ≒ 資産が2倍になる年数」。年利6%なら12年で2倍。時間を味方にする投資の基本法則。'},{tag:'ENGLISH WORD',title:'Resilience — 回復力',body:'"She showed remarkable resilience after the setback." 逆境から立ち直る力。受験にも人生にも必要な概念。'},{tag:'ECONOMICS',title:'円安とは何か？',body:'1ドル=100円→150円になると円の価値が下がる。輸出企業有利・輸入品（食料・エネルギー）が高騰する。'},{tag:'GLOBAL POLITICS',title:'NATOの存在意義',body:'1949年、ソ連への対抗として結成。「1カ国への攻撃は全加盟国への攻撃」という集団的自衛権が核心。'},{tag:'FINANCE',title:'ETFとは何か',body:'上場投資信託。株のように売買できる分散投資商品。S&P500連動型は低コストで長期投資に人気。'},{tag:'ENGLISH WORD',title:'Pragmatic — 実際的な',body:'"A pragmatic approach to problem-solving." 現実主義的・実用的。政治・ビジネスで頻出の重要語。'},{tag:'GLOBAL POLITICS',title:'G7とG20の違い',body:'G7は主要先進7カ国、G20は新興国も含む20カ国。経済・安保の議論の場だが拘束力はない。'},{tag:'FINANCE',title:'インフレと金利の関係',body:'物価上昇→中央銀行が金利を上げてお金の流通を抑制。これが世界経済を動かす基本メカニズム。'},{tag:'ENGLISH WORD',title:'Nuance — 微妙なニュアンス',body:'"The nuance was lost in translation." 細かな意味の違い。英語力が上がるほど重要になる語彙。'},{tag:'GLOBAL POLITICS',title:'パレスチナ問題の基本',body:'1948年イスラエル建国以来の領土紛争。ガザ地区に約200万人が暮らす中東情勢の核心的課題。'},{tag:'FINANCE',title:'株式と債券の違い',body:'株式は会社の所有権でリターン高・リスク大。債券は貸付で安定的・リターン低め。ポートフォリオの基本。'}];
-function loadFeed(){const c=document.getElementById('feedCards');c.innerHTML='';const idxs=[];while(idxs.length<3){const i=Math.floor(Math.random()*FEEDS.length);if(!idxs.includes(i))idxs.push(i);}idxs.forEach(i=>{const f=FEEDS[i];const d=document.createElement('div');d.className='feed-card';d.innerHTML=`<div class="feed-tag">${f.tag}</div><div class="feed-title">${f.title}</div><div class="feed-body">${f.body}</div>`;c.appendChild(d);});}loadFeed();
+function loadFeed(){const c=document.getElementById('feedCards');if(!c)return;c.innerHTML='';const idxs=[];while(idxs.length<3){const i=Math.floor(Math.random()*FEEDS.length);if(!idxs.includes(i))idxs.push(i);}idxs.forEach(i=>{const f=FEEDS[i];const d=document.createElement('div');d.className='feed-card';d.innerHTML=`<div class="feed-tag">${f.tag}</div><div class="feed-title">${f.title}</div><div class="feed-body">${f.body}</div>`;c.appendChild(d);});}loadFeed();
 
 let recordPeriod=7;
 
@@ -809,25 +809,6 @@ function renderVideoManagementList(){
   });
 }
 
-function renderVideoList(){
-  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
-  const el=document.getElementById('videoThumbnails');
-  el.innerHTML='';
-  videos.forEach((v,i)=>{
-    const div=document.createElement('div');
-    div.className='card';
-    div.style.cssText='margin-bottom:0;cursor:pointer;padding:0;overflow:hidden';
-    div.innerHTML=`
-      <div style="aspect-ratio:1;background:var(--surface3);display:flex;align-items:center;justify-content:center;position:relative">
-        <span style="font-size:24px">▶</span>
-        <div style="position:absolute;top:4px;right:4px"><button class="del-btn" onclick="delVideo(${i}); event.stopPropagation();">×</button></div>
-      </div>
-      <div style="padding:8px;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${v.name}</div>
-    `;
-    div.onclick=()=>playVideoFullscreen(i);
-    el.appendChild(div);
-  });
-}
 
 function playVideoFullscreen(idx){
   const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
@@ -844,6 +825,7 @@ function showVideoFullscreen(data,current,total){
   document.getElementById('videoCounter').textContent=`${current}/${total}`;
   fullscreen.style.display='flex';
   document.body.style.overflow='hidden';
+  swipeEnabled=false;
 }
 
 function nextRandomVideo(){
@@ -855,7 +837,9 @@ function nextRandomVideo(){
 
 function closeVideoFullscreen(){
   document.getElementById('videoFullscreen').style.display='none';
+  document.getElementById('videoPlayer').src='';
   document.body.style.overflow='auto';
+  swipeEnabled=true;
 }
 
 // Vertical swipe inside video fullscreen
@@ -995,10 +979,13 @@ function switchTab(id,btn){document.querySelectorAll('.section').forEach(s=>s.cl
 
 // Swipe gesture for tabs
 let touchStartX=0,touchEndX=0,touchStartY=0,touchEndY=0;
+let swipeEnabled=true;
+
 function handleSwipe(){
+  if(!swipeEnabled)return;
   const dx=touchEndX-touchStartX;
   const dy=touchEndY-touchStartY;
-  if(Math.abs(dx)<Math.abs(dy)||Math.abs(dx)<50)return; // ignore vertical or tiny swipes
+  if(Math.abs(dx)<Math.abs(dy)||Math.abs(dx)<50)return;
   
   const btns=Array.from(document.querySelectorAll('.tab-btn'));
   const idx=btns.findIndex(b=>b.classList.contains('active'));
