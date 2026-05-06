@@ -298,10 +298,10 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
 <div class="section" id="tab-motivation">
   <div class="sec-label">Motivation</div>
   
-  <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:12px">
+  <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:12px">
     
     <!-- Tap to Play - big left -->
-    <div style="grid-column:1;grid-row:1/3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px;cursor:pointer;active:opacity:.8" onclick="switchMotivationView('videos')">
+    <div style="grid-column:1;grid-row:1/3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px;cursor:pointer" onclick="switchMotivationView('videos')">
       <div style="font-size:40px;margin-bottom:12px">▶</div>
       <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--accent);letter-spacing:.1em">TAP TO PLAY</div>
     </div>
@@ -317,15 +317,6 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
       <div id="motivQuotePreview" style="font-size:13px;color:var(--accent);font-style:italic;line-height:1.5"></div>
     </div>
     
-  </div>
-
-  <!-- Videos fullscreen -->
-  <div id="videosView" style="display:none">
-    <div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:var(--black);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-      <button style="position:absolute;top:20px;left:20px;background:none;border:none;color:var(--text);font-size:28px;cursor:pointer;z-index:101;padding:8px" onclick="closeVideoFullscreen()">←</button>
-      <video id="videoPlayer" style="width:100%;height:100%;object-fit:contain" controls autoplay playsinline></video>
-      <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);color:var(--muted);font-size:12px;text-align:center" id="videoCounter"></div>
-    </div>
   </div>
   
   <!-- Quotes view -->
@@ -345,6 +336,13 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
       <div id="videoManagementList"></div>
     </div>
   </div>
+</div>
+
+<!-- Video fullscreen overlay (outside tabs, fixed positioning) -->
+<div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;flex-direction:column;align-items:center;justify-content:center">
+  <button style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:28px;cursor:pointer;z-index:1001;padding:8px 14px;border-radius:8px" onclick="closeVideoFullscreen()">←</button>
+  <video id="videoPlayer" style="width:100%;height:100%;object-fit:contain;background:#000" controls autoplay playsinline></video>
+  <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);color:#aaa;font-size:12px;text-align:center;background:rgba(0,0,0,.5);padding:4px 12px;border-radius:12px;z-index:1001" id="videoCounter"></div>
 </div>
 
 </div>
@@ -743,10 +741,8 @@ function delVideo(i){
 }
 
 function switchMotivationView(view){
-  // home grid
-  const homeGrid=document.querySelector('#tab-motivation > div:nth-child(2)');
-  if(homeGrid)homeGrid.style.display=view==='home'?'grid':'none';
-  document.getElementById('videosView').style.display='none';
+  const home=document.getElementById('motivationHome');
+  if(home)home.style.display=view==='home'?'grid':'none';
   document.getElementById('quotesView').style.display=view==='quotes'?'block':'none';
   document.getElementById('optionView').style.display=view==='option'?'block':'none';
   
@@ -835,9 +831,9 @@ function playVideoFullscreen(idx){
 
 let currentVideoIdx=0;
 let videoSwipeStartY=0;
-function showVideoFullscreen(data,current,total){
+function showVideoFullscreen(url,current,total){
   const fullscreen=document.getElementById('videoFullscreen');
-  document.getElementById('videoPlayer').src=data;
+  document.getElementById('videoPlayer').src=url;
   document.getElementById('videoCounter').textContent=`${current}/${total}`;
   fullscreen.style.display='flex';
   document.body.style.overflow='hidden';
