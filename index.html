@@ -318,7 +318,7 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
   
   <div id="optionView" style="display:none">
     <button class="add-btn" onclick="document.getElementById('videoUpload').click()">+ Add Video</button>
-    <input type="file" id="videoUpload" accept="video/mp4" multiple style="display:none">
+    <input type="file" id="videoUpload" accept="video/mp4" multiple style="display:none" onchange="uploadVideo()">
     <div style="margin-top:16px">
       <div class="sec-label">Current Videos</div>
       <div id="videoManagementList"></div>
@@ -733,6 +733,8 @@ function switchMotivationView(view){
     const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
     if(videos.length>0){
       playVideoFullscreen(0);
+    }else{
+      alert('動画がありません。OptionタブからAddしてください');
     }
   }
   if(view==='option'){
@@ -829,11 +831,13 @@ function renderVideoList(){
 
 function playVideoFullscreen(idx){
   const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
+  if(!videos[idx])return;
   currentVideoIdx=idx;
   showVideoFullscreen(videos[idx].data,idx+1,videos.length);
 }
 
 let currentVideoIdx=0;
+let videoSwipeStartY=0;
 function showVideoFullscreen(data,current,total){
   const fullscreen=document.getElementById('videoFullscreen');
   document.getElementById('videoPlayer').src=data;
@@ -853,6 +857,17 @@ function closeVideoFullscreen(){
   document.getElementById('videoFullscreen').style.display='none';
   document.body.style.overflow='auto';
 }
+
+// Vertical swipe inside video fullscreen
+document.addEventListener('DOMContentLoaded',()=>{
+  const fs=document.getElementById('videoFullscreen');
+  fs.addEventListener('touchstart',e=>{videoSwipeStartY=e.changedTouches[0].screenY;e.stopPropagation();},{passive:true});
+  fs.addEventListener('touchend',e=>{
+    const dy=videoSwipeStartY-e.changedTouches[0].screenY;
+    if(Math.abs(dy)>80)nextRandomVideo();
+    e.stopPropagation();
+  },{passive:true});
+});
 function setRecordPeriod(days){
   recordPeriod=days;
   document.querySelectorAll('.record-filter-btn').forEach(b=>b.classList.remove('active'));
@@ -979,29 +994,24 @@ function calcScore(){document.getElementById('topScore').textContent=calcScoreFo
 function switchTab(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');btn.classList.add('active');if(id==='record')renderRecord();}
 
 // Swipe gesture for tabs
-let touchStartX=0,touchEndX=0;
-const tabOrder=['diary','check','health','study','motivation','record'];
+let touchStartX=0,touchEndX=0,touchStartY=0,touchEndY=0;
 function handleSwipe(){
-  if(touchEndX<touchStartX-50){
-    // Swipe left - next tab
-    const active=document.querySelector('.tab-btn.active');
-    const idx=Array.from(document.querySelectorAll('.tab-btn')).indexOf(active);
-    if(idx<tabOrder.length-1){
-      const nextBtn=document.querySelectorAll('.tab-btn')[idx+1];
-      nextBtn.click();
-    }
-  }else if(touchEndX>touchStartX+50){
-    // Swipe right - prev tab
-    const active=document.querySelector('.tab-btn.active');
-    const idx=Array.from(document.querySelectorAll('.tab-btn')).indexOf(active);
-    if(idx>0){
-      const prevBtn=document.querySelectorAll('.tab-btn')[idx-1];
-      prevBtn.click();
-    }
+  const dx=touchEndX-touchStartX;
+  const dy=touchEndY-touchStartY;
+  if(Math.abs(dx)<Math.abs(dy)||Math.abs(dx)<50)return; // ignore vertical or tiny swipes
+  
+  const btns=Array.from(document.querySelectorAll('.tab-btn'));
+  const idx=btns.findIndex(b=>b.classList.contains('active'));
+  if(dx<0&&idx<btns.length-1){
+    btns[idx+1].click();
+    btns[idx+1].scrollIntoView({inline:'center',behavior:'smooth'});
+  }else if(dx>0&&idx>0){
+    btns[idx-1].click();
+    btns[idx-1].scrollIntoView({inline:'center',behavior:'smooth'});
   }
 }
-document.addEventListener('touchstart',e=>{touchStartX=e.changedTouches[0].screenX},false);
-document.addEventListener('touchend',e=>{touchEndX=e.changedTouches[0].screenX;handleSwipe()},false);
+document.addEventListener('touchstart',e=>{touchStartX=e.changedTouches[0].screenX;touchStartY=e.changedTouches[0].screenY;},{passive:true});
+document.addEventListener('touchend',e=>{touchEndX=e.changedTouches[0].screenX;touchEndY=e.changedTouches[0].screenY;handleSwipe();},{passive:true});
 
 let modalMode='',modalSi=-1;
 function openModal(mode,si){modalMode=mode;modalSi=si??-1;const titles={subject:'Add Subject',book:'Add Textbook',check:'Add Checklist Item',cardio:'Add Cardio Exercise',strength:'Add Strength Exercise',goal:'Set Study Goal',quote:'Add Quote'};document.getElementById('modalTitle').textContent=titles[mode]||'Add';let body='';if(mode==='goal'){const gh=Math.floor(goalMins/60),gm=goalMins%60;body=`<div style="font-size:12px;color:var(--muted);margin-bottom:12px">現在の目標: ${minsToStr(goalMins)}</div><div style="display:flex;gap:8px;margin-bottom:8px"><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">時間 (h)</div><input class="modal-input" type="number" id="goalH" min="0" max="24" value="${gh}" style="margin-bottom:0"></div><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">分 (min)</div><input class="modal-input" type="number" id="goalM" min="0" max="59" value="${gm}" style="margin-bottom:0"></div></div>`;}else if(mode==='quote'){body=`<textarea class="diary-area" id="modalInput" placeholder="名言を入力..." style="min-height:100px"></textarea>`;}else if(mode==='cardio'||mode==='strength'){const uOpts=mode==='cardio'?['km','分','回','kcal']:['回','kg','set'];body=`<input class="modal-input" id="modalInput" placeholder="${mode==='cardio'?'例: ランニング':'例: ベンチプレス'}"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">単位</div><select class="modal-input" id="modalUnit" style="cursor:pointer;color:var(--text)">${uOpts.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>`;}else{const ph={subject:'例: 物理',book:'例: 化学の新演習',check:'例: 読書 30分'};body=`<input class="modal-input" id="modalInput" placeholder="${ph[mode]||''}">`;}document.getElementById('modalBody').innerHTML=body;document.getElementById('modalOk').textContent=mode==='goal'?'Set':'Add';document.getElementById('modal').classList.add('open');setTimeout(()=>document.getElementById('modalInput')?.focus(),300);}
