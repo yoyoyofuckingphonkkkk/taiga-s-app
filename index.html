@@ -717,9 +717,7 @@ function saveQuotes(){localStorage.setItem('ym4_quotes',JSON.stringify(quotes));
 
 function delVideo(i){
   if(!confirm('削除しますか？'))return;
-  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
   videos.splice(i,1);
-  localStorage.setItem('ym4_videos',JSON.stringify(videos));
   renderVideoManagementList();
 }
 
@@ -767,34 +765,24 @@ function delQuote(i){
   renderQuotesList();
 }
 
+
 function uploadVideo(){
   const files=document.getElementById('videoUpload').files;
   if(files.length===0)return;
   
-  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
-  let processed=0;
   Array.from(files).forEach(file=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const id='v'+Date.now()+processed;
-      videos.push({id,name:file.name,data:e.target.result});
-      processed++;
-      if(processed===files.length){
-        localStorage.setItem('ym4_videos',JSON.stringify(videos));
-        document.getElementById('videoUpload').value='';
-        renderVideoManagementList();
-      }
-    };
-    reader.readAsDataURL(file);
+    const url=URL.createObjectURL(file);
+    videos.push({id:'v'+Date.now()+Math.random(),name:file.name,url});
   });
+  
+  renderVideoManagementList();
 }
 
 function renderVideoManagementList(){
-  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
   const el=document.getElementById('videoManagementList');
   el.innerHTML='';
   if(videos.length===0){
-    el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">動画なし</div>';
+    el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">動画なし<br><span style="font-size:11px">+ Add Videoから追加してください</span></div>';
     return;
   }
   videos.forEach((v,i)=>{
@@ -802,7 +790,7 @@ function renderVideoManagementList(){
     div.className='card';
     div.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px';
     div.innerHTML=`
-      <span style="font-size:13px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</span>
+      <span style="font-size:13px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">▶ ${v.name}</span>
       <button class="del-btn" onclick="delVideo(${i})">×</button>
     `;
     el.appendChild(div);
@@ -811,10 +799,9 @@ function renderVideoManagementList(){
 
 
 function playVideoFullscreen(idx){
-  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
   if(!videos[idx])return;
   currentVideoIdx=idx;
-  showVideoFullscreen(videos[idx].data,idx+1,videos.length);
+  showVideoFullscreen(videos[idx].url,idx+1,videos.length);
 }
 
 let currentVideoIdx=0;
@@ -829,10 +816,9 @@ function showVideoFullscreen(data,current,total){
 }
 
 function nextRandomVideo(){
-  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
   if(videos.length===0)return;
   const randomIdx=Math.floor(Math.random()*videos.length);
-  showVideoFullscreen(videos[randomIdx].data,randomIdx+1,videos.length);
+  showVideoFullscreen(videos[randomIdx].url,randomIdx+1,videos.length);
 }
 
 function closeVideoFullscreen(){
