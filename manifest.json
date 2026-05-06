@@ -1,6 +1,6 @@
 {
-  "name": "YUIMEI LIFE",
-  "short_name": "YUIMEI",
+  "name": "Taiga's App",
+  "short_name": "App",
   "description": "有意義生活ダッシュボード — 勉強・健康・日記管理アプリ",
   "start_url": "/",
   "display": "standalone",
