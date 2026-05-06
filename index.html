@@ -182,33 +182,13 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
       <div class="app-title">YUIMEI LIFE</div>
       <div class="app-date" id="hdate"></div>
     </div>
-    <div class="top-score-box">
+    <div class="top-score-box" onclick="showScoreBreakdown()">
       <div class="top-score-n" id="topScore">—</div>
       <div class="top-score-l">LIFE SCORE</div>
     </div>
   </div>
   
-  <div class="widgets-grid" id="widgetsGrid">
-    <!-- Main widget: Study Time -->
-    <div class="widget main-widget">
-      <div class="ring-wrap">
-        <svg class="ring-svg" viewBox="0 0 190 190">
-          <circle class="ring-bg" cx="95" cy="95" r="78"/>
-          <circle class="ring-fill" id="ringFill" cx="95" cy="95" r="78" stroke-dasharray="490" stroke-dashoffset="490"/>
-        </svg>
-        <div class="ring-center">
-          <div class="ring-current" id="ringCurrent">0h 00m</div>
-          <div class="ring-sep">/ GOAL</div>
-          <div class="ring-goal-txt" id="ringGoal">6h 00m</div>
-          <div class="ring-pct" id="ringPct">0%</div>
-        </div>
-      </div>
-      <div class="ring-label">TODAY'S STUDY TIME</div>
-      <div class="goal-row">
-        <button class="goal-btn" onclick="openModal('goal')">⚙ Change Goal</button>
-      </div>
-    </div>
-  </div>
+  <div class="widgets-grid" id="widgetsGrid"></div>
   
   <div style="text-align:center;margin-top:12px">
     <button class="goal-btn" onclick="addWidget()" style="margin-right:6px">+ Add Widget</button>
@@ -542,12 +522,12 @@ function updateRing(){
   const pct=Math.min(1,tot/goalMins);
   const circ=2*Math.PI*78;
   const f=document.getElementById('ringFill');
+  if(!f)return;
   f.style.strokeDasharray=circ;
   f.style.strokeDashoffset=circ*(1-pct);
   document.getElementById('ringCurrent').textContent=minsToStr(tot);
   document.getElementById('ringGoal').textContent=minsToStr(goalMins);
   document.getElementById('ringPct').textContent=Math.round(pct*100)+'%';
-  renderWidgets();
 }
 
 function renderStudy(){
@@ -559,9 +539,10 @@ function renderStudy(){
     div.innerHTML=`<div class="subj-header" onclick="toggleSubj(${si})"><div class="subj-name">${s.name}</div><div style="display:flex;align-items:center;gap:6px"><span id="stot_${si}" style="font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--accent)">${tot}min</span><span id="sarr_${si}" class="subj-arrow">▶</span></div></div><div class="subj-books" id="books_${si}">${bHtml}<button class="add-btn" onclick="openModal('book',${si})">+ Add Textbook</button><button class="add-btn" style="border-color:var(--red);color:var(--red);margin-top:4px" onclick="delSubject(${si})">Delete Subject</button></div>`;
     el.appendChild(div);
   });
+  updateRing();
 }
 function toggleSubj(si){const b=document.getElementById('books_'+si);const a=document.getElementById('sarr_'+si);const o=b.classList.toggle('open');a.classList.toggle('open',o);}
-function setBook(si,bi,val){const s=subjects[si];const b=s.books[bi];const m=Math.max(0,Math.round(val)||0);if(!state.study[s.id])state.study[s.id]={};state.study[s.id][b.id]=m;const inp=document.getElementById('bm_'+si+'_'+bi);if(inp&&+inp.value!==m)inp.value=m;const tot=s.books.reduce((a,b2)=>a+(state.study[s.id]?.[b2.id]||0),0);const te=document.getElementById('stot_'+si);if(te)te.textContent=tot+'min';saveState();updateRing();calcScore();}
+function setBook(si,bi,val){const s=subjects[si];const b=s.books[bi];const m=Math.max(0,Math.round(val)||0);if(!state.study[s.id])state.study[s.id]={};state.study[s.id][b.id]=m;const inp=document.getElementById('bm_'+si+'_'+bi);if(inp&&+inp.value!==m)inp.value=m;const tot=s.books.reduce((a,b2)=>a+(state.study[s.id]?.[b2.id]||0),0);const te=document.getElementById('stot_'+si);if(te)te.textContent=tot+'min';saveState();renderWidgets();updateRing();calcScore();}
 function changeBook(si,bi,d){const cur=state.study[subjects[si].id]?.[subjects[si].books[bi].id]||0;setBook(si,bi,cur+d);}
 function delBook(si,bi){if(!confirm('削除しますか？'))return;subjects[si].books.splice(bi,1);saveSubjects();renderStudy();}
 function delSubject(si){if(!confirm('科目ごと削除しますか？'))return;subjects.splice(si,1);saveSubjects();renderStudy();updateRing();}
@@ -728,7 +709,60 @@ function loadFeed(){const c=document.getElementById('feedCards');if(!c)return;c.
 
 let recordPeriod=7;
 
-// ===== MOTIVATION =====
+// ===== INDEXEDDB FOR VIDEOS =====
+let db=null;
+const DB_NAME='yuimei_videos';
+const STORE_NAME='videos';
+
+function initDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NAME,1);
+    req.onerror=()=>reject(req.error);
+    req.onsuccess=()=>{db=req.result;resolve();};
+    req.onupgradeneeded=(e)=>{
+      const store=e.target.result.createObjectStore(STORE_NAME,{keyPath:'id'});
+    };
+  });
+}
+
+async function saveVideoToIndexedDB(id,name,blob){
+  if(!db)await initDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE_NAME,'readwrite');
+    const store=tx.objectStore(STORE_NAME);
+    store.put({id,name,blob:blob,timestamp:Date.now()});
+    tx.oncomplete=resolve;
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+
+async function loadVideosFromIndexedDB(){
+  if(!db)await initDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE_NAME,'readonly');
+    const store=tx.objectStore(STORE_NAME);
+    const req=store.getAll();
+    req.onsuccess=()=>{
+      const vids=req.result.map(v=>({
+        id:v.id,name:v.name,
+        url:URL.createObjectURL(v.blob)
+      }));
+      resolve(vids);
+    };
+    req.onerror=()=>reject(req.error);
+  });
+}
+
+async function deleteVideoFromIndexedDB(id){
+  if(!db)await initDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE_NAME,'readwrite');
+    const store=tx.objectStore(STORE_NAME);
+    store.delete(id);
+    tx.oncomplete=resolve;
+    tx.onerror=()=>reject(tx.error);
+  });
+}
 let quotes=JSON.parse(localStorage.getItem('ym4_quotes')||'null')||[{id:'q1',text:'毎日の小さな努力が大きな成果につながる'},{id:'q2',text:'今この瞬間を大切にしよう'},{id:'q3',text:'失敗は成功への道'}];
 let videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
 
@@ -736,6 +770,8 @@ function saveQuotes(){localStorage.setItem('ym4_quotes',JSON.stringify(quotes));
 
 function delVideo(i){
   if(!confirm('削除しますか？'))return;
+  const v=videos[i];
+  if(v)deleteVideoFromIndexedDB(v.id).catch(e=>console.error('IndexedDB delete failed',e));
   videos.splice(i,1);
   renderVideoManagementList();
 }
@@ -796,8 +832,10 @@ function uploadVideo(){
   if(files.length===0)return;
   
   Array.from(files).forEach(file=>{
+    const id='v'+Date.now()+Math.random();
     const url=URL.createObjectURL(file);
-    videos.push({id:'v'+Date.now()+Math.random(),name:file.name,url});
+    videos.push({id,name:file.name,url});
+    saveVideoToIndexedDB(id,file.name,file).catch(e=>console.error('IndexedDB save failed',e));
   });
   
   renderVideoManagementList();
@@ -907,7 +945,7 @@ function renderRecord(){
     const div=document.createElement('div');
     div.className='record-day';
     div.innerHTML=`<div class="record-header" onclick="this.nextElementSibling.classList.toggle('open')">
-      <div><div class="record-date-txt">${k}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${minsToStr(sm)}</div></div>
+      <div><div class="record-date-txt" style="cursor:pointer" onclick="showRecordDetail('${k}'); event.stopPropagation()">${k}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${minsToStr(sm)}</div></div>
       <div class="record-score">${sc}</div>
     </div>
     <div class="record-body">
@@ -967,8 +1005,8 @@ function drawScoreGraph(scores){
 function calcScoreFor(r){
   const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
   
-  // 70% Study
-  const studyScore=Math.min(70,sm/6*7);
+  // 70% Study - based on goal percentage
+  const studyScore=Math.min(70,(sm/goalMins)*70);
   
   // 10% Exercise
   const exScore=Math.min(10,(r.health?.exercise||0)/30);
@@ -985,6 +1023,144 @@ function calcScoreFor(r){
   return Math.min(100,Math.round(studyScore+exScore+mealScore+otherScore));
 }
 function calcScore(){document.getElementById('topScore').textContent=calcScoreFor(state);}
+
+function showRecordDetail(date){
+  const r=allData[date];
+  if(!r)return;
+  
+  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
+  const ch=Object.values(r.checks||{}).filter(Boolean).length;
+  const sc=calcScoreFor(r);
+  
+  // Study details
+  let studyDetail='';
+  subjects.forEach(s=>{
+    const total=s.books.reduce((a,b)=>a+(r.study?.[s.id]?.[b.id]||0),0);
+    if(total>0){
+      studyDetail+=`<div style="margin-bottom:8px"><div style="font-size:12px;color:var(--text);font-weight:bold">${s.name}</div>`;
+      s.books.forEach(b=>{
+        const min=r.study?.[s.id]?.[b.id]||0;
+        if(min>0)studyDetail+=`<div style="font-size:11px;color:var(--text2);margin-left:8px">• ${b.name}: ${minsToStr(min)}</div>`;
+      });
+      studyDetail+='</div>';
+    }
+  });
+  
+  // Checks details
+  let checksDetail='';
+  checkItems.forEach((item,i)=>{
+    const done=r.checks?.[item.id];
+    checksDetail+=`<div style="font-size:11px;color:var(--text2);margin-bottom:4px">${done?'✓':'○'} ${item.label}</div>`;
+  });
+  
+  const modal=document.createElement('div');
+  modal.className='modal-bg';
+  modal.id='recordDetailModal';
+  modal.innerHTML=`
+    <div class="modal" style="max-width:350px;max-height:80vh;overflow-y:auto">
+      <button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;position:absolute;top:16px;left:16px;padding:0" onclick="document.getElementById('recordDetailModal').remove()">←</button>
+      <div class="modal-title" style="text-align:center">${date}</div>
+      
+      <div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">LIFE SCORE</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--accent)">${sc}</div>
+      </div>
+      
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">STUDY TIME</div>
+        <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px">
+          <div style="color:var(--text);margin-bottom:8px">総勉強時間: <strong>${minsToStr(sm)}</strong></div>
+          ${studyDetail||'<div style="color:var(--muted)">記録なし</div>'}
+        </div>
+      </div>
+      
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">EXERCISE</div>
+        <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px">
+          ${r.health?.exercise?`<div style="color:var(--text)">${r.health.exercise}分</div>`:'<div style="color:var(--muted)">記録なし</div>'}
+        </div>
+      </div>
+      
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">MEAL</div>
+        <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px">
+          ${r.health?.meal?`<div style="color:var(--text)">${r.health.meal}/5</div>`:'<div style="color:var(--muted)">記録なし</div>'}
+        </div>
+      </div>
+      
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">CHECKS (${ch}/${checkItems.length})</div>
+        <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px">
+          ${checksDetail||'<div style="color:var(--muted)">記録なし</div>'}
+        </div>
+      </div>
+      
+      ${r.diary?`<div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">DIARY</div>
+        <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px;color:var(--text2);line-height:1.6">${r.diary}</div>
+      </div>`:''}
+      
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.classList.add('open');
+}
+
+function showScoreBreakdown(){
+  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study?.[s.id]?.[b.id]||0),0),0);
+  const n=Math.max(1,checkItems.length);
+  const checkScore=(Object.values(state.checks||{}).filter(Boolean).length/n)*5;
+  const studyScore=Math.min(70,sm/6*7);
+  const exScore=Math.min(10,(state.health?.exercise||0)/30);
+  const mealScore=(state.health?.meal||0)*2;
+  const diaryScore=((state.diary?.length||0)>10?5:0);
+  const otherScore=checkScore+diaryScore;
+  const total=Math.round(studyScore+exScore+mealScore+otherScore);
+  
+  const modal=document.createElement('div');
+  modal.className='modal-bg';
+  modal.id='scoreModal';
+  modal.innerHTML=`
+    <div class="modal" style="max-width:300px">
+      <div class="modal-title">Score Breakdown</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div class="card" style="margin-bottom:0;text-align:center">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Study</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(studyScore)}</div>
+          <div style="font-size:9px;color:var(--muted)">70%</div>
+        </div>
+        <div class="card" style="margin-bottom:0;text-align:center">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Exercise</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(exScore)}</div>
+          <div style="font-size:9px;color:var(--muted)">10%</div>
+        </div>
+        <div class="card" style="margin-bottom:0;text-align:center">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Meal</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(mealScore)}</div>
+          <div style="font-size:9px;color:var(--muted)">10%</div>
+        </div>
+        <div class="card" style="margin-bottom:0;text-align:center">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Other</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(otherScore)}</div>
+          <div style="font-size:9px;color:var(--muted)">10%</div>
+        </div>
+      </div>
+      <div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">TOTAL</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent)">${total}</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.6">
+        <div>勉強: ${Math.round(sm/6)}/360分</div>
+        <div>運動: ${state.health?.exercise||0}/30分</div>
+        <div>食事: ${state.health?.meal||0}/5</div>
+        <div>チェック: ${Object.values(state.checks||{}).filter(Boolean).length}/${n}</div>
+      </div>
+      <button class="modal-cancel" onclick="document.getElementById('scoreModal').remove()" style="margin-top:12px;width:100%">閉じる</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.classList.add('open');
+}
 
 function switchTab(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');btn.classList.add('active');if(id==='record')renderRecord();}
 
@@ -1017,7 +1193,15 @@ function closeModal(){document.getElementById('modal').classList.remove('open');
 function modalConfirm(){if(modalMode==='goal'){const h=parseInt(document.getElementById('goalH').value)||0;const m=parseInt(document.getElementById('goalM').value)||0;const tot=h*60+m;if(tot>0){goalMins=tot;localStorage.setItem('ym4_goal',tot);updateRing();}closeModal();return;}if(modalMode==='quote'){const text=document.getElementById('modalInput')?.value.trim();if(!text){closeModal();return;}quotes.push({id:'q'+Date.now(),text});saveQuotes();renderQuotesList();closeModal();return;}const val=document.getElementById('modalInput')?.value.trim();if(!val){closeModal();return;}if(modalMode==='subject'){subjects.push({id:'s'+Date.now(),name:val,books:[]});saveSubjects();renderStudy();}else if(modalMode==='book'){subjects[modalSi].books.push({id:'b'+Date.now(),name:val});saveSubjects();renderStudy();}else if(modalMode==='check'){checkItems.push({id:'c'+Date.now(),label:val});saveChecks();renderChecks();calcScore();}else if(modalMode==='cardio'){const u=document.getElementById('modalUnit')?.value||'km';cardioList.push({id:'ca'+Date.now(),name:val,unit:u});saveCardio();renderCardio();}else if(modalMode==='strength'){const u=document.getElementById('modalUnit')?.value||'回';const id='st'+Date.now();strengthList.push({id,name:val,unit:u});state.strength[id]=[0,0,0];saveStrength();saveState();renderStrength();}closeModal();}
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 
-renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();
+// Initialize DB and load saved videos
+(async()=>{
+  try{
+    await initDB();
+    const savedVideos=await loadVideosFromIndexedDB();
+    videos=savedVideos;
+  }catch(e){console.error('Failed to load videos from IndexedDB:',e);}
+  renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();
+})();
 </script>
 </body>
 </html>
