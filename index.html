@@ -202,6 +202,14 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
   <button class="timer-mini-resume" onclick="showTimer()">Resume</button>
 </div>
 
+<div id="editBanner" style="display:none;background:var(--accent2);padding:10px 16px;display:none;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:14px;color:#fff;letter-spacing:.08em" id="editBannerDate">EDITING: —</div>
+  <div style="display:flex;gap:8px">
+    <button onclick="cancelEdit()" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer">← キャンセル</button>
+    <button onclick="saveEdit()" style="background:#fff;border:none;color:var(--accent2);font-size:12px;font-weight:bold;padding:5px 10px;border-radius:8px;cursor:pointer">保存</button>
+  </div>
+</div>
+
 <div class="tab-bar">
   <button class="tab-btn" onclick="switchTab('diary',this)">DIARY</button>
   <button class="tab-btn" onclick="switchTab('check',this)">CHECK</button>
@@ -364,6 +372,9 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
 const TODAY_KEY=new Date().toISOString().slice(0,10);
 let state=JSON.parse(localStorage.getItem('ym4_'+TODAY_KEY)||'null')||{study:{},checks:{},health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},diary:'',diaryDate:TODAY_KEY,healthMemo:''};
 let allData=JSON.parse(localStorage.getItem('ym4_all')||'{}');
+let editMode=false;
+let editDate=null;
+let editStateBackup=null;
 let subjects=JSON.parse(localStorage.getItem('ym4_subjects')||'null')||[{id:'s1',name:'英語',books:[{id:'b1',name:'ターゲット1900'},{id:'b2',name:'ネクステージ'}]},{id:'s2',name:'数学',books:[{id:'b1',name:'青チャート'}]},{id:'s3',name:'国語',books:[{id:'b1',name:'現代文読解'}]}];
 let checkItems=JSON.parse(localStorage.getItem('ym4_checks')||'null')||[{id:'c1',label:'Breakfast — 朝食'},{id:'c2',label:'Teeth / Skincare — 身だしなみ'},{id:'c3',label:'Study — 勉強した'},{id:'c4',label:'Exercise — 運動した'},{id:'c5',label:'No Doomscrolling — SNS制限'},{id:'c6',label:'Sleep 7h+ — 7時間以上睡眠'},{id:'c7',label:'Evening Review — 夜の振り返り'}];
 let cardioList=JSON.parse(localStorage.getItem('ym4_cardio')||'null')||[{id:'ca1',name:'ランニング',unit:'km'},{id:'ca2',name:'ウォーキング',unit:'分'}];
@@ -869,6 +880,15 @@ function playVideoFullscreen(idx){
 
 let currentVideoIdx=0;
 let videoSwipeStartY=0;
+let shownVideoIndices=[];
+
+function playVideoFullscreen(idx){
+  if(!videos[idx])return;
+  currentVideoIdx=idx;
+  shownVideoIndices=[idx];
+  showVideoFullscreen(videos[idx].url,idx+1,videos.length);
+}
+
 function showVideoFullscreen(url,current,total){
   const fullscreen=document.getElementById('videoFullscreen');
   document.getElementById('videoPlayer').src=url;
@@ -880,7 +900,26 @@ function showVideoFullscreen(url,current,total){
 
 function nextRandomVideo(){
   if(videos.length===0)return;
-  const randomIdx=Math.floor(Math.random()*videos.length);
+  
+  // Get available indices (not yet shown)
+  const available=[];
+  for(let i=0;i<videos.length;i++){
+    if(!shownVideoIndices.includes(i)){
+      available.push(i);
+    }
+  }
+  
+  // If all shown, reset
+  if(available.length===0){
+    shownVideoIndices=[];
+    for(let i=0;i<videos.length;i++){
+      available.push(i);
+    }
+  }
+  
+  // Pick random from available
+  const randomIdx=available[Math.floor(Math.random()*available.length)];
+  shownVideoIndices.push(randomIdx);
   showVideoFullscreen(videos[randomIdx].url,randomIdx+1,videos.length);
 }
 
@@ -889,6 +928,11 @@ function closeVideoFullscreen(){
   document.getElementById('videoPlayer').src='';
   document.body.style.overflow='auto';
   swipeEnabled=true;
+  // Restore motivation home view
+  const home=document.getElementById('motivationHome');
+  if(home)home.style.display='grid';
+  document.getElementById('quotesView').style.display='none';
+  document.getElementById('optionView').style.display='none';
 }
 
 // Vertical swipe inside video fullscreen
@@ -1100,10 +1144,76 @@ function showRecordDetail(date){
         <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px;color:var(--text2);line-height:1.6">${r.diary}</div>
       </div>`:''}
       
+      <button onclick="startEditMode('${date}')" style="width:100%;padding:12px;background:var(--accent);border:none;border-radius:12px;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.1em;color:var(--black);cursor:pointer;margin-top:4px">✏ この日を編集</button>
+      
     </div>
   `;
   document.body.appendChild(modal);
   modal.classList.add('open');
+}
+
+function startEditMode(date){
+  // Close detail modal
+  document.getElementById('recordDetailModal')?.remove();
+  
+  // Backup today's state
+  editStateBackup=JSON.parse(JSON.stringify(state));
+  editDate=date;
+  editMode=true;
+  
+  // Load past date's state into current state
+  state=JSON.parse(JSON.stringify(allData[date]||{study:{},checks:{},health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},diary:'',diaryDate:date,healthMemo:''}));
+  
+  // Show banner
+  const banner=document.getElementById('editBanner');
+  banner.style.display='flex';
+  document.getElementById('editBannerDate').textContent=`EDITING: ${date}`;
+  
+  // Render all with past data
+  renderStudy();
+  renderChecks();
+  renderExercise();
+  updateRing();
+  calcScore();
+  
+  // Switch to study tab
+  const studyBtn=Array.from(document.querySelectorAll('.tab-btn')).find(b=>b.textContent==='STUDY');
+  if(studyBtn)studyBtn.click();
+}
+
+function saveEdit(){
+  if(!editMode||!editDate)return;
+  
+  // Save edited state to allData
+  allData[editDate]=JSON.parse(JSON.stringify(state));
+  localStorage.setItem('ym4_all',JSON.stringify(allData));
+  localStorage.setItem('ym4_'+editDate,JSON.stringify(state));
+  
+  cancelEdit();
+}
+
+function cancelEdit(){
+  if(!editMode)return;
+  
+  // Restore today's state
+  state=editStateBackup;
+  editMode=false;
+  editDate=null;
+  editStateBackup=null;
+  
+  // Hide banner
+  document.getElementById('editBanner').style.display='none';
+  
+  // Re-render with today's data
+  renderStudy();
+  renderChecks();
+  renderExercise();
+  updateRing();
+  calcScore();
+  
+  // Go back to record tab
+  const recordBtn=Array.from(document.querySelectorAll('.tab-btn')).find(b=>b.textContent==='RECORD');
+  if(recordBtn)recordBtn.click();
 }
 
 function showScoreBreakdown(){
