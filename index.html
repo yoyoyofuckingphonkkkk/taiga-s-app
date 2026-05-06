@@ -296,27 +296,48 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
 </div>
 
 <div class="section" id="tab-motivation">
-  <div class="sec-label">Quotes & Videos</div>
-  <div style="display:flex;gap:6px;margin-bottom:12px">
-    <button class="record-filter-btn active" onclick="switchMotivationView('quotes')">Quotes</button>
-    <button class="record-filter-btn" onclick="switchMotivationView('videos')">Videos</button>
-    <button class="record-filter-btn" onclick="switchMotivationView('option')">Option</button>
-  </div>
+  <div class="sec-label">Motivation</div>
   
-  <div id="quotesView">
-    <div id="quotesList"></div>
-    <button class="add-btn" onclick="openModal('quote')">+ Add Quote</button>
+  <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:12px">
+    
+    <!-- Tap to Play - big left -->
+    <div style="grid-column:1;grid-row:1/3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px;cursor:pointer;active:opacity:.8" onclick="switchMotivationView('videos')">
+      <div style="font-size:40px;margin-bottom:12px">▶</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--accent);letter-spacing:.1em">TAP TO PLAY</div>
+    </div>
+    
+    <!-- Option - top right -->
+    <div style="grid-column:2;grid-row:1;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:80px" onclick="switchMotivationView('option')">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.1em;color:var(--text)">OPTION</div>
+    </div>
+    
+    <!-- Quotes - bottom right -->
+    <div style="grid-column:2;grid-row:2;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;cursor:pointer;min-height:120px;overflow:hidden" onclick="switchMotivationView('quotes')">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:8px">QUOTES</div>
+      <div id="motivQuotePreview" style="font-size:13px;color:var(--accent);font-style:italic;line-height:1.5"></div>
+    </div>
+    
   </div>
-  
+
+  <!-- Videos fullscreen -->
   <div id="videosView" style="display:none">
-    <div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:var(--black);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px">
-      <button style="position:absolute;top:20px;left:20px;background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;z-index:101" onclick="closeVideoFullscreen()">←</button>
-      <video id="videoPlayer" style="width:100%;height:100%;max-width:430px;object-fit:contain" controls autoplay></video>
+    <div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:var(--black);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <button style="position:absolute;top:20px;left:20px;background:none;border:none;color:var(--text);font-size:28px;cursor:pointer;z-index:101;padding:8px" onclick="closeVideoFullscreen()">←</button>
+      <video id="videoPlayer" style="width:100%;height:100%;object-fit:contain" controls autoplay playsinline></video>
       <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);color:var(--muted);font-size:12px;text-align:center" id="videoCounter"></div>
     </div>
   </div>
   
-  <div id="optionView" style="display:none">
+  <!-- Quotes view -->
+  <div id="quotesView" style="display:none;margin-top:16px">
+    <button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;margin-bottom:8px" onclick="switchMotivationView('home')">←</button>
+    <div id="quotesList"></div>
+    <button class="add-btn" onclick="openModal('quote')">+ Add Quote</button>
+  </div>
+  
+  <!-- Option view -->
+  <div id="optionView" style="display:none;margin-top:16px">
+    <button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;margin-bottom:8px" onclick="switchMotivationView('home')">←</button>
     <button class="add-btn" onclick="document.getElementById('videoUpload').click()">+ Add Video</button>
     <input type="file" id="videoUpload" accept="video/mp4" multiple style="display:none" onchange="uploadVideo();this.value=''">
     <div style="margin-top:16px">
@@ -722,22 +743,30 @@ function delVideo(i){
 }
 
 function switchMotivationView(view){
+  // home grid
+  const homeGrid=document.querySelector('#tab-motivation > div:nth-child(2)');
+  if(homeGrid)homeGrid.style.display=view==='home'?'grid':'none';
+  document.getElementById('videosView').style.display='none';
   document.getElementById('quotesView').style.display=view==='quotes'?'block':'none';
-  document.getElementById('videosView').style.display=view==='videos'?'block':'none';
   document.getElementById('optionView').style.display=view==='option'?'block':'none';
-  document.querySelectorAll('#tab-motivation .record-filter-btn').forEach(b=>b.classList.remove('active'));
-  event.target.classList.add('active');
+  
   if(view==='videos'){
-    const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
     if(videos.length>0){
       playVideoFullscreen(0);
     }else{
-      alert('動画がありません。OptionタブからAddしてください');
+      alert('動画がありません。Optionから追加してください');
     }
   }
-  if(view==='option'){
-    renderVideoManagementList();
-  }
+  if(view==='option') renderVideoManagementList();
+  if(view==='home') renderMotivQuotePreview();
+}
+
+function renderMotivQuotePreview(){
+  const el=document.getElementById('motivQuotePreview');
+  if(!el)return;
+  if(quotes.length===0){el.textContent='名言なし';return;}
+  const q=quotes[Math.floor(Math.random()*quotes.length)];
+  el.textContent='"'+q.text+'"';
 }
 
 function renderQuotesList(){
@@ -992,7 +1021,7 @@ function closeModal(){document.getElementById('modal').classList.remove('open');
 function modalConfirm(){if(modalMode==='goal'){const h=parseInt(document.getElementById('goalH').value)||0;const m=parseInt(document.getElementById('goalM').value)||0;const tot=h*60+m;if(tot>0){goalMins=tot;localStorage.setItem('ym4_goal',tot);updateRing();}closeModal();return;}if(modalMode==='quote'){const text=document.getElementById('modalInput')?.value.trim();if(!text){closeModal();return;}quotes.push({id:'q'+Date.now(),text});saveQuotes();renderQuotesList();closeModal();return;}const val=document.getElementById('modalInput')?.value.trim();if(!val){closeModal();return;}if(modalMode==='subject'){subjects.push({id:'s'+Date.now(),name:val,books:[]});saveSubjects();renderStudy();}else if(modalMode==='book'){subjects[modalSi].books.push({id:'b'+Date.now(),name:val});saveSubjects();renderStudy();}else if(modalMode==='check'){checkItems.push({id:'c'+Date.now(),label:val});saveChecks();renderChecks();calcScore();}else if(modalMode==='cardio'){const u=document.getElementById('modalUnit')?.value||'km';cardioList.push({id:'ca'+Date.now(),name:val,unit:u});saveCardio();renderCardio();}else if(modalMode==='strength'){const u=document.getElementById('modalUnit')?.value||'回';const id='st'+Date.now();strengthList.push({id,name:val,unit:u});state.strength[id]=[0,0,0];saveStrength();saveState();renderStrength();}closeModal();}
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 
-renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();
+renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();
 </script>
 </body>
 </html>
