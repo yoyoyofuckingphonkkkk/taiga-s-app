@@ -298,11 +298,16 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
 <div class="section" id="tab-motivation">
   <div class="sec-label">Quotes & Videos</div>
   <div style="display:flex;gap:6px;margin-bottom:12px">
-    <button class="record-filter-btn active" onclick="switchMotivationView('videos')">Videos</button>
-    <button class="record-filter-btn" onclick="switchMotivationView('quotes')">Quotes</button>
+    <button class="record-filter-btn active" onclick="switchMotivationView('quotes')">Quotes</button>
+    <button class="record-filter-btn" onclick="switchMotivationView('videos')">Videos</button>
   </div>
   
-  <div id="videosView">
+  <div id="quotesView">
+    <div id="quotesList"></div>
+    <button class="add-btn" onclick="openModal('quote')">+ Add Quote</button>
+  </div>
+  
+  <div id="videosView" style="display:none">
     <div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:var(--black);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px">
       <button style="position:absolute;top:20px;left:20px;background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;z-index:101" onclick="closeVideoFullscreen()">←</button>
       <video id="videoPlayer" style="width:100%;height:100%;max-width:430px;object-fit:contain" controls autoplay></video>
@@ -316,11 +321,6 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
       </div>
       <div id="videoThumbnails" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px"></div>
     </div>
-  </div>
-  
-  <div id="quotesView" style="display:none">
-    <div id="quotesList"></div>
-    <button class="add-btn" onclick="openModal('quote')">+ Add Quote</button>
   </div>
 </div>
 
@@ -709,7 +709,7 @@ let recordPeriod=7;
 
 // ===== MOTIVATION =====
 let quotes=JSON.parse(localStorage.getItem('ym4_quotes')||'null')||[{id:'q1',text:'毎日の小さな努力が大きな成果につながる'},{id:'q2',text:'今この瞬間を大切にしよう'},{id:'q3',text:'失敗は成功への道'}];
-let videos=[];
+let videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
 
 function saveQuotes(){localStorage.setItem('ym4_quotes',JSON.stringify(quotes));}
 
@@ -955,7 +955,7 @@ function switchTab(id,btn){document.querySelectorAll('.section').forEach(s=>s.cl
 
 // Swipe gesture for tabs
 let touchStartX=0,touchEndX=0;
-const tabOrder=['study','check','health','diary','feed','record'];
+const tabOrder=['diary','check','health','study','motivation','record'];
 function handleSwipe(){
   if(touchEndX<touchStartX-50){
     // Swipe left - next tab
