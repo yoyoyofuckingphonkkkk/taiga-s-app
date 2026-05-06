@@ -764,16 +764,16 @@ function uploadVideo(){
   const files=document.getElementById('videoUpload').files;
   if(files.length===0)return;
   
+  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
   let processed=0;
   Array.from(files).forEach(file=>{
     const reader=new FileReader();
     reader.onload=e=>{
       const id='v'+Date.now()+processed;
-      const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
       videos.push({id,name:file.name,data:e.target.result});
-      localStorage.setItem('ym4_videos',JSON.stringify(videos));
       processed++;
       if(processed===files.length){
+        localStorage.setItem('ym4_videos',JSON.stringify(videos));
         document.getElementById('videoUpload').value='';
         renderVideoList();
       }
@@ -815,16 +815,6 @@ function showVideoFullscreen(data,current,total){
   document.getElementById('videoCounter').textContent=`${current}/${total}`;
   fullscreen.style.display='flex';
   document.body.style.overflow='hidden';
-  
-  // Swipe down to next video
-  let touchStartY=0;
-  document.addEventListener('touchstart',e=>{touchStartY=e.changedTouches[0].screenY},false);
-  document.addEventListener('touchend',e=>{
-    const touchEndY=e.changedTouches[0].screenY;
-    if(touchStartY-touchEndY>100){
-      nextRandomVideo();
-    }
-  },false);
 }
 
 function nextRandomVideo(){
