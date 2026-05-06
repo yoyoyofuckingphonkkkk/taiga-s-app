@@ -223,11 +223,12 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
 </div>
 
 <div class="tab-bar">
-  <button class="tab-btn active" onclick="switchTab('study',this)">STUDY</button>
-  <button class="tab-btn" onclick="switchTab('check',this)">CHECK</button>
-  <button class="tab-btn" onclick="switchTab('health',this)">HEALTH</button>
   <button class="tab-btn" onclick="switchTab('diary',this)">DIARY</button>
+  <button class="tab-btn" onclick="switchTab('check',this)">CHECK</button>
+  <button class="tab-btn active" onclick="switchTab('study',this)">STUDY</button>
+  <button class="tab-btn" onclick="switchTab('health',this)">HEALTH</button>
   <button class="tab-btn" onclick="switchTab('feed',this)">FEED</button>
+  <button class="tab-btn" onclick="switchTab('motivation',this)">MOTIVATION</button>
   <button class="tab-btn" onclick="switchTab('record',this)">RECORD</button>
 </div>
 
@@ -300,6 +301,30 @@ html,body{background:var(--black);color:var(--text);font-family:'Noto Sans JP',s
   <div id="recordList"></div>
 </div>
 
+<div class="section" id="tab-motivation">
+  <div class="sec-label">Quotes & Videos</div>
+  <div style="display:flex;gap:6px;margin-bottom:12px">
+    <button class="record-filter-btn active" onclick="switchMotivationView('quotes')">Quotes</button>
+    <button class="record-filter-btn" onclick="switchMotivationView('videos')">Videos</button>
+  </div>
+  
+  <div id="quotesView">
+    <div id="quotesList"></div>
+    <button class="add-btn" onclick="openModal('quote')">+ Add Quote</button>
+  </div>
+  
+  <div id="videosView" style="display:none">
+    <div id="videoPlayer" style="background:var(--black);border-radius:15px;overflow:hidden;margin-bottom:16px;aspect-ratio:9/16;max-height:500px">
+      <video id="motivationVideo" style="width:100%;height:100%;object-fit:contain" controls></video>
+    </div>
+    <div id="videoList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:200px;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px">
+      <input type="file" id="videoUpload" accept="video/mp4" style="flex:1;font-size:12px">
+      <button class="add-btn" style="margin-top:0;flex:0.3" onclick="uploadVideo()">Upload</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <div class="modal-bg" id="modal">
@@ -351,21 +376,43 @@ let widgets=JSON.parse(localStorage.getItem('ym4_widgets')||'null')||['study'];
 function saveWidgets(){localStorage.setItem('ym4_widgets',JSON.stringify(widgets));}
 
 function addWidget(){
-  const options=['exercise','meal','checks','remaining-days'];
-  const choice=prompt(`追加するウィジェット:\n1=運動\n2=食事\n3=チェック\n4=残り日数\n\n番号を入力:`);
-  if(!choice)return;
-  const idx=parseInt(choice)-1;
-  if(idx<0||idx>=options.length)return;
-  if(!widgets.includes(options[idx])){
-    widgets.push(options[idx]);
+  const modal=document.createElement('div');
+  modal.className='modal-bg open';
+  modal.id='widgetModal';
+  modal.innerHTML=`
+    <div class="modal">
+      <div class="modal-title">Add Widget</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="modal-ok" onclick="selectWidget('exercise')">運動</button>
+        <button class="modal-ok" onclick="selectWidget('checks')">チェック</button>
+        <button class="modal-ok" onclick="selectWidget('remaining-days')">残り日数</button>
+        <button class="modal-cancel" onclick="document.getElementById('widgetModal').remove()">キャンセル</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function selectWidget(w){
+  if(!widgets.includes(w)){
+    if(w==='remaining-days'){
+      const title=prompt('タイトルを入力（例：受験日まで）:','受験日まで');
+      if(!title)return;
+      const date=prompt('日付を入力（YYYY-MM-DD）:',new Date(new Date().getFullYear(),11,31).toISOString().slice(0,10));
+      if(!date)return;
+      widgets.push({type:w,title,date});
+    }else{
+      widgets.push(w);
+    }
     saveWidgets();
     renderWidgets();
   }
+  document.getElementById('widgetModal')?.remove();
 }
 
 function removeWidget(w){
   if(w==='study'){alert('勉強ウィジェットは削除できません');return;}
-  widgets=widgets.filter(x=>x!==w);
+  widgets=widgets.filter(x=>(typeof x==='string'?x:x.type)!==w);
   saveWidgets();
   renderWidgets();
 }
@@ -374,7 +421,7 @@ function renderWidgets(){
   const grid=document.getElementById('widgetsGrid');
   grid.innerHTML='';
   
-  // Main widget always first
+  // Main widget
   const mainDiv=document.createElement('div');
   mainDiv.className='widget main-widget';
   mainDiv.innerHTML=`
@@ -399,11 +446,12 @@ function renderWidgets(){
   
   // Sub widgets
   widgets.forEach(w=>{
-    if(w==='study')return;
+    const wType=typeof w==='string'?w:w.type;
+    if(wType==='study')return;
     const div=document.createElement('div');
     div.className='widget sub-widget';
     
-    if(w==='exercise'){
+    if(wType==='exercise'){
       const exTime=state.health?.exercise||0;
       div.innerHTML=`
         <button class="widget-close" onclick="removeWidget('exercise')">×</button>
@@ -421,25 +469,7 @@ function renderWidgets(){
           <div style="font-size:11px;color:var(--text2)">目標: 60分</div>
         </div>
       `;
-    }else if(w==='meal'){
-      const mealScore=state.health?.meal||0;
-      div.innerHTML=`
-        <button class="widget-close" onclick="removeWidget('meal')">×</button>
-        <div class="ring-wrap">
-          <svg class="ring-svg" viewBox="0 0 120 120">
-            <circle class="ring-bg" cx="60" cy="60" r="50"/>
-            <circle class="ring-fill" cx="60" cy="60" r="50" stroke="var(--accent2)" stroke-width="8" stroke-dasharray="${Math.PI*100}" stroke-dashoffset="${Math.PI*100*(1-mealScore/5)}" style="fill:none;stroke-linecap:round"/>
-          </svg>
-          <div class="ring-center">
-            <div class="ring-current" style="font-size:20px">${mealScore}/5</div>
-          </div>
-        </div>
-        <div>
-          <div class="ring-label">MEAL</div>
-          <div style="font-size:11px;color:var(--text2)">バランス評価</div>
-        </div>
-      `;
-    }else if(w==='checks'){
+    }else if(wType==='checks'){
       const done=Object.values(state.checks||{}).filter(Boolean).length;
       const total=checkItems.length;
       div.innerHTML=`
@@ -458,16 +488,15 @@ function renderWidgets(){
           <div style="font-size:11px;color:var(--text2)">チェック項目</div>
         </div>
       `;
-    }else if(w==='remaining-days'){
-      const today=new Date().toISOString().slice(0,10);
-      const yearEnd=new Date(new Date().getFullYear(),11,31).toISOString().slice(0,10);
-      const daysLeft=Math.ceil((new Date(yearEnd)-new Date(today))/(1000*60*60*24));
+    }else if(wType==='remaining-days'){
+      const wObj=typeof w==='object'?w:{type:'remaining-days',title:'残り日数',date:new Date(new Date().getFullYear(),11,31).toISOString().slice(0,10)};
+      const daysLeft=Math.ceil((new Date(wObj.date)-new Date())/(1000*60*60*24));
       div.innerHTML=`
         <button class="widget-close" onclick="removeWidget('remaining-days')">×</button>
         <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:120px">
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--accent4)">${daysLeft}</div>
-          <div class="ring-label" style="margin-top:0">DAYS LEFT</div>
-          <div style="font-size:11px;color:var(--text2)">今年も残り</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--accent4)">${Math.max(0,daysLeft)}</div>
+          <div class="ring-label" style="margin-top:0">${wObj.title}</div>
+          <div style="font-size:11px;color:var(--text2)">${wObj.date}</div>
         </div>
       `;
     }
@@ -678,6 +707,93 @@ const FEEDS=[{tag:'GLOBAL POLITICS',title:'国連安保理の拒否権とは？'
 function loadFeed(){const c=document.getElementById('feedCards');c.innerHTML='';const idxs=[];while(idxs.length<3){const i=Math.floor(Math.random()*FEEDS.length);if(!idxs.includes(i))idxs.push(i);}idxs.forEach(i=>{const f=FEEDS[i];const d=document.createElement('div');d.className='feed-card';d.innerHTML=`<div class="feed-tag">${f.tag}</div><div class="feed-title">${f.title}</div><div class="feed-body">${f.body}</div>`;c.appendChild(d);});}loadFeed();
 
 let recordPeriod=7;
+
+// ===== MOTIVATION =====
+let quotes=JSON.parse(localStorage.getItem('ym4_quotes')||'null')||[{id:'q1',text:'毎日の小さな努力が大きな成果につながる'},{id:'q2',text:'今この瞬間を大切にしよう'},{id:'q3',text:'失敗は成功への道'}];
+let videos=[];
+
+function saveQuotes(){localStorage.setItem('ym4_quotes',JSON.stringify(quotes));}
+
+function switchMotivationView(view){
+  document.getElementById('quotesView').style.display=view==='quotes'?'block':'none';
+  document.getElementById('videosView').style.display=view==='videos'?'block':'none';
+  document.querySelectorAll('#tab-motivation .record-filter-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  if(view==='videos')renderVideoList();
+}
+
+function renderQuotesList(){
+  const el=document.getElementById('quotesList');
+  el.innerHTML='';
+  quotes.forEach((q,i)=>{
+    const div=document.createElement('div');
+    div.className='card';
+    div.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:14px;color:var(--accent);line-height:1.6;font-style:italic">"${q.text}"</div>
+        </div>
+        <button class="del-btn" onclick="delQuote(${i})">×</button>
+      </div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function delQuote(i){
+  if(!confirm('削除しますか？'))return;
+  quotes.splice(i,1);
+  saveQuotes();
+  renderQuotesList();
+}
+
+function uploadVideo(){
+  const file=document.getElementById('videoUpload').files[0];
+  if(!file)return;
+  
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const id='v'+Date.now();
+    videos.push({id,name:file.name,data:e.target.result});
+    localStorage.setItem('ym4_videos',JSON.stringify(videos));
+    document.getElementById('videoUpload').value='';
+    renderVideoList();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderVideoList(){
+  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
+  const el=document.getElementById('videoList');
+  el.innerHTML='';
+  videos.forEach((v,i)=>{
+    const div=document.createElement('div');
+    div.className='card';
+    div.style.marginBottom='0';
+    div.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <button style="flex:1;text-align:left;background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;padding:0" onclick="playVideo(${i})">${v.name}</button>
+        <button class="del-btn" onclick="delVideo(${i})">×</button>
+      </div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function playVideo(i){
+  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
+  if(videos[i]){
+    document.getElementById('motivationVideo').src=videos[i].data;
+  }
+}
+
+function delVideo(i){
+  if(!confirm('削除しますか？'))return;
+  const videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
+  videos.splice(i,1);
+  localStorage.setItem('ym4_videos',JSON.stringify(videos));
+  renderVideoList();
+}
 function setRecordPeriod(days){
   recordPeriod=days;
   document.querySelectorAll('.record-filter-btn').forEach(b=>b.classList.remove('active'));
@@ -803,13 +919,38 @@ function calcScore(){document.getElementById('topScore').textContent=calcScoreFo
 
 function switchTab(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');btn.classList.add('active');if(id==='record')renderRecord();}
 
+// Swipe gesture for tabs
+let touchStartX=0,touchEndX=0;
+const tabOrder=['study','check','health','diary','feed','record'];
+function handleSwipe(){
+  if(touchEndX<touchStartX-50){
+    // Swipe left - next tab
+    const active=document.querySelector('.tab-btn.active');
+    const idx=Array.from(document.querySelectorAll('.tab-btn')).indexOf(active);
+    if(idx<tabOrder.length-1){
+      const nextBtn=document.querySelectorAll('.tab-btn')[idx+1];
+      nextBtn.click();
+    }
+  }else if(touchEndX>touchStartX+50){
+    // Swipe right - prev tab
+    const active=document.querySelector('.tab-btn.active');
+    const idx=Array.from(document.querySelectorAll('.tab-btn')).indexOf(active);
+    if(idx>0){
+      const prevBtn=document.querySelectorAll('.tab-btn')[idx-1];
+      prevBtn.click();
+    }
+  }
+}
+document.addEventListener('touchstart',e=>{touchStartX=e.changedTouches[0].screenX},false);
+document.addEventListener('touchend',e=>{touchEndX=e.changedTouches[0].screenX;handleSwipe()},false);
+
 let modalMode='',modalSi=-1;
-function openModal(mode,si){modalMode=mode;modalSi=si??-1;const titles={subject:'Add Subject',book:'Add Textbook',check:'Add Checklist Item',cardio:'Add Cardio Exercise',strength:'Add Strength Exercise',goal:'Set Study Goal'};document.getElementById('modalTitle').textContent=titles[mode]||'Add';let body='';if(mode==='goal'){const gh=Math.floor(goalMins/60),gm=goalMins%60;body=`<div style="font-size:12px;color:var(--muted);margin-bottom:12px">現在の目標: ${minsToStr(goalMins)}</div><div style="display:flex;gap:8px;margin-bottom:8px"><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">時間 (h)</div><input class="modal-input" type="number" id="goalH" min="0" max="24" value="${gh}" style="margin-bottom:0"></div><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">分 (min)</div><input class="modal-input" type="number" id="goalM" min="0" max="59" value="${gm}" style="margin-bottom:0"></div></div>`;}else if(mode==='cardio'||mode==='strength'){const uOpts=mode==='cardio'?['km','分','回','kcal']:['回','kg','set'];body=`<input class="modal-input" id="modalInput" placeholder="${mode==='cardio'?'例: ランニング':'例: ベンチプレス'}"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">単位</div><select class="modal-input" id="modalUnit" style="cursor:pointer;color:var(--text)">${uOpts.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>`;}else{const ph={subject:'例: 物理',book:'例: 化学の新演習',check:'例: 読書 30分'};body=`<input class="modal-input" id="modalInput" placeholder="${ph[mode]||''}">`;}document.getElementById('modalBody').innerHTML=body;document.getElementById('modalOk').textContent=mode==='goal'?'Set':'Add';document.getElementById('modal').classList.add('open');setTimeout(()=>document.getElementById('modalInput')?.focus(),300);}
+function openModal(mode,si){modalMode=mode;modalSi=si??-1;const titles={subject:'Add Subject',book:'Add Textbook',check:'Add Checklist Item',cardio:'Add Cardio Exercise',strength:'Add Strength Exercise',goal:'Set Study Goal',quote:'Add Quote'};document.getElementById('modalTitle').textContent=titles[mode]||'Add';let body='';if(mode==='goal'){const gh=Math.floor(goalMins/60),gm=goalMins%60;body=`<div style="font-size:12px;color:var(--muted);margin-bottom:12px">現在の目標: ${minsToStr(goalMins)}</div><div style="display:flex;gap:8px;margin-bottom:8px"><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">時間 (h)</div><input class="modal-input" type="number" id="goalH" min="0" max="24" value="${gh}" style="margin-bottom:0"></div><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">分 (min)</div><input class="modal-input" type="number" id="goalM" min="0" max="59" value="${gm}" style="margin-bottom:0"></div></div>`;}else if(mode==='quote'){body=`<textarea class="diary-area" id="modalInput" placeholder="名言を入力..." style="min-height:100px"></textarea>`;}else if(mode==='cardio'||mode==='strength'){const uOpts=mode==='cardio'?['km','分','回','kcal']:['回','kg','set'];body=`<input class="modal-input" id="modalInput" placeholder="${mode==='cardio'?'例: ランニング':'例: ベンチプレス'}"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">単位</div><select class="modal-input" id="modalUnit" style="cursor:pointer;color:var(--text)">${uOpts.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>`;}else{const ph={subject:'例: 物理',book:'例: 化学の新演習',check:'例: 読書 30分'};body=`<input class="modal-input" id="modalInput" placeholder="${ph[mode]||''}">`;}document.getElementById('modalBody').innerHTML=body;document.getElementById('modalOk').textContent=mode==='goal'?'Set':'Add';document.getElementById('modal').classList.add('open');setTimeout(()=>document.getElementById('modalInput')?.focus(),300);}
 function closeModal(){document.getElementById('modal').classList.remove('open');}
-function modalConfirm(){if(modalMode==='goal'){const h=parseInt(document.getElementById('goalH').value)||0;const m=parseInt(document.getElementById('goalM').value)||0;const tot=h*60+m;if(tot>0){goalMins=tot;localStorage.setItem('ym4_goal',tot);updateRing();}closeModal();return;}const val=document.getElementById('modalInput')?.value.trim();if(!val){closeModal();return;}if(modalMode==='subject'){subjects.push({id:'s'+Date.now(),name:val,books:[]});saveSubjects();renderStudy();}else if(modalMode==='book'){subjects[modalSi].books.push({id:'b'+Date.now(),name:val});saveSubjects();renderStudy();}else if(modalMode==='check'){checkItems.push({id:'c'+Date.now(),label:val});saveChecks();renderChecks();calcScore();}else if(modalMode==='cardio'){const u=document.getElementById('modalUnit')?.value||'km';cardioList.push({id:'ca'+Date.now(),name:val,unit:u});saveCardio();renderCardio();}else if(modalMode==='strength'){const u=document.getElementById('modalUnit')?.value||'回';const id='st'+Date.now();strengthList.push({id,name:val,unit:u});state.strength[id]=[0,0,0];saveStrength();saveState();renderStrength();}closeModal();}
+function modalConfirm(){if(modalMode==='goal'){const h=parseInt(document.getElementById('goalH').value)||0;const m=parseInt(document.getElementById('goalM').value)||0;const tot=h*60+m;if(tot>0){goalMins=tot;localStorage.setItem('ym4_goal',tot);updateRing();}closeModal();return;}if(modalMode==='quote'){const text=document.getElementById('modalInput')?.value.trim();if(!text){closeModal();return;}quotes.push({id:'q'+Date.now(),text});saveQuotes();renderQuotesList();closeModal();return;}const val=document.getElementById('modalInput')?.value.trim();if(!val){closeModal();return;}if(modalMode==='subject'){subjects.push({id:'s'+Date.now(),name:val,books:[]});saveSubjects();renderStudy();}else if(modalMode==='book'){subjects[modalSi].books.push({id:'b'+Date.now(),name:val});saveSubjects();renderStudy();}else if(modalMode==='check'){checkItems.push({id:'c'+Date.now(),label:val});saveChecks();renderChecks();calcScore();}else if(modalMode==='cardio'){const u=document.getElementById('modalUnit')?.value||'km';cardioList.push({id:'ca'+Date.now(),name:val,unit:u});saveCardio();renderCardio();}else if(modalMode==='strength'){const u=document.getElementById('modalUnit')?.value||'回';const id='st'+Date.now();strengthList.push({id,name:val,unit:u});state.strength[id]=[0,0,0];saveStrength();saveState();renderStrength();}closeModal();}
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 
-renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();
+renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();
 </script>
 </body>
 </html>
