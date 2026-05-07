@@ -1,7 +1,7 @@
 {
-  "name": "ASCEND LIFE",
+  "name": "ASCEND",
   "short_name": "ASCEND",
-  "description": "日々を極める — 勉強・健康・日記管理アプリ",
+  "description": "日々を極める",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
