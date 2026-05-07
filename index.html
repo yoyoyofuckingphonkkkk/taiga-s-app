@@ -435,11 +435,9 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
   <div id="videoPlayIcon" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1015;opacity:0;pointer-events:none;transition:opacity .2s">
     <div style="width:0;height:0;border-left:24px solid #fff;border-top:16px solid transparent;border-bottom:16px solid transparent;margin-left:6px"></div>
   </div>
-  <div id="videoStack" style="position:absolute;top:0;left:0;width:100%;height:100%;will-change:transform">
-    <div class="vid-slot" data-pos="prev" style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;overflow:hidden;transform:translateY(-100%)"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video></div>
-    <div class="vid-slot" data-pos="curr" style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;overflow:hidden"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video></div>
-    <div class="vid-slot" data-pos="next" style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;overflow:hidden;transform:translateY(100%)"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video></div>
-  </div>
+  <div class="vid-slot" data-pos="prev" style="position:absolute;left:0;top:0;width:100%;height:100%;background:#000;overflow:hidden"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video></div>
+  <div class="vid-slot" data-pos="curr" style="position:absolute;left:0;top:0;width:100%;height:100%;background:#000;overflow:hidden"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video></div>
+  <div class="vid-slot" data-pos="next" style="position:absolute;left:0;top:0;width:100%;height:100%;background:#000;overflow:hidden"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video></div>
 </div>
 
 </div>
@@ -1532,10 +1530,9 @@ function playVideoFullscreen(idx){
   document.body.style.overflow='hidden';
   swipeEnabled=false;
   
-  // スタックの位置リセット
-  const stack=document.getElementById('videoStack');
-  stack.style.transition='none';
-  stack.style.transform='translateY(0)';
+  // スロット位置リセット
+  setSlotsTransition(false);
+  positionSlots(0);
   
   refreshAllSlots();
   
@@ -1547,22 +1544,41 @@ function playVideoFullscreen(idx){
   window.history.pushState({videoOpen:true},'');
 }
 
+function positionSlots(offsetPx){
+  // offsetPx: スワイプ中の指の移動量（0なら静止状態）
+  const fs=document.getElementById('videoFullscreen');
+  const h=fs.clientHeight;
+  const slots={
+    prev:document.querySelector('.vid-slot[data-pos="prev"]'),
+    curr:document.querySelector('.vid-slot[data-pos="curr"]'),
+    next:document.querySelector('.vid-slot[data-pos="next"]')
+  };
+  if(slots.prev) slots.prev.style.transform=`translateY(${-h+offsetPx}px)`;
+  if(slots.curr) slots.curr.style.transform=`translateY(${offsetPx}px)`;
+  if(slots.next) slots.next.style.transform=`translateY(${h+offsetPx}px)`;
+}
+
+function setSlotsTransition(on){
+  ['prev','curr','next'].forEach(p=>{
+    const s=document.querySelector(`.vid-slot[data-pos="${p}"]`);
+    if(s)s.style.transition=on?'transform .3s cubic-bezier(.22,.61,.36,1)':'none';
+  });
+}
+
 function shiftVideo(direction){
-  // direction: +1=次へ, -1=前へ
   if(videoTransitioning||videos.length===0)return;
   videoTransitioning=true;
   
   const fs=document.getElementById('videoFullscreen');
-  const stack=document.getElementById('videoStack');
   const h=fs.clientHeight;
   
-  stack.style.transition='transform .3s cubic-bezier(.22,.61,.36,1)';
-  stack.style.transform=`translateY(${direction>0?-h:h}px)`;
+  setSlotsTransition(true);
+  positionSlots(direction>0?-h:h);
   
   setTimeout(()=>{
     videoQueuePos=((videoQueuePos+direction)%videoQueue.length+videoQueue.length)%videoQueue.length;
-    stack.style.transition='none';
-    stack.style.transform='translateY(0)';
+    setSlotsTransition(false);
+    positionSlots(0);
     refreshAllSlots();
     const playIcon=document.getElementById('videoPlayIcon');
     if(playIcon)playIcon.style.opacity='0';
@@ -1586,7 +1602,7 @@ function closeVideoFullscreen(){
   const fs=document.getElementById('videoFullscreen');
   fs.style.display='none';
   // 全videoを停止
-  document.querySelectorAll('#videoStack video').forEach(v=>{v.pause();v.removeAttribute('src');v.load();v.dataset.idx='';});
+  document.querySelectorAll('#videoFullscreen .vid-slot video').forEach(v=>{v.pause();v.removeAttribute('src');v.load();v.dataset.idx='';});
   document.body.style.overflow='auto';
   swipeEnabled=true;
   
@@ -1629,14 +1645,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   }, 1000);
   
   const fs=document.getElementById('videoFullscreen');
-  const stack=document.getElementById('videoStack');
   
   fs.addEventListener('touchstart',e=>{
     if(videoTransitioning)return;
     videoSwipeStartY=e.changedTouches[0].screenY;
     videoSwipeCurrentY=videoSwipeStartY;
     videoSwipeActive=true;
-    stack.style.transition='none';
+    setSlotsTransition(false);
     e.stopPropagation();
   },{passive:true});
   
@@ -1644,7 +1659,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!videoSwipeActive||videoTransitioning)return;
     videoSwipeCurrentY=e.changedTouches[0].screenY;
     const dy=videoSwipeCurrentY-videoSwipeStartY;
-    stack.style.transform=`translateY(${dy}px)`;
+    positionSlots(dy);
     e.stopPropagation();
   },{passive:true});
   
@@ -1660,15 +1675,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     }else if(dy>threshold){
       shiftVideo(-1); // 下スワイプ→前へ
     }else if(Math.abs(dy)<25){
-      // タップ判定（25px以下なら動いてないとみなす）
+      // タップ判定
       const t=e.changedTouches[0];
-      // 戻るボタンエリアならスルー
       const backBtn=document.getElementById('videoBackBtn');
       if(backBtn && backBtn.style.opacity==='1'){
         const r=backBtn.getBoundingClientRect();
         if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom){
-          stack.style.transition='transform .25s cubic-bezier(.22,.61,.36,1)';
-          stack.style.transform='translateY(0)';
+          setSlotsTransition(true);positionSlots(0);
           return;
         }
       }
@@ -1677,7 +1690,6 @@ document.addEventListener('DOMContentLoaded',()=>{
       const cyMin=h*0.3,cyMax=h*0.7;
       const inCenter=t.clientX>=cxMin&&t.clientX<=cxMax&&t.clientY>=cyMin&&t.clientY<=cyMax;
       if(inCenter){
-        // 一時停止/再生
         const vid=document.querySelector('.vid-slot[data-pos="curr"] video');
         const playIcon=document.getElementById('videoPlayIcon');
         if(vid){
@@ -1690,15 +1702,12 @@ document.addEventListener('DOMContentLoaded',()=>{
           }
         }
       }else{
-        // 戻るボタン表示
         toggleVideoBackBtn();
       }
-      stack.style.transition='transform .25s cubic-bezier(.22,.61,.36,1)';
-      stack.style.transform='translateY(0)';
+      setSlotsTransition(true);positionSlots(0);
     }else{
       // 元に戻す
-      stack.style.transition='transform .25s cubic-bezier(.22,.61,.36,1)';
-      stack.style.transform='translateY(0)';
+      setSlotsTransition(true);positionSlots(0);
     }
     e.stopPropagation();
   },{passive:true});
