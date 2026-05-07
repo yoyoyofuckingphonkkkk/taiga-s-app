@@ -195,8 +195,8 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 .hero-subtitle{font-family:var(--display);font-size:10px;color:rgba(255,255,255,0.8);letter-spacing:.3em;margin-top:6px;text-transform:uppercase}
 .hero-controls{position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:.2s;pointer-events:none}
 .hero-controls.visible{opacity:1;pointer-events:auto}
-.hero-btn{background:rgba(0,0,0,0.6);border:0.5px solid rgba(255,255,255,0.3);color:#fff;border-radius:4px;padding:6px 10px;font-size:10px;cursor:pointer;font-family:var(--sans);letter-spacing:.05em}
-.hero-btn:hover{background:rgba(0,0,0,0.8)}
+.hero-btn{background:rgba(0,0,0,0.6);border:0.5px solid rgba(255,255,255,0.3);color:#fff;border-radius:4px;padding:10px 16px;font-size:12px;cursor:pointer;font-family:var(--sans);letter-spacing:.05em;-webkit-tap-highlight-color:transparent;touch-action:manipulation;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;}
+.hero-btn:active{background:rgba(255,255,255,0.2)}
 </style>
 </head>
 <body>
@@ -293,6 +293,11 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
   <!-- Overview tab -->
   <div id="healthOverview">
     <div class="health-section-label" style="margin-top:0">General</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <span style="font-size:12px;color:var(--muted);flex:1">体重（カロリー計算用）</span>
+      <input type="number" id="bodyWeightInput" min="30" max="200" style="width:70px;padding:6px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;text-align:center" oninput="localStorage.setItem('ym4_bodyweight',this.value)">
+      <span style="font-size:12px;color:var(--muted)">kg</span>
+    </div>
     <div class="health-grid" id="healthGrid"></div>
     <div style="margin-top:14px">
       <div class="sec-label">Body Memo</div>
@@ -424,11 +429,15 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
   </div>
 </div>
 
-<!-- Video fullscreen overlay (outside tabs, fixed positioning) -->
-<div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;flex-direction:column;align-items:center;justify-content:center">
-  <button style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:28px;cursor:pointer;z-index:1001;padding:8px 14px;border-radius:8px" onclick="closeVideoFullscreen()">←</button>
-  <video id="videoPlayer" style="width:100%;height:100%;object-fit:contain;background:#000" autoplay loop playsinline></video>
-  <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);color:#aaa;font-size:12px;text-align:center;background:rgba(0,0,0,.5);padding:4px 12px;border-radius:12px;z-index:1001" id="videoCounter"></div>
+<!-- Video fullscreen overlay (TikTok-style) -->
+<div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;overflow:hidden">
+  <button style="position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;cursor:pointer;z-index:1010;padding:6px 12px;border-radius:8px" onclick="closeVideoFullscreen()">←</button>
+  <div id="videoCounter" style="position:absolute;top:max(24px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);color:#fff;font-size:13px;background:rgba(0,0,0,.5);padding:6px 14px;border-radius:14px;z-index:1010"></div>
+  <div id="videoStack" style="position:absolute;inset:0;will-change:transform">
+    <div class="vid-slot" data-pos="prev" style="position:absolute;top:-100%;left:0;width:100%;height:100%"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video></div>
+    <div class="vid-slot" data-pos="curr" style="position:absolute;top:0;left:0;width:100%;height:100%"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video></div>
+    <div class="vid-slot" data-pos="next" style="position:absolute;top:100%;left:0;width:100%;height:100%"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video></div>
+  </div>
 </div>
 
 </div>
@@ -508,9 +517,9 @@ function renderHero(tabName){
   const mediaHtml = hasVid
     ? `<video class="hero-img" src="${h.vid}" autoplay muted loop playsinline style="object-fit:cover;object-position:${h.posX||50}% ${h.posY||50}%"></video>`
     : hasImg
-      ? `<img class="hero-img" src="${h.img}" alt="" style="object-position:${h.posX||50}% ${h.posY||50}%;transform:scale(${h.zoom||1})">`
+      ? `<img class="hero-img" src="${h.img}" alt="" style="object-fit:cover;object-position:${h.posX||50}% ${h.posY||50}%;transform:scale(${h.zoom||1});transform-origin:${h.posX||50}% ${h.posY||50}%">`
       : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#111 0%,#222 100%)"></div>`;
-  return `<div class="hero-section" id="hero-wrap-${tabName}" onclick="heroToggleEdit('${tabName}')">
+  return `<div class="hero-section" id="hero-wrap-${tabName}" ontouchend="heroToggleEdit('${tabName}',event)" onclick="heroToggleEdit('${tabName}',event)">
     ${mediaHtml}
     <div class="hero-overlay"></div>
     <div class="hero-text">
@@ -518,29 +527,29 @@ function renderHero(tabName){
       <div class="hero-subtitle">${h.subtitle||''}</div>
     </div>
     <div class="hero-controls" id="hero-ctrl-${tabName}">
-      <button class="hero-btn" onclick="event.stopPropagation();openHeroEditor('${tabName}')" ontouchstart="event.stopPropagation()">✎ Edit</button>
+      <button class="hero-btn" ontouchend="event.stopPropagation();event.preventDefault();openHeroEditor('${tabName}')" onclick="event.stopPropagation();openHeroEditor('${tabName}')">✎ Edit</button>
     </div>
   </div>`;
 }
 
-function heroToggleEdit(tabName){
+
+
+function heroToggleEdit(tabName,e){
+  if(e && e.type==='click' && e._touchHandled) return;
+  if(e && e.type==='touchend'){e.preventDefault();e._touchHandled=true;}
   const ctrl=document.getElementById('hero-ctrl-'+tabName);
   if(!ctrl) return;
   const isVisible=ctrl.classList.contains('visible');
-  // 全部閉じる
   document.querySelectorAll('.hero-controls').forEach(el=>el.classList.remove('visible'));
   if(!isVisible) ctrl.classList.add('visible');
-  // 外クリックリスナー設置
   setTimeout(()=>{
     document.addEventListener('click',closeHeroCtrlOnOutside,{once:true});
   },50);
 }
 
 function closeHeroCtrlOnOutside(e){
-  // 直近のhero-sectionの中か確認
   const heroSect=e.target.closest('.hero-section');
-  if(heroSect) return; // 内側なら何もしない
-  // 外側ならすべてクローズ
+  if(heroSect) return;
   document.querySelectorAll('.hero-controls.visible').forEach(el=>el.classList.remove('visible'));
 }
 
@@ -562,7 +571,7 @@ function openHeroEditor(tabName){
           <button onclick="deleteHeroMedia('${tabName}')" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);border:none;color:#fff;font-size:11px;padding:4px 8px;border-radius:4px;cursor:pointer">✕</button>
          </div>`
       : '';
-  const adjustHtml = hasImg ? `
+  const adjustHtml = (hasImg || hasVid) ? `
     <div style="margin-bottom:16px;padding:12px;background:var(--surface2);border-radius:8px">
       <div style="font-size:11px;color:var(--muted);letter-spacing:.15em;margin-bottom:10px">ADJUST</div>
       <div style="margin-bottom:8px">
@@ -578,7 +587,10 @@ function openHeroEditor(tabName){
         <input type="range" id="heroPosY" min="0" max="100" value="${h.posY||50}" style="width:100%" oninput="heroAdjustPreview('${tabName}')">
       </div>
       <div style="margin-top:10px;width:100%;height:80px;border-radius:6px;overflow:hidden;position:relative;border:0.5px solid var(--border)">
-        <img id="heroAdjPreview" src="${h.img}" style="width:100%;height:100%;object-fit:cover;transform:scale(${h.zoom||1});object-position:${h.posX||50}% ${h.posY||50}%">
+        ${hasVid
+          ? `<video id="heroAdjPreview" src="${h.vid}" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${h.posX||50}% ${h.posY||50}%;transform:scale(${h.zoom||1});transform-origin:${h.posX||50}% ${h.posY||50}%"></video>`
+          : `<img id="heroAdjPreview" src="${h.img}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${h.posX||50}% ${h.posY||50}%;transform:scale(${h.zoom||1});transform-origin:${h.posX||50}% ${h.posY||50}%">`
+        }
       </div>
     </div>` : '';
   overlay.innerHTML=`
@@ -619,7 +631,11 @@ function heroAdjustPreview(tabName){
   document.getElementById('heroPosXVal').textContent=x+'%';
   document.getElementById('heroPosYVal').textContent=y+'%';
   prev.style.transform=`scale(${z})`;
+  prev.style.transformOrigin=`${x}% ${y}%`;
   prev.style.objectPosition=`${x}% ${y}%`;
+  // 実際のバナーにもリアルタイム反映
+  const bannerEl=document.querySelector(`#hero-wrap-${tabName} .hero-img`);
+  if(bannerEl){bannerEl.style.transform=`scale(${z})`;bannerEl.style.transformOrigin=`${x}% ${y}%`;bannerEl.style.objectPosition=`${x}% ${y}%`;}
 }
 
 function saveHeroEdit(tabName){
@@ -1229,6 +1245,7 @@ document.getElementById('diaryText').addEventListener('input',e=>{state.diary=e.
 document.getElementById('diaryDate').addEventListener('change',e=>{state.diaryDate=e.target.value;saveState()});
 document.getElementById('healthMemo').value=state.healthMemo||'';
 document.getElementById('healthMemo').addEventListener('input',e=>{state.healthMemo=e.target.value;saveState()});
+document.getElementById('bodyWeightInput').value=localStorage.getItem('ym4_bodyweight')||'70';
 function saveDiary(){saveState();const el=document.getElementById('diarySaved');el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200);}
 
 const FEEDS=[{tag:'GLOBAL POLITICS',title:'国連安保理の拒否権とは？',body:'常任理事国（米英仏露中）は1カ国の反対で決議を阻止できる。冷戦期から現在まで国際秩序を大きく左右する。'},{tag:'FINANCE',title:'Rule of 72 — 複利の法則',body:'「72 ÷ yr利率 ≒ 資産が2倍になるyr数」。yr利6%なら12yrで2倍。Timeを味方にする投資の基本法則。'},{tag:'ENGLISH WORD',title:'Resilience — reps復力',body:'"She showed remarkable resilience after the setback." 逆境から立ち直る力。受験にも人生にも必要な概念。'},{tag:'ECONOMICS',title:'円安とは何か？',body:'1ドル=100円→150円になると円の価値が下がる。輸出企業有利・輸入品（食料・エネルギー）が高騰する。'},{tag:'GLOBAL POLITICS',title:'NATOの存在意義',body:'1949yr、ソ連への対抗として結成。「1カ国への攻撃は全加盟国への攻撃」という集団的自衛権が核心。'},{tag:'FINANCE',title:'ETFとは何か',body:'上場投資信託。株のように売買できるm散投資商品。S&P500連動型は低コストで長期投資に人気。'},{tag:'ENGLISH WORD',title:'Pragmatic — 実際的な',body:'"A pragmatic approach to problem-solving." 現実主義的・実用的。政治・ビジネスで頻出の重要語。'},{tag:'GLOBAL POLITICS',title:'G7とG20の違い',body:'G7は主要先進7カ国、G20は新興国も含む20カ国。経済・安保の議論の場だが拘束力はない。'},{tag:'FINANCE',title:'インフレと金利の関係',body:'物価上昇→中央銀行が金利を上げてお金の流通を抑制。これが世界経済を動かす基本メカニズム。'},{tag:'ENGLISH WORD',title:'Nuance — 微妙なニュアンス',body:'"The nuance was lost in translation." 細かな意味の違い。英語力が上がるほど重要になる語彙。'},{tag:'GLOBAL POLITICS',title:'パレスチナ問題の基本',body:'1948yrイスラエル建国以来の領土紛争。ガザ地区に約200万人が暮らす中東情勢の核心的課題。'},{tag:'FINANCE',title:'株式と債券の違い',body:'株式は会社の所有権でリターン高・リスク大。債券は貸付で安定的・リターン低め。ポートフォリオの基本。'}];
@@ -1393,82 +1410,125 @@ function renderVideoManagementList(){
 
 
 let currentVideoIdx=0;
-let videoSwipeStartY=0;
-let videoSwipeStartX=0;
-let shownVideoIndices=[];
+let videoQueue=[]; // ランダム順序のキュー
+let videoQueuePos=0;
 let videoClosedByBackButton=false;
+let videoSwipeStartY=0;
+let videoSwipeCurrentY=0;
+let videoSwipeActive=false;
+let videoTransitioning=false;
+
+function buildVideoQueue(startIdx){
+  // ランダム順のキューを作る（重複なし）
+  const indices=videos.map((_,i)=>i);
+  // shuffle
+  for(let i=indices.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [indices[i],indices[j]]=[indices[j],indices[i]];
+  }
+  // startIdxを先頭に
+  if(startIdx!==undefined){
+    const pos=indices.indexOf(startIdx);
+    if(pos>0){indices.splice(pos,1);indices.unshift(startIdx);}
+  }
+  videoQueue=indices;
+  videoQueuePos=0;
+}
+
+function getVidIdxAtOffset(offset){
+  if(videoQueue.length===0)return -1;
+  const pos=((videoQueuePos+offset)%videoQueue.length+videoQueue.length)%videoQueue.length;
+  return videoQueue[pos];
+}
+
+function loadSlot(slotPos,vidIdx){
+  // slotPos: 'prev' | 'curr' | 'next'
+  const slot=document.querySelector(`.vid-slot[data-pos="${slotPos}"]`);
+  if(!slot)return;
+  const vid=slot.querySelector('video');
+  if(vidIdx<0||!videos[vidIdx]){vid.removeAttribute('src');vid.load();return;}
+  if(vid.dataset.idx!==String(vidIdx)){
+    vid.src=videos[vidIdx].url;
+    vid.dataset.idx=String(vidIdx);
+  }
+  if(slotPos==='curr'){
+    vid.muted=false;
+    vid.play().catch(()=>{vid.muted=true;vid.play().catch(()=>{});});
+  }else{
+    vid.pause();
+    vid.muted=true;
+  }
+}
+
+function refreshAllSlots(){
+  loadSlot('prev',getVidIdxAtOffset(-1));
+  loadSlot('curr',getVidIdxAtOffset(0));
+  loadSlot('next',getVidIdxAtOffset(1));
+  updateVideoCounter();
+}
+
+function updateVideoCounter(){
+  const idx=getVidIdxAtOffset(0);
+  document.getElementById('videoCounter').textContent=`${idx+1}/${videos.length}`;
+  currentVideoIdx=idx;
+}
 
 function playVideoFullscreen(idx){
   if(!videos.length)return;
-  
-  // If no index provided, pick random
-  if(idx===undefined){
-    idx=Math.floor(Math.random()*videos.length);
-  }
-  
+  if(idx===undefined)idx=Math.floor(Math.random()*videos.length);
   if(!videos[idx])return;
-  currentVideoIdx=idx;
-  // Only track as shown if it's not the initial play
-  shownVideoIndices=[];
   
-  // Push history state so back button closes video
-  window.history.pushState({videoOpen:true},'');
+  buildVideoQueue(idx);
   
-  showVideoFullscreen(videos[idx].url,idx+1,videos.length);
-}
-
-function showVideoFullscreen(url,current,total){
   const fullscreen=document.getElementById('videoFullscreen');
-  document.getElementById('videoPlayer').src=url;
-  document.getElementById('videoCounter').textContent=`${current}/${total}`;
-  currentVideoIdx=current-1;
-  fullscreen.style.display='flex';
+  fullscreen.style.display='block';
   document.body.style.overflow='hidden';
   swipeEnabled=false;
+  
+  // スタックの位置リセット
+  const stack=document.getElementById('videoStack');
+  stack.style.transition='none';
+  stack.style.transform='translateY(0)';
+  
+  refreshAllSlots();
+  
+  window.history.pushState({videoOpen:true},'');
 }
 
-function nextRandomVideo(){
-  if(videos.length===0)return;
+function shiftVideo(direction){
+  // direction: +1=次へ, -1=前へ
+  if(videoTransitioning||videos.length===0)return;
+  videoTransitioning=true;
   
-  // Get available indices (not yet shown)
-  const available=[];
-  for(let i=0;i<videos.length;i++){
-    if(!shownVideoIndices.includes(i)){
-      available.push(i);
-    }
-  }
+  const stack=document.getElementById('videoStack');
+  const h=window.innerHeight;
   
-  // If all shown, reset
-  if(available.length===0){
-    shownVideoIndices=[];
-    for(let i=0;i<videos.length;i++){
-      available.push(i);
-    }
-  }
+  stack.style.transition='transform .3s cubic-bezier(.22,.61,.36,1)';
+  stack.style.transform=`translateY(${direction>0?-h:h}px)`;
   
-  // Pick random from available
-  const randomIdx=available[Math.floor(Math.random()*available.length)];
-  shownVideoIndices.push(randomIdx);
-  showVideoFullscreen(videos[randomIdx].url,randomIdx+1,videos.length);
+  setTimeout(()=>{
+    videoQueuePos=((videoQueuePos+direction)%videoQueue.length+videoQueue.length)%videoQueue.length;
+    stack.style.transition='none';
+    stack.style.transform='translateY(0)';
+    refreshAllSlots();
+    videoTransitioning=false;
+  },300);
 }
 
 function closeVideoFullscreen(){
-  document.getElementById('videoFullscreen').style.display='none';
-  document.getElementById('videoPlayer').src='';
+  const fs=document.getElementById('videoFullscreen');
+  fs.style.display='none';
+  // 全videoを停止
+  document.querySelectorAll('#videoStack video').forEach(v=>{v.pause();v.removeAttribute('src');v.load();v.dataset.idx='';});
   document.body.style.overflow='auto';
   swipeEnabled=true;
-  // Restore motivation home view
+  
   const home=document.getElementById('motivationHome');
   if(home)home.style.display='grid';
   document.getElementById('quotesView').style.display='none';
   document.getElementById('optionView').style.display='none';
   
-  // Go back in history if not already closed by back button
-  if(!videoClosedByBackButton){
-    window.history.back();
-  }
-  
-  // Reset flag after short delay
+  if(!videoClosedByBackButton){window.history.back();}
   setTimeout(()=>{videoClosedByBackButton=false;},100);
 }
 
@@ -1500,16 +1560,39 @@ document.addEventListener('DOMContentLoaded',()=>{
   }, 1000);
   
   const fs=document.getElementById('videoFullscreen');
+  const stack=document.getElementById('videoStack');
+  
   fs.addEventListener('touchstart',e=>{
+    if(videoTransitioning)return;
     videoSwipeStartY=e.changedTouches[0].screenY;
+    videoSwipeCurrentY=videoSwipeStartY;
+    videoSwipeActive=true;
+    stack.style.transition='none';
     e.stopPropagation();
   },{passive:true});
+  
+  fs.addEventListener('touchmove',e=>{
+    if(!videoSwipeActive||videoTransitioning)return;
+    videoSwipeCurrentY=e.changedTouches[0].screenY;
+    const dy=videoSwipeCurrentY-videoSwipeStartY;
+    stack.style.transform=`translateY(${dy}px)`;
+    e.stopPropagation();
+  },{passive:true});
+  
   fs.addEventListener('touchend',e=>{
-    const dy=videoSwipeStartY-e.changedTouches[0].screenY;
+    if(!videoSwipeActive)return;
+    videoSwipeActive=false;
+    const dy=videoSwipeCurrentY-videoSwipeStartY;
+    const threshold=window.innerHeight*0.2;
     
-    // Vertical swipe (80px threshold)
-    if(Math.abs(dy)>80){
-      nextRandomVideo();
+    if(dy<-threshold){
+      shiftVideo(1); // 上スワイプ→次へ
+    }else if(dy>threshold){
+      shiftVideo(-1); // 下スワイプ→前へ
+    }else{
+      // 元に戻す
+      stack.style.transition='transform .25s cubic-bezier(.22,.61,.36,1)';
+      stack.style.transform='translateY(0)';
     }
     e.stopPropagation();
   },{passive:true});
@@ -1922,14 +2005,7 @@ function showSettings(){
   modal.innerHTML=`
     <div class="modal">
       <div class="modal-title">Settings</div>
-      <div style="margin-bottom:16px">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Weight（カロリー計算用）</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="number" id="bodyWeightInput" value="${bw}" min="30" max="200" style="flex:1;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px">
-          <span style="color:var(--muted);font-size:13px">kg</span>
-          <button onclick="saveBodyWeight()" class="modal-ok" style="width:auto;padding:8px 14px">保存</button>
-        </div>
-      </div>
+
       <div style="margin-bottom:16px">
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">背景</div>
         <button onclick="setBlackBackground()" class="modal-ok" style="width:100%;margin-bottom:8px">黒色（デフォルト）</button>
