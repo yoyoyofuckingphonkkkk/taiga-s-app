@@ -430,14 +430,12 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 </div>
 
 <!-- Video fullscreen overlay (TikTok-style) -->
-<div id="videoFullscreen" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;background:#000;z-index:1000;overflow:hidden;touch-action:none;overscroll-behavior:contain">
-  <button id="videoBackBtn" style="position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;z-index:1020;padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s;touch-action:manipulation;-webkit-tap-highlight-color:transparent" ontouchend="event.preventDefault();event.stopPropagation();closeVideoFullscreen()" onclick="closeVideoFullscreen()">←</button>
-  <div id="videoPlayIcon" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1015;opacity:0;pointer-events:none;transition:opacity .2s">
+<div id="videoFullscreen" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;background:#000;z-index:1000;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">
+  <button id="videoBackBtn" style="position:fixed;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;z-index:1020;padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent" onclick="closeVideoFullscreen()">←</button>
+  <div id="videoPlayIcon" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1015;opacity:0;pointer-events:none;transition:opacity .2s">
     <div style="width:0;height:0;border-left:24px solid #fff;border-top:16px solid transparent;border-bottom:16px solid transparent;margin-left:6px"></div>
   </div>
-  <div class="vid-slot" data-pos="prev" style="position:absolute;left:0;top:0;width:100%;height:100%;background:#000;overflow:hidden"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video></div>
-  <div class="vid-slot" data-pos="curr" style="position:absolute;left:0;top:0;width:100%;height:100%;background:#000;overflow:hidden"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video></div>
-  <div class="vid-slot" data-pos="next" style="position:absolute;left:0;top:0;width:100%;height:100%;background:#000;overflow:hidden"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video></div>
+  <div id="videoScroll" style="width:100%"></div>
 </div>
 
 </div>
@@ -1467,14 +1465,11 @@ let videoSwipeActive=false;
 let videoTransitioning=false;
 
 function buildVideoQueue(startIdx){
-  // ランダム順のキューを作る（重複なし）
   const indices=videos.map((_,i)=>i);
-  // shuffle
   for(let i=indices.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
     [indices[i],indices[j]]=[indices[j],indices[i]];
   }
-  // startIdxを先頭に
   if(startIdx!==undefined){
     const pos=indices.indexOf(startIdx);
     if(pos>0){indices.splice(pos,1);indices.unshift(startIdx);}
@@ -1483,36 +1478,39 @@ function buildVideoQueue(startIdx){
   videoQueuePos=0;
 }
 
-function getVidIdxAtOffset(offset){
-  if(videoQueue.length===0)return -1;
-  const pos=((videoQueuePos+offset)%videoQueue.length+videoQueue.length)%videoQueue.length;
-  return videoQueue[pos];
+function buildScrollItems(){
+  // 各動画を100vh高さのアイテムとしてscrollコンテナに配置
+  const scroll=document.getElementById('videoScroll');
+  const fs=document.getElementById('videoFullscreen');
+  const h=fs.clientHeight||window.innerHeight;
+  scroll.innerHTML='';
+  videoQueue.forEach((vidIdx,i)=>{
+    const item=document.createElement('div');
+    item.className='vid-item';
+    item.dataset.idx=String(i);
+    item.style.cssText=`width:100%;height:${h}px;scroll-snap-align:start;scroll-snap-stop:always;background:#000;position:relative;overflow:hidden`;
+    const video=document.createElement('video');
+    video.muted=true;video.loop=true;video.playsInline=true;
+    video.setAttribute('playsinline','');
+    video.style.cssText='width:100%;height:100%;object-fit:contain;background:#000;display:block';
+    video.dataset.vidIdx=String(vidIdx);
+    item.appendChild(video);
+    scroll.appendChild(item);
+  });
 }
 
-function loadSlot(slotPos,vidIdx){
-  // slotPos: 'prev' | 'curr' | 'next'
-  const slot=document.querySelector(`.vid-slot[data-pos="${slotPos}"]`);
-  if(!slot)return;
-  const vid=slot.querySelector('video');
-  if(vidIdx<0||!videos[vidIdx]){vid.removeAttribute('src');vid.load();return;}
-  if(vid.dataset.idx!==String(vidIdx)){
-    vid.src=videos[vidIdx].url;
-    vid.dataset.idx=String(vidIdx);
-  }
-  if(slotPos==='curr'){
-    vid.muted=false;
-    vid.play().catch(()=>{vid.muted=true;vid.play().catch(()=>{});});
-  }else{
-    vid.pause();
-    vid.muted=true;
+function loadVideoForItem(item){
+  const video=item.querySelector('video');
+  const vidIdx=+video.dataset.vidIdx;
+  if(!videos[vidIdx])return;
+  if(!video.src){
+    video.src=videos[vidIdx].url;
   }
 }
 
-function refreshAllSlots(){
-  loadSlot('prev',getVidIdxAtOffset(-1));
-  loadSlot('curr',getVidIdxAtOffset(0));
-  loadSlot('next',getVidIdxAtOffset(1));
-  currentVideoIdx=getVidIdxAtOffset(0);
+function unloadVideoForItem(item){
+  const video=item.querySelector('video');
+  if(video){video.pause();}
 }
 
 function playVideoFullscreen(idx){
@@ -1523,20 +1521,32 @@ function playVideoFullscreen(idx){
   buildVideoQueue(idx);
   
   const fullscreen=document.getElementById('videoFullscreen');
-  // 明示的に高さセット（モバイルアドレスバー対策）
-  const setH=()=>{fullscreen.style.height=window.innerHeight+'px';};
+  const setH=()=>{
+    fullscreen.style.height=window.innerHeight+'px';
+    // 既存のアイテムも高さ追従
+    document.querySelectorAll('.vid-item').forEach(it=>{it.style.height=window.innerHeight+'px';});
+  };
   setH();
   fullscreen.style.display='block';
   document.body.style.overflow='hidden';
   swipeEnabled=false;
   
-  // スロット位置リセット
-  setSlotsTransition(false);
-  positionSlots(0);
+  buildScrollItems();
+  fullscreen.scrollTop=0;
   
-  refreshAllSlots();
+  // 最初のvideoだけロード&再生
+  const items=document.querySelectorAll('.vid-item');
+  if(items[0]){
+    loadVideoForItem(items[0]);
+    const v0=items[0].querySelector('video');
+    v0.play().catch(()=>{});
+  }
+  // 次のvideoもプリロード
+  if(items[1])loadVideoForItem(items[1]);
   
-  // 表示後に再計算（アドレスバーの状態が確定してから）
+  // スクロール監視
+  setupVideoScrollObserver();
+  
   requestAnimationFrame(()=>{setH();requestAnimationFrame(setH);});
   setTimeout(setH,100);
   setTimeout(setH,500);
@@ -1544,46 +1554,35 @@ function playVideoFullscreen(idx){
   window.history.pushState({videoOpen:true},'');
 }
 
-function positionSlots(offsetPx){
-  // offsetPx: スワイプ中の指の移動量（0なら静止状態）
+let videoScrollObserver=null;
+function setupVideoScrollObserver(){
+  if(videoScrollObserver){videoScrollObserver.disconnect();}
   const fs=document.getElementById('videoFullscreen');
-  const h=fs.clientHeight;
-  const slots={
-    prev:document.querySelector('.vid-slot[data-pos="prev"]'),
-    curr:document.querySelector('.vid-slot[data-pos="curr"]'),
-    next:document.querySelector('.vid-slot[data-pos="next"]')
-  };
-  if(slots.prev) slots.prev.style.transform=`translateY(${-h+offsetPx}px)`;
-  if(slots.curr) slots.curr.style.transform=`translateY(${offsetPx}px)`;
-  if(slots.next) slots.next.style.transform=`translateY(${h+offsetPx}px)`;
-}
-
-function setSlotsTransition(on){
-  ['prev','curr','next'].forEach(p=>{
-    const s=document.querySelector(`.vid-slot[data-pos="${p}"]`);
-    if(s)s.style.transition=on?'transform .3s cubic-bezier(.22,.61,.36,1)':'none';
-  });
-}
-
-function shiftVideo(direction){
-  if(videoTransitioning||videos.length===0)return;
-  videoTransitioning=true;
+  videoScrollObserver=new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      const item=entry.target;
+      const video=item.querySelector('video');
+      if(entry.intersectionRatio>0.7){
+        // この動画が画面の大半を占めてる→再生
+        loadVideoForItem(item);
+        video.play().catch(()=>{});
+        currentVideoIdx=+video.dataset.vidIdx;
+        // 前後もプリロード
+        const prevSibling=item.previousElementSibling;
+        const nextSibling=item.nextElementSibling;
+        if(prevSibling)loadVideoForItem(prevSibling);
+        if(nextSibling)loadVideoForItem(nextSibling);
+        // 再生アイコン消す
+        const playIcon=document.getElementById('videoPlayIcon');
+        if(playIcon)playIcon.style.opacity='0';
+      }else if(entry.intersectionRatio<0.3){
+        // 画面外→停止
+        video.pause();
+      }
+    });
+  },{root:fs,threshold:[0.3,0.7]});
   
-  const fs=document.getElementById('videoFullscreen');
-  const h=fs.clientHeight;
-  
-  setSlotsTransition(true);
-  positionSlots(direction>0?-h:h);
-  
-  setTimeout(()=>{
-    videoQueuePos=((videoQueuePos+direction)%videoQueue.length+videoQueue.length)%videoQueue.length;
-    setSlotsTransition(false);
-    positionSlots(0);
-    refreshAllSlots();
-    const playIcon=document.getElementById('videoPlayIcon');
-    if(playIcon)playIcon.style.opacity='0';
-    videoTransitioning=false;
-  },300);
+  document.querySelectorAll('.vid-item').forEach(it=>videoScrollObserver.observe(it));
 }
 
 function toggleVideoBackBtn(){
@@ -1602,7 +1601,8 @@ function closeVideoFullscreen(){
   const fs=document.getElementById('videoFullscreen');
   fs.style.display='none';
   // 全videoを停止
-  document.querySelectorAll('#videoFullscreen .vid-slot video').forEach(v=>{v.pause();v.removeAttribute('src');v.load();v.dataset.idx='';});
+  document.querySelectorAll('#videoFullscreen video').forEach(v=>{v.pause();v.removeAttribute('src');v.load();});
+  if(videoScrollObserver){videoScrollObserver.disconnect();videoScrollObserver=null;}
   document.body.style.overflow='auto';
   swipeEnabled=true;
   
@@ -1646,42 +1646,26 @@ document.addEventListener('DOMContentLoaded',()=>{
   
   const fs=document.getElementById('videoFullscreen');
   
+  // タップ判定のみ（スクロールはブラウザネイティブ）
+  let tapStartY=0,tapStartX=0,tapStartT=0;
   fs.addEventListener('touchstart',e=>{
-    if(videoTransitioning)return;
-    videoSwipeStartY=e.changedTouches[0].screenY;
-    videoSwipeCurrentY=videoSwipeStartY;
-    videoSwipeActive=true;
-    setSlotsTransition(false);
-    e.stopPropagation();
-  },{passive:true});
-  
-  fs.addEventListener('touchmove',e=>{
-    if(!videoSwipeActive||videoTransitioning)return;
-    videoSwipeCurrentY=e.changedTouches[0].screenY;
-    const dy=videoSwipeCurrentY-videoSwipeStartY;
-    positionSlots(dy);
-    e.stopPropagation();
+    tapStartY=e.changedTouches[0].clientY;
+    tapStartX=e.changedTouches[0].clientX;
+    tapStartT=Date.now();
   },{passive:true});
   
   fs.addEventListener('touchend',e=>{
-    if(!videoSwipeActive)return;
-    videoSwipeActive=false;
-    const dy=videoSwipeCurrentY-videoSwipeStartY;
-    const fsH=fs.clientHeight;
-    const threshold=fsH*0.2;
-    
-    if(dy<-threshold){
-      shiftVideo(1); // 上スワイプ→次へ
-    }else if(dy>threshold){
-      shiftVideo(-1); // 下スワイプ→前へ
-    }else if(Math.abs(dy)<25){
-      // タップ判定
-      const t=e.changedTouches[0];
+    const t=e.changedTouches[0];
+    const dy=Math.abs(t.clientY-tapStartY);
+    const dx=Math.abs(t.clientX-tapStartX);
+    const dt=Date.now()-tapStartT;
+    // タップ＝動いてない＆短時間
+    if(dy<10&&dx<10&&dt<300){
+      // 戻るボタンエリア
       const backBtn=document.getElementById('videoBackBtn');
       if(backBtn && backBtn.style.opacity==='1'){
         const r=backBtn.getBoundingClientRect();
         if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom){
-          setSlotsTransition(true);positionSlots(0);
           return;
         }
       }
@@ -1689,27 +1673,26 @@ document.addEventListener('DOMContentLoaded',()=>{
       const cxMin=w*0.25,cxMax=w*0.75;
       const cyMin=h*0.3,cyMax=h*0.7;
       const inCenter=t.clientX>=cxMin&&t.clientX<=cxMax&&t.clientY>=cyMin&&t.clientY<=cyMax;
-      if(inCenter){
-        const vid=document.querySelector('.vid-slot[data-pos="curr"] video');
+      // 現在表示中のvideoを取得
+      const items=document.querySelectorAll('.vid-item');
+      let curVid=null;
+      items.forEach(it=>{
+        const r=it.getBoundingClientRect();
+        if(r.top<=h/2&&r.bottom>=h/2)curVid=it.querySelector('video');
+      });
+      if(inCenter && curVid){
         const playIcon=document.getElementById('videoPlayIcon');
-        if(vid){
-          if(vid.paused){
-            vid.play().catch(()=>{});
-            if(playIcon)playIcon.style.opacity='0';
-          }else{
-            vid.pause();
-            if(playIcon)playIcon.style.opacity='1';
-          }
+        if(curVid.paused){
+          curVid.play().catch(()=>{});
+          if(playIcon)playIcon.style.opacity='0';
+        }else{
+          curVid.pause();
+          if(playIcon)playIcon.style.opacity='1';
         }
-      }else{
+      }else if(!inCenter){
         toggleVideoBackBtn();
       }
-      setSlotsTransition(true);positionSlots(0);
-    }else{
-      // 元に戻す
-      setSlotsTransition(true);positionSlots(0);
     }
-    e.stopPropagation();
   },{passive:true});
 });
 
