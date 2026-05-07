@@ -60,11 +60,15 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 .goal-btn{background:none;border:0.5px solid var(--border2);color:var(--muted);font-size:11px;padding:4px 12px;border-radius:20px;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
 .tab-bar{display:flex;overflow-x:auto;border-bottom:0.5px solid var(--border);background:rgba(0,0,0,0.95);backdrop-filter:blur(10px)}
 .tab-bar::-webkit-scrollbar{display:none}
-.tab-btn{flex-shrink:0;flex:1;min-width:55px;padding:14px 4px 12px;font-size:9px;letter-spacing:.25em;color:var(--muted);background:none;border:none;border-bottom:1px solid transparent;cursor:pointer;white-space:nowrap;font-family:var(--display);transition:.3s ease;font-weight:400;text-transform:uppercase}
+.tab-btn{flex-shrink:0;flex:1;min-width:55px;padding:14px 4px 12px;font-size:9px;letter-spacing:.25em;color:var(--muted);background:none;border:none;border-bottom:1px solid transparent;cursor:pointer;white-space:nowrap;font-family:var(--display);transition:color .2s ease,border-color .2s ease,transform .15s ease;font-weight:400;text-transform:uppercase}
 .tab-btn.active{color:var(--gold);border-bottom-color:var(--gold)}
+.tab-btn:active{transform:scale(.92)}
 .section{display:none;padding:18px 14px 0;animation:fi .2s ease}
 .section.active{display:block}
 @keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes heroFadeIn{from{opacity:0;transform:scale(1.04)}to{opacity:1;transform:scale(1)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tabIndIn{from{opacity:0;transform:scaleX(0)}to{opacity:1;transform:scaleX(1)}}
 .sec-label{font-family:var(--serif);font-size:24px;letter-spacing:.02em;color:var(--text);margin-bottom:20px;font-weight:400;font-style:italic;position:relative;padding-bottom:12px}
 .sec-label::after{content:'';position:absolute;bottom:0;left:0;width:40px;height:1px;background:var(--gold)}
 .sec-label::before{content:attr(data-num);position:absolute;top:-4px;right:0;font-family:var(--display);font-size:11px;color:var(--muted);letter-spacing:.2em;font-style:normal;font-weight:400}
@@ -132,7 +136,7 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 .diary-save{width:100%;margin-top:10px;padding:12px;border-radius:12px;border:none;background:var(--accent);color:var(--black);font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
 .diary-saved{font-size:12px;color:var(--green);text-align:center;margin-top:8px;opacity:0;transition:.3s}
 .diary-saved.show{opacity:1}
-.feed-card{background:var(--surface);border:0.5px solid var(--border);border-radius:15px;padding:15px;margin-bottom:10px;position:relative;overflow:hidden}
+.feed-card{background:var(--surface);border:0.5px solid var(--border);border-radius:15px;padding:15px;margin-bottom:10px;position:relative;overflow:hidden;transition:transform .15s ease,box-shadow .15s ease}
 .feed-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent4)}
 .feed-tag{font-size:10px;letter-spacing:.15em;color:var(--accent4);margin-bottom:6px;text-transform:uppercase}
 .feed-title{font-size:15px;font-weight:500;line-height:1.4;margin-bottom:7px}
@@ -183,14 +187,14 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 .timer-mini-text{font-size:12px;flex:1;color:var(--text2)}
 .timer-mini-time{font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--accent3)}
 .timer-mini-resume{font-size:11px;color:var(--accent3);padding:4px 10px;border:0.5px solid var(--accent3);border-radius:8px;background:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;flex-shrink:0}
-.hero-section{margin:-18px -14px 20px -14px;height:180px;overflow:hidden;position:relative;group}
+.hero-section{margin:-18px -14px 20px -14px;height:180px;overflow:hidden;position:relative}
 .hero-img{width:100%;height:100%;object-fit:cover}
 .hero-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.3) 0%,rgba(0,0,0,0.9) 100%)}
 .hero-text{position:absolute;bottom:16px;left:20px;right:20px}
 .hero-title{font-family:var(--serif);font-size:28px;color:#fff;font-style:italic;line-height:1.1;letter-spacing:.02em}
 .hero-subtitle{font-family:var(--display);font-size:10px;color:rgba(255,255,255,0.8);letter-spacing:.3em;margin-top:6px;text-transform:uppercase}
-.hero-controls{position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:.2s}
-.hero-section:hover .hero-controls{opacity:1}
+.hero-controls{position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:.2s;pointer-events:none}
+.hero-controls.visible{opacity:1;pointer-events:auto}
 .hero-btn{background:rgba(0,0,0,0.6);border:0.5px solid rgba(255,255,255,0.3);color:#fff;border-radius:4px;padding:6px 10px;font-size:10px;cursor:pointer;font-family:var(--sans);letter-spacing:.05em}
 .hero-btn:hover{background:rgba(0,0,0,0.8)}
 </style>
@@ -260,6 +264,7 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
   <button class="tab-btn" onclick="switchTab('record',this)">RECORD</button>
 </div>
 
+<div class="tab-content-wrap" id="tabContentWrap">
 <div class="section active" id="tab-study">
   <div id="hero-study"></div>
   <div class="sec-label" data-num="01">Study Log</div>
@@ -422,8 +427,10 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 <!-- Video fullscreen overlay (outside tabs, fixed positioning) -->
 <div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;flex-direction:column;align-items:center;justify-content:center">
   <button style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:28px;cursor:pointer;z-index:1001;padding:8px 14px;border-radius:8px" onclick="closeVideoFullscreen()">←</button>
-  <video id="videoPlayer" style="width:100%;height:100%;object-fit:contain;background:#000" controls autoplay playsinline></video>
+  <video id="videoPlayer" style="width:100%;height:100%;object-fit:contain;background:#000" autoplay loop playsinline></video>
   <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);color:#aaa;font-size:12px;text-align:center;background:rgba(0,0,0,.5);padding:4px 12px;border-radius:12px;z-index:1001" id="videoCounter"></div>
+</div>
+
 </div>
 
 </div>
@@ -476,12 +483,12 @@ let goalMins=+localStorage.getItem('ym4_goal')||360;
 
 // ===== HERO IMAGES & TEXT =====
 let heroData=JSON.parse(localStorage.getItem('ym4_heroes')||'null')||{
-  study:{img:'',title:'Study',subtitle:'Focus & Master'},
-  check:{img:'',title:'Discipline',subtitle:'Daily Habits'},
-  health:{img:'',title:'Health',subtitle:'Mind & Body'},
-  diary:{img:'',title:'Journal',subtitle:'Reflection'},
-  record:{img:'',title:'The Record',subtitle:'A Legacy in Motion'},
-  motivation:{img:'',title:'Ascend',subtitle:'Master Every Day'}
+  study:{img:'',vid:'',title:'Study',subtitle:'Focus & Master',zoom:1,posX:50,posY:50},
+  check:{img:'',vid:'',title:'Discipline',subtitle:'Daily Habits',zoom:1,posX:50,posY:50},
+  health:{img:'',vid:'',title:'Health',subtitle:'Mind & Body',zoom:1,posX:50,posY:50},
+  diary:{img:'',vid:'',title:'Journal',subtitle:'Reflection',zoom:1,posX:50,posY:50},
+  record:{img:'',vid:'',title:'The Record',subtitle:'A Legacy in Motion',zoom:1,posX:50,posY:50},
+  motivation:{img:'',vid:'',title:'Ascend',subtitle:'Master Every Day',zoom:1,posX:50,posY:50}
 };
 
 function saveHeroData(){localStorage.setItem('ym4_heroes',JSON.stringify(heroData));}
@@ -490,44 +497,101 @@ function renderHero(tabName){
   const h=heroData[tabName];
   if(!h) return '';
   const hasImg=h.img && h.img.length>0;
-  const hasContent=hasImg || (h.title && h.title.trim()) || (h.subtitle && h.subtitle.trim());
+  const hasVid=h.vid && h.vid.length>0;
+  const hasMedia=hasImg||hasVid;
+  const hasContent=hasMedia || (h.title && h.title.trim()) || (h.subtitle && h.subtitle.trim());
   if(!hasContent){
-    // 空状態：追加ボタン表示
     return `<div style="margin:-20px -20px 16px -20px;display:flex;align-items:center;justify-content:center;min-height:60px;background:var(--surface);border-bottom:0.5px solid var(--border)">
-      <button onclick="openHeroEditor('${tabName}')" style="background:none;border:1px dashed var(--muted);color:var(--muted);font-size:11px;letter-spacing:.2em;padding:8px 20px;border-radius:4px;cursor:pointer;font-family:var(--display)">+ ADD PHOTO & TEXT</button>
+      <button onclick="openHeroEditor('${tabName}')" style="background:none;border:1px dashed var(--muted);color:var(--muted);font-size:11px;letter-spacing:.2em;padding:8px 20px;border-radius:4px;cursor:pointer;font-family:var(--display)">+ ADD MEDIA & TEXT</button>
     </div>`;
   }
-  return `<div class="hero-section">
-    ${hasImg ? `<img class="hero-img" src="${h.img}" alt="">` : '<div style="position:absolute;inset:0;background:linear-gradient(135deg,#111 0%,#222 100%)"></div>'}
+  const mediaHtml = hasVid
+    ? `<video class="hero-img" src="${h.vid}" autoplay muted loop playsinline style="object-fit:cover;object-position:${h.posX||50}% ${h.posY||50}%"></video>`
+    : hasImg
+      ? `<img class="hero-img" src="${h.img}" alt="" style="object-position:${h.posX||50}% ${h.posY||50}%;transform:scale(${h.zoom||1})">`
+      : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#111 0%,#222 100%)"></div>`;
+  return `<div class="hero-section" id="hero-wrap-${tabName}" onclick="heroToggleEdit('${tabName}')">
+    ${mediaHtml}
     <div class="hero-overlay"></div>
     <div class="hero-text">
       <div class="hero-title">${h.title||''}</div>
       <div class="hero-subtitle">${h.subtitle||''}</div>
     </div>
-    <div class="hero-controls">
-      <button class="hero-btn" onclick="openHeroEditor('${tabName}')">✎ Edit</button>
+    <div class="hero-controls" id="hero-ctrl-${tabName}">
+      <button class="hero-btn" onclick="event.stopPropagation();openHeroEditor('${tabName}')" ontouchstart="event.stopPropagation()">✎ Edit</button>
     </div>
   </div>`;
 }
 
+function heroToggleEdit(tabName){
+  const ctrl=document.getElementById('hero-ctrl-'+tabName);
+  if(!ctrl) return;
+  const isVisible=ctrl.classList.contains('visible');
+  // 全部閉じる
+  document.querySelectorAll('.hero-controls').forEach(el=>el.classList.remove('visible'));
+  if(!isVisible) ctrl.classList.add('visible');
+  // 外クリックリスナー設置
+  setTimeout(()=>{
+    document.addEventListener('click',closeHeroCtrlOnOutside,{once:true});
+  },50);
+}
+
+function closeHeroCtrlOnOutside(e){
+  // 直近のhero-sectionの中か確認
+  const heroSect=e.target.closest('.hero-section');
+  if(heroSect) return; // 内側なら何もしない
+  // 外側ならすべてクローズ
+  document.querySelectorAll('.hero-controls.visible').forEach(el=>el.classList.remove('visible'));
+}
+
 function openHeroEditor(tabName){
-  const h=heroData[tabName]||{img:'',title:'',subtitle:''};
+  const h=heroData[tabName]||{img:'',vid:'',title:'',subtitle:'',posX:50,posY:50,zoom:1};
   const hasImg=h.img && h.img.length>0;
+  const hasVid=h.vid && h.vid.length>0;
   const overlay=document.createElement('div');
   overlay.className='modal-bg open';
   overlay.id='heroEditorOverlay';
+  const previewHtml = hasVid
+    ? `<div style="width:100%;height:120px;border-radius:8px;overflow:hidden;margin-bottom:10px;position:relative">
+        <video src="${h.vid}" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover"></video>
+        <button onclick="deleteHeroMedia('${tabName}')" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);border:none;color:#fff;font-size:11px;padding:4px 8px;border-radius:4px;cursor:pointer">✕</button>
+       </div>`
+    : hasImg
+      ? `<div style="width:100%;height:120px;border-radius:8px;overflow:hidden;margin-bottom:10px;position:relative">
+          <img src="${h.img}" style="width:100%;height:100%;object-fit:cover">
+          <button onclick="deleteHeroMedia('${tabName}')" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);border:none;color:#fff;font-size:11px;padding:4px 8px;border-radius:4px;cursor:pointer">✕</button>
+         </div>`
+      : '';
+  const adjustHtml = hasImg ? `
+    <div style="margin-bottom:16px;padding:12px;background:var(--surface2);border-radius:8px">
+      <div style="font-size:11px;color:var(--muted);letter-spacing:.15em;margin-bottom:10px">ADJUST</div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Zoom: <span id="heroZoomVal">${Math.round((h.zoom||1)*100)}%</span></div>
+        <input type="range" id="heroZoom" min="100" max="300" value="${Math.round((h.zoom||1)*100)}" style="width:100%" oninput="heroAdjustPreview('${tabName}')">
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Position X: <span id="heroPosXVal">${h.posX||50}%</span></div>
+        <input type="range" id="heroPosX" min="0" max="100" value="${h.posX||50}" style="width:100%" oninput="heroAdjustPreview('${tabName}')">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Position Y: <span id="heroPosYVal">${h.posY||50}%</span></div>
+        <input type="range" id="heroPosY" min="0" max="100" value="${h.posY||50}" style="width:100%" oninput="heroAdjustPreview('${tabName}')">
+      </div>
+      <div style="margin-top:10px;width:100%;height:80px;border-radius:6px;overflow:hidden;position:relative;border:0.5px solid var(--border)">
+        <img id="heroAdjPreview" src="${h.img}" style="width:100%;height:100%;object-fit:cover;transform:scale(${h.zoom||1});object-position:${h.posX||50}% ${h.posY||50}%">
+      </div>
+    </div>` : '';
   overlay.innerHTML=`
     <div class="modal" style="max-height:90vh;overflow-y:auto">
       <div class="modal-title" style="margin-bottom:16px">Edit Banner</div>
-      <div style="margin-bottom:16px">
-        ${hasImg ? `<div style="width:100%;height:120px;border-radius:8px;overflow:hidden;margin-bottom:10px;position:relative">
-          <img src="${h.img}" style="width:100%;height:100%;object-fit:cover">
-          <button onclick="deleteHeroImg('${tabName}')" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);border:none;color:#fff;font-size:11px;padding:4px 8px;border-radius:4px;cursor:pointer">✕ Remove</button>
-        </div>` : ''}
-        <button onclick="uploadHeroImage('${tabName}')" style="width:100%;padding:10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;color:var(--text2);font-size:12px;cursor:pointer;letter-spacing:.1em">
-          ${hasImg ? '🔄 Change Photo' : '📷 Add Photo'}
-        </button>
+      <div style="margin-bottom:12px">
+        ${previewHtml}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button onclick="uploadHeroImage('${tabName}')" style="padding:10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;color:var(--text2);font-size:12px;cursor:pointer">📷 Photo</button>
+          <button onclick="uploadHeroVideo('${tabName}')" style="padding:10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;color:var(--text2);font-size:12px;cursor:pointer">🎬 Video</button>
+        </div>
       </div>
+      ${adjustHtml}
       <div style="margin-bottom:12px">
         <div style="font-size:11px;color:var(--muted);letter-spacing:.15em;margin-bottom:6px">TITLE</div>
         <input id="heroTitleInput" value="${h.title||''}" style="width:100%;padding:10px;background:var(--surface2);border:0.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;box-sizing:border-box" placeholder="e.g. ASCEND">
@@ -542,11 +606,33 @@ function openHeroEditor(tabName){
   document.body.appendChild(overlay);
 }
 
+function heroAdjustPreview(tabName){
+  const zoom=document.getElementById('heroZoom');
+  const posX=document.getElementById('heroPosX');
+  const posY=document.getElementById('heroPosY');
+  const prev=document.getElementById('heroAdjPreview');
+  if(!zoom||!posX||!posY||!prev) return;
+  const z=zoom.value/100;
+  const x=posX.value;
+  const y=posY.value;
+  document.getElementById('heroZoomVal').textContent=zoom.value+'%';
+  document.getElementById('heroPosXVal').textContent=x+'%';
+  document.getElementById('heroPosYVal').textContent=y+'%';
+  prev.style.transform=`scale(${z})`;
+  prev.style.objectPosition=`${x}% ${y}%`;
+}
+
 function saveHeroEdit(tabName){
   const title=document.getElementById('heroTitleInput').value;
   const subtitle=document.getElementById('heroSubtitleInput').value;
+  const zoomEl=document.getElementById('heroZoom');
+  const posXEl=document.getElementById('heroPosX');
+  const posYEl=document.getElementById('heroPosY');
   heroData[tabName].title=title;
   heroData[tabName].subtitle=subtitle;
+  if(zoomEl) heroData[tabName].zoom=zoomEl.value/100;
+  if(posXEl) heroData[tabName].posX=+posXEl.value;
+  if(posYEl) heroData[tabName].posY=+posYEl.value;
   saveHeroData();
   document.getElementById('heroEditorOverlay').remove();
   renderHeroToDOM(tabName);
@@ -559,15 +645,16 @@ function renderHeroToDOM(tabName){
 
 function editHero(tabName){ openHeroEditor(tabName); }
 
-function deleteHeroImg(tabName){
+function deleteHeroMedia(tabName){
   heroData[tabName].img='';
+  heroData[tabName].vid='';
   saveHeroData();
-  // エディターを閉じて再開
   const overlay=document.getElementById('heroEditorOverlay');
   if(overlay) overlay.remove();
   openHeroEditor(tabName);
   renderHeroToDOM(tabName);
 }
+function deleteHeroImg(tabName){ deleteHeroMedia(tabName); }
 
 function uploadHeroImage(tabName){
   const input=document.createElement('input');
@@ -579,8 +666,38 @@ function uploadHeroImage(tabName){
     const reader=new FileReader();
     reader.onload=(ev)=>{
       heroData[tabName].img=ev.target.result;
+      heroData[tabName].vid='';
+      heroData[tabName].zoom=1;
+      heroData[tabName].posX=50;
+      heroData[tabName].posY=50;
       saveHeroData();
-      // エディターを閉じて再開
+      const overlay=document.getElementById('heroEditorOverlay');
+      if(overlay) overlay.remove();
+      openHeroEditor(tabName);
+      renderHeroToDOM(tabName);
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function uploadHeroVideo(tabName){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='video/mp4,video/mov,video/quicktime,video/*';
+  input.onchange=(e)=>{
+    const file=e.target.files[0];
+    if(!file) return;
+    // 動画サイズチェック (50MB上限)
+    if(file.size > 50*1024*1024){
+      alert('動画サイズは50MB以下にしてください');
+      return;
+    }
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      heroData[tabName].vid=ev.target.result;
+      heroData[tabName].img='';
+      saveHeroData();
       const overlay=document.getElementById('heroEditorOverlay');
       if(overlay) overlay.remove();
       openHeroEditor(tabName);
@@ -1304,6 +1421,7 @@ function showVideoFullscreen(url,current,total){
   const fullscreen=document.getElementById('videoFullscreen');
   document.getElementById('videoPlayer').src=url;
   document.getElementById('videoCounter').textContent=`${current}/${total}`;
+  currentVideoIdx=current-1;
   fullscreen.style.display='flex';
   document.body.style.overflow='hidden';
   swipeEnabled=false;
@@ -1361,6 +1479,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     const el=document.getElementById('hero-'+t);
     if(el) el.innerHTML=renderHero(t);
   });
+  // 初期wrapの高さセット
+  setTimeout(()=>{
+    const activeSection=document.querySelector('.section.active');
+    const wrap=document.getElementById('tabContentWrap');
+    if(activeSection&&wrap) wrap.style.minHeight=activeSection.scrollHeight+'px';
+  },200);
   // Hide loading screen
   setTimeout(() => {
     const loading = document.getElementById('loadingScreen');
@@ -2107,7 +2231,13 @@ function showScoreBreakdown(){
   modal.classList.add('open');
 }
 
-function switchTab(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');btn.classList.add('active');if(id==='record')renderRecord();}
+function switchTab(id,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='record') renderRecord();
+}
 
 function showStudyGraph(){
   // Get last 7 days of study data
