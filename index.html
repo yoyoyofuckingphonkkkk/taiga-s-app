@@ -424,11 +424,31 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
   </div>
 </div>
 
-<!-- Video fullscreen overlay (outside tabs, fixed positioning) -->
-<div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;flex-direction:column;align-items:center;justify-content:center">
-  <button style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:28px;cursor:pointer;z-index:1001;padding:8px 14px;border-radius:8px" onclick="closeVideoFullscreen()">←</button>
-  <video id="videoPlayer" style="width:100%;height:100%;object-fit:contain;background:#000" autoplay loop playsinline></video>
-  <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);color:#aaa;font-size:12px;text-align:center;background:rgba(0,0,0,.5);padding:4px 12px;border-radius:12px;z-index:1001" id="videoCounter"></div>
+<!-- Video fullscreen overlay - Reels style -->
+<div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;overflow:hidden;touch-action:none">
+  <!-- 戻るボタン -->
+  <button onclick="closeVideoFullscreen()" style="position:absolute;top:20px;left:20px;z-index:1002;background:none;border:none;color:#fff;font-size:26px;cursor:pointer;padding:8px">←</button>
+  <!-- カウンター -->
+  <div id="videoCounter" style="position:absolute;top:24px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.7);font-size:12px;z-index:1002;font-family:'Bebas Neue',sans-serif;letter-spacing:.1em"></div>
+  <!-- スライドコンテナ -->
+  <div id="reelsContainer" style="width:100%;height:100%;position:relative;will-change:transform;transition:transform .0s">
+    <!-- 前の動画 -->
+    <div id="reelPrev" style="position:absolute;top:-100%;left:0;width:100%;height:100%;background:#000">
+      <video id="videoPrev" style="width:100%;height:100%;object-fit:cover" playsinline muted></video>
+    </div>
+    <!-- 現在の動画 -->
+    <div id="reelCurrent" style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000">
+      <video id="videoPlayer" style="width:100%;height:100%;object-fit:cover" autoplay loop playsinline></video>
+    </div>
+    <!-- 次の動画 -->
+    <div id="reelNext" style="position:absolute;top:100%;left:0;width:100%;height:100%;background:#000">
+      <video id="videoNext" style="width:100%;height:100%;object-fit:cover" playsinline muted></video>
+    </div>
+  </div>
+  <!-- コントロール（タップで表示） -->
+  <div id="videoControls" style="position:absolute;inset:0;z-index:1001;display:none;align-items:center;justify-content:center">
+    <button id="videoPlayBtn" onclick="reelTogglePlay()" style="background:rgba(0,0,0,.5);border:none;color:#fff;font-size:40px;width:72px;height:72px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center">⏸</button>
+  </div>
 </div>
 
 </div>
@@ -1392,1320 +1412,126 @@ function renderVideoManagementList(){
 }
 
 
+// ===== REELS VIDEO =====
 let currentVideoIdx=0;
-let videoSwipeStartY=0;
-let videoSwipeStartX=0;
-let shownVideoIndices=[];
 let videoClosedByBackButton=false;
+let reelDragY=0;
+let reelDragging=false;
+let reelControlsTimer=null;
 
 function playVideoFullscreen(idx){
-  if(!videos.length)return;
-  
-  // If no index provided, pick random
-  if(idx===undefined){
-    idx=Math.floor(Math.random()*videos.length);
-  }
-  
-  if(!videos[idx])return;
+  if(!videos.length) return;
+  if(idx===undefined) idx=Math.floor(Math.random()*videos.length);
+  if(!videos[idx]) return;
   currentVideoIdx=idx;
-  // Only track as shown if it's not the initial play
-  shownVideoIndices=[];
-  
-  // Push history state so back button closes video
   window.history.pushState({videoOpen:true},'');
-  
-  showVideoFullscreen(videos[idx].url,idx+1,videos.length);
-}
-
-function showVideoFullscreen(url,current,total){
-  const fullscreen=document.getElementById('videoFullscreen');
-  document.getElementById('videoPlayer').src=url;
-  document.getElementById('videoCounter').textContent=`${current}/${total}`;
-  currentVideoIdx=current-1;
-  fullscreen.style.display='flex';
+  reelLoad(idx);
+  document.getElementById('videoFullscreen').style.display='block';
   document.body.style.overflow='hidden';
   swipeEnabled=false;
 }
 
+function reelLoad(idx){
+  const cur=videos[idx];
+  const prev=videos[idx-1];
+  const next=videos[idx+1];
+  // 現在
+  const vp=document.getElementById('videoPlayer');
+  vp.src=cur.url; vp.play();
+  // 前
+  const vPrev=document.getElementById('videoPrev');
+  vPrev.src=prev?prev.url:'';
+  // 次
+  const vNext=document.getElementById('videoNext');
+  vNext.src=next?next.url:'';
+  // コンテナをリセット
+  const c=document.getElementById('reelsContainer');
+  c.style.transition='none';
+  c.style.transform='translateY(0)';
+  // カウンター
+  document.getElementById('videoCounter').textContent=`${idx+1} / ${videos.length}`;
+}
+
+function reelGo(dir){
+  // dir: 1=次, -1=前
+  const next=currentVideoIdx+dir;
+  if(next<0||next>=videos.length) return false;
+  const c=document.getElementById('reelsContainer');
+  c.style.transition='transform .32s cubic-bezier(.4,0,.2,1)';
+  c.style.transform=`translateY(${dir<0?'100%':'-100%'})`;
+  setTimeout(()=>{
+    currentVideoIdx=next;
+    reelLoad(next);
+  },320);
+  return true;
+}
+
+function showVideoFullscreen(url,current,total){
+  // 後方互換
+  playVideoFullscreen(current-1);
+}
+
+function reelTogglePlay(){
+  const v=document.getElementById('videoPlayer');
+  const btn=document.getElementById('videoPlayBtn');
+  if(v.paused){v.play();btn.textContent='⏸';}
+  else{v.pause();btn.textContent='▶';}
+}
+
 function nextRandomVideo(){
-  if(videos.length===0)return;
-  
-  // Get available indices (not yet shown)
-  const available=[];
-  for(let i=0;i<videos.length;i++){
-    if(!shownVideoIndices.includes(i)){
-      available.push(i);
-    }
-  }
-  
-  // If all shown, reset
-  if(available.length===0){
-    shownVideoIndices=[];
-    for(let i=0;i<videos.length;i++){
-      available.push(i);
-    }
-  }
-  
-  // Pick random from available
-  const randomIdx=available[Math.floor(Math.random()*available.length)];
-  shownVideoIndices.push(randomIdx);
-  showVideoFullscreen(videos[randomIdx].url,randomIdx+1,videos.length);
+  reelGo(1)||(currentVideoIdx=0,reelLoad(0));
 }
 
 function closeVideoFullscreen(){
-  document.getElementById('videoFullscreen').style.display='none';
+  document.getElementById('videoPlayer').pause();
   document.getElementById('videoPlayer').src='';
+  document.getElementById('videoFullscreen').style.display='none';
   document.body.style.overflow='auto';
   swipeEnabled=true;
-  // Restore motivation home view
   const home=document.getElementById('motivationHome');
   if(home)home.style.display='grid';
   document.getElementById('quotesView').style.display='none';
   document.getElementById('optionView').style.display='none';
-  
-  // Go back in history if not already closed by back button
-  if(!videoClosedByBackButton){
-    window.history.back();
-  }
-  
-  // Reset flag after short delay
-  setTimeout(()=>{videoClosedByBackButton=false;},100);
+  if(!videoClosedByBackButton) window.history.back();
 }
 
-// Vertical swipe inside video fullscreen (next video)
-document.addEventListener('DOMContentLoaded',()=>{
-  // Render all heroes
-  ['study','check','health','diary','record','motivation'].forEach(t=>{
-    const el=document.getElementById('hero-'+t);
-    if(el) el.innerHTML=renderHero(t);
-  });
-  // 初期wrapの高さセット
-  setTimeout(()=>{
-    const activeSection=document.querySelector('.section.active');
-    const wrap=document.getElementById('tabContentWrap');
-    if(activeSection&&wrap) wrap.style.minHeight=activeSection.scrollHeight+'px';
-  },200);
-  // Hide loading screen
-  setTimeout(() => {
-    const loading = document.getElementById('loadingScreen');
-    if (loading) {
-      loading.style.transition = 'opacity 0.8s ease-out';
-      loading.style.opacity = '0';
-      setTimeout(() => {
-        loading.style.display = 'none';
-        document.querySelector('.app').style.opacity = '1';
-        document.querySelector('.app').style.pointerEvents = 'auto';
-      }, 800);
-    }
-  }, 1000);
-  
+function toggleVideoControls(){
+  const ctrl=document.getElementById('videoControls');
+  ctrl.style.display='flex';
+  clearTimeout(reelControlsTimer);
+  reelControlsTimer=setTimeout(()=>ctrl.style.display='none',3000);
+}
+
+// Reels タッチ操作
+(function(){
   const fs=document.getElementById('videoFullscreen');
+  if(!fs) return;
+  let startY=0,startTime=0,moved=false;
   fs.addEventListener('touchstart',e=>{
-    videoSwipeStartY=e.changedTouches[0].screenY;
-    e.stopPropagation();
+    startY=e.touches[0].clientY;
+    startTime=Date.now();
+    moved=false;
+    document.getElementById('reelsContainer').style.transition='none';
+  },{passive:true});
+  fs.addEventListener('touchmove',e=>{
+    const dy=e.touches[0].clientY-startY;
+    moved=true;
+    document.getElementById('reelsContainer').style.transform=`translateY(${dy}px)`;
   },{passive:true});
   fs.addEventListener('touchend',e=>{
-    const dy=videoSwipeStartY-e.changedTouches[0].screenY;
-    
-    // Vertical swipe (80px threshold)
-    if(Math.abs(dy)>80){
-      nextRandomVideo();
+    const dy=e.changedTouches[0].clientY-startY;
+    const dt=Date.now()-startTime;
+    const fast=dt<300&&Math.abs(dy)>40;
+    const far=Math.abs(dy)>80;
+    if(moved&&(fast||far)){
+      reelGo(dy<0?1:-1);
+    } else {
+      const c=document.getElementById('reelsContainer');
+      c.style.transition='transform .2s ease';
+      c.style.transform='translateY(0)';
+      if(!moved||Math.abs(dy)<8) toggleVideoControls();
     }
-    e.stopPropagation();
   },{passive:true});
-});
-
-// Back button to close video
-window.addEventListener('popstate',()=>{
-  const fs=document.getElementById('videoFullscreen');
-  if(fs && fs.style.display!=='none' && fs.style.display!==''){
-    videoClosedByBackButton=true;
-    closeVideoFullscreen();
-  }
-});
-function setRecordPeriod(days){
-  recordPeriod=days;
-  document.querySelectorAll('.record-filter-btn').forEach(b=>b.classList.remove('active'));
-  event.target.classList.add('active');
-  renderRecord();
-}
-function renderRecord(){
-  const keys=Object.keys(allData).sort();
-  const now=new Date();
-  
-  let filteredKeys=keys;
-  if(recordPeriod>0){
-    const cutoff=new Date(now.getTime()-recordPeriod*24*60*60*1000).toISOString().slice(0,10);
-    filteredKeys=keys.filter(k=>k>=cutoff);
-  }
-  
-  if(filteredKeys.length===0){
-    document.getElementById('recordList').innerHTML='<div class="empty-record">No records yet.<br>Start logging today!</div>';
-    document.getElementById('recordStats').innerHTML='<div class="card" style="text-align:center;margin-bottom:0"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">平均</div><div style="font-family:\'Bebas Neue\',sans-serif;font-size:24px;color:var(--accent)">—</div></div><div class="card" style="text-align:center;margin-bottom:0"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">最高</div><div style="font-family:\'Bebas Neue\',sans-serif;font-size:24px;color:var(--accent)">—</div></div>';
-    renderCalendar();
-    return;
-  }
-  
-  // Calculate scores
-  const scores=filteredKeys.map(k=>({date:k,score:calcScoreFor(allData[k])}));
-  const avgScore=Math.round(scores.reduce((a,b)=>a+b.score,0)/scores.length);
-  const maxScore=Math.max(...scores.map(s=>s.score));
-  
-  document.getElementById('recordAvg').textContent=avgScore;
-  document.getElementById('recordMax').textContent=maxScore;
-  
-  // Draw graph
-  drawScoreGraph(scores);
-  
-  // List
-  const el=document.getElementById('recordList');
-  el.innerHTML='';
-  filteredKeys.forEach(k=>{
-    const r=allData[k];
-    const sc=calcScoreFor(r);
-    const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
-    const ch=Object.values(r.checks||{}).filter(Boolean).length;
-    const div=document.createElement('div');
-    div.className='record-day';
-    div.innerHTML=`<div class="record-header" onclick="this.nextElementSibling.classList.toggle('open')">
-      <div><div class="record-date-txt" style="cursor:pointer" onclick="showRecordDetail('${k}'); event.stopPropagation()">${k}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${minsToStr(sm)}</div></div>
-      <div class="record-score">${sc}</div>
-    </div>
-    <div class="record-body">
-      <div class="record-item"><span>Study</span><span class="record-val">${minsToStr(sm)}</span></div>
-      <div class="record-item"><span>Checks</span><span class="record-val">${ch}/${checkItems.length}</span></div>
-      <div class="record-item"><span>Exercise</span><span class="record-val">${r.health?.exercise||0}min</span></div>
-      <div class="record-item"><span>Meal</span><span class="record-val">${r.health?.meal||0}/5</span></div>
-    </div>`;
-    el.appendChild(div);
-  });
-  
-  // Render calendar
-  renderCalendar();
-}
-
-function drawScoreGraph(scores){
-  const svg=document.getElementById('scoreChart');
-  svg.innerHTML='';
-  
-  const w=400,h=300,padding=40;
-  const graphW=w-padding*2,graphH=h-padding*2;
-  
-  // Draw axes
-  const axes=document.createElementNS('http://www.w3.org/2000/svg','g');
-  axes.innerHTML=`
-    <line x1="${padding}" y1="${h-padding}" x2="${w-padding}" y2="${h-padding}" stroke="var(--border)" stroke-width="1"/>
-    <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${h-padding}" stroke="var(--border)" stroke-width="1"/>
-    <text x="10" y="${padding-10}" font-size="10" fill="var(--muted)">100</text>
-    <text x="10" y="${h-padding+15}" font-size="10" fill="var(--muted)">0</text>
-  `;
-  svg.appendChild(axes);
-  
-  // Draw line
-  const points=scores.map((s,i)=>{
-    const x=padding+(i/(scores.length-1||1))*graphW;
-    const y=h-padding-(s.score/100)*graphH;
-    return `${x},${y}`;
-  }).join(' ');
-  
-  const line=document.createElementNS('http://www.w3.org/2000/svg','polyline');
-  line.setAttribute('points',points);
-  line.setAttribute('stroke','var(--accent)');
-  line.setAttribute('stroke-width','2');
-  line.setAttribute('fill','none');
-  svg.appendChild(line);
-  
-  // Draw points
-  scores.forEach((s,i)=>{
-    const x=padding+(i/(scores.length-1||1))*graphW;
-    const y=h-padding-(s.score/100)*graphH;
-    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    circle.setAttribute('cx',x);
-    circle.setAttribute('cy',y);
-    circle.setAttribute('r','3');
-    circle.setAttribute('fill','var(--accent)');
-    svg.appendChild(circle);
-  });
-}
-
-function renderCalendar(){
-  const grid=document.getElementById('calendarGrid');
-  if(!grid)return; // グリッドが見つからない場合は処理しない
-  
-  const year=calendarMonthDate.getFullYear();
-  const month=calendarMonthDate.getMonth();
-  
-  // Month/Year header
-  const monthName=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month];
-  const headerEl=document.getElementById('calMonthYear');
-  if(headerEl)headerEl.textContent=`${monthName} ${year}`;
-  
-  // Get days in month
-  const firstDay=new Date(year,month,1).getDay();
-  const daysInMonth=new Date(year,month+1,0).getDate();
-  
-  grid.innerHTML='';
-  
-  // Day headers
-  ['S','M','T','W','T','F','S'].forEach(d=>{
-    const header=document.createElement('div');
-    header.style.cssText='color:var(--muted);font-weight:bold;padding:4px';
-    header.textContent=d;
-    grid.appendChild(header);
-  });
-  
-  // Empty cells
-  for(let i=0;i<firstDay;i++){
-    const empty=document.createElement('div');
-    grid.appendChild(empty);
-  }
-  
-  // Days
-  for(let day=1;day<=daysInMonth;day++){
-    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const hasData=allData[dateStr];
-    const dayEl=document.createElement('button');
-    dayEl.style.cssText=`
-      padding:6px;border-radius:6px;border:1px solid var(--border);
-      background:${hasData?'var(--accent)':'var(--surface)'};
-      color:${hasData?'var(--black)':'var(--text)'};
-      cursor:pointer;font-weight:bold;font-size:12px
-    `;
-    dayEl.textContent=day;
-    dayEl.onclick=()=>startEditMode(dateStr);
-    grid.appendChild(dayEl);
-  }
-}
-
-function prevCalMonth(){
-  calendarMonthDate.setMonth(calendarMonthDate.getMonth()-1);
-  renderCalendar();
-}
-
-function nextCalMonth(){
-  calendarMonthDate.setMonth(calendarMonthDate.getMonth()+1);
-  renderCalendar();
-}
-
-function calcScoreFor(r){
-  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
-  
-  // 70% Study - based on goal percentage
-  const studyScore=Math.min(70,(sm/goalMins)*70);
-  
-  // 15% Exercise (increased from 10)
-  const exScore=Math.min(15,(r.health?.exercise||0)/30*15);
-  
-  // 15% Other (checks + diary, increased from 10)
-  const n=Math.max(1,checkItems.length);
-  const checkScore=(Object.values(r.checks||{}).filter(Boolean).length/n)*10;
-  const diaryScore=(r.diary?.length||0)>0?5:0;
-  const otherScore=checkScore+diaryScore;
-  
-  return Math.min(100,Math.round(studyScore+exScore+otherScore));
-}
-function calcScore(){document.getElementById('topScore').textContent=calcScoreFor(state);}
-
-function showRecordDetail(date){
-  // Create or get record for this date
-  if(!allData[date]){
-    allData[date]={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:''};
-  }
-  const r=allData[date];
-  
-  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
-  const ch=Object.values(r.checks||{}).filter(Boolean).length;
-  const sc=calcScoreFor(r);
-  
-  // Study details
-  let studyDetail='';
-  subjects.forEach(s=>{
-    const total=s.books.reduce((a,b)=>a+(r.study?.[s.id]?.[b.id]||0),0);
-    if(total>0){
-      studyDetail+=`<div style="margin-bottom:8px"><div style="font-size:12px;color:var(--text);font-weight:bold">${s.name}</div>`;
-      s.books.forEach(b=>{
-        const min=r.study?.[s.id]?.[b.id]||0;
-        if(min>0)studyDetail+=`<div style="font-size:11px;color:var(--text2);margin-left:8px">• ${b.name}: ${minsToStr(min)}</div>`;
-      });
-      studyDetail+='</div>';
-    }
-  });
-  
-  // Checks details
-  let checksDetail='';
-  checkItems.forEach((item,i)=>{
-    const done=r.checks?.[item.id];
-    checksDetail+=`<div style="font-size:11px;color:var(--text2);margin-bottom:4px">${done?'✓':'○'} ${item.label}</div>`;
-  });
-  
-  const modal=document.createElement('div');
-  modal.className='modal-bg';
-  modal.id='recordDetailModal';
-  modal.innerHTML=`
-    <div class="modal" style="max-width:350px;max-height:80vh;overflow-y:auto">
-      <button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;position:absolute;top:16px;left:16px;padding:0" onclick="document.getElementById('recordDetailModal').remove()">←</button>
-      <div class="modal-title" style="text-align:center">${date}</div>
-      
-      <button style="position:absolute;top:16px;right:16px;background:var(--accent);color:var(--black);border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:bold" onclick="startEditMode('${date}')">Edit</button>
-      
-      <div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:12px;text-align:center">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">LIFE SCORE</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--accent)">${sc}</div>
-      </div>
-      
-      <div style="margin-bottom:12px">
-        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">STUDY TIME</div>
-        <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px">
-          <div style="color:var(--text);margin-bottom:8px">Total Study: <strong>${minsToStr(sm)}</strong></div>
-          ${studyDetail||'<div style="color:var(--muted)">No record</div>'}
-        </div>
-      </div>
-      
-      <div style="margin-bottom:12px">
-        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">EXERCISE</div>
-        <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px">
-          ${r.health?.exercise?`<div style="color:var(--text)">${r.health.exercise}m</div>`:'<div style="color:var(--muted)">No record</div>'}
-        </div>
-      </div>
-      
-      <div style="margin-bottom:12px">
-        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">CHECKS (${ch}/${checkItems.length})</div>
-        <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px">
-          ${checksDetail||'<div style="color:var(--muted)">No record</div>'}
-        </div>
-      </div>
-      
-      ${r.diary?`<div style="margin-bottom:12px">
-        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">DIARY</div>
-        <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px;color:var(--text2);line-height:1.6">${r.diary}</div>
-      </div>`:''}
-      
-      ${(()=>{
-        // Strength
-        const sd=r.strengthDaily||[];
-        if(!sd.length)return '';
-        let html='<div style="margin-bottom:12px"><div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">Strength</div><div style="background:var(--surface);border-radius:12px;padding:12px">';
-        sd.forEach(id=>{
-          const ex=strengthList.find(e=>e.id===id);
-          const d=r.strength?.[id]||{};
-          if(!ex)return;
-          const vol=(d.reps||0)*(d.weight||0);
-          html+=`<div style="margin-bottom:6px;font-size:11px"><span style="color:var(--accent3)">${ex.name}</span><span style="color:var(--text2);margin-left:8px">${d.reps||0}reps × ${d.weight||0}kg${vol?` = ${vol}kg`:''}</span>${d.time?`<span style="color:var(--muted);margin-left:6px">${d.time}m</span>`:''}</div>`;
-        });
-        html+='</div></div>';
-        return html;
-      })()}
-      
-      ${(()=>{
-        // Cardio
-        const cd=r.cardio||{};
-        const entries=Object.entries(cd).filter(([id,d])=>d.distance||d.time);
-        if(!entries.length)return '';
-        let html='<div style="margin-bottom:12px"><div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">Cardio</div><div style="background:var(--surface);border-radius:12px;padding:12px">';
-        entries.forEach(([id,d])=>{
-          const ex=cardioList.find(e=>e.id===id);
-          const name=ex?ex.name:id;
-          const kcal=calcCardioCalories(d.distance,d.time);
-          html+=`<div style="margin-bottom:6px;font-size:11px"><span style="color:var(--green)">${name}</span><span style="color:var(--text2);margin-left:8px">${d.distance||0}km ${d.time||0}m${kcal?` ${kcal}kcal`:''}</span></div>`;
-        });
-        html+='</div></div>';
-        return html;
-      })()}
-      
-      <button onclick="startEditMode('${date}')" style="width:100%;padding:12px;background:var(--accent);border:none;border-radius:12px;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.1em;color:var(--black);cursor:pointer;margin-top:4px">✏ このdをEdit</button>
-      
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.classList.add('open');
-}
-
-function startEditMode(date){
-  // Create record if doesn't exist
-  if(!allData[date]){
-    allData[date]={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:''};
-  }
-  
-  // Close detail modal
-  document.getElementById('recordDetailModal')?.remove();
-  
-  // Backup today's state
-  editStateBackup=JSON.parse(JSON.stringify(state));
-  editDate=date;
-  editMode=true;
-  
-  // Load past date's state into current state
-  state=JSON.parse(JSON.stringify(allData[date]||{study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:''}));
-  
-  // Show banner
-  const banner=document.getElementById('editBanner');
-  banner.style.display='flex';
-  document.getElementById('editBannerDate').textContent=`EDITING: ${date}`;
-  
-  // Render all with past data
-  renderStudy();
-  renderChecks();
-  renderExercise();
-  updateRing();
-  calcScore();
-  
-  // Switch to study tab
-  const studyBtn=Array.from(document.querySelectorAll('.tab-btn')).find(b=>b.textContent==='STUDY');
-  if(studyBtn)studyBtn.click();
-}
-
-function saveEdit(){
-  if(!editMode||!editDate)return;
-  
-  // Save edited state to allData
-  allData[editDate]=JSON.parse(JSON.stringify(state));
-  localStorage.setItem('ym4_all',JSON.stringify(allData));
-  localStorage.setItem('ym4_'+editDate,JSON.stringify(state));
-  
-  cancelEdit();
-}
-
-function cancelEdit(){
-  if(!editMode)return;
-  
-  // Restore today's state
-  state=editStateBackup;
-  editMode=false;
-  editDate=null;
-  editStateBackup=null;
-  
-  // Hide banner
-  document.getElementById('editBanner').style.display='none';
-  
-  // Re-render with today's data
-  renderStudy();
-  renderChecks();
-  renderExercise();
-  updateRing();
-  calcScore();
-  
-  // Go back to record tab
-  const recordBtn=Array.from(document.querySelectorAll('.tab-btn')).find(b=>b.textContent==='RECORD');
-  if(recordBtn)recordBtn.click();
-}
-
-function toggleFullscreen(){
-  const elem=document.documentElement;
-  if(!document.fullscreenElement){
-    if(elem.requestFullscreen){
-      elem.requestFullscreen().catch(err=>console.log('フルスクリーンエラー:',err));
-    }else if(elem.webkitRequestFullscreen){
-      elem.webkitRequestFullscreen();
-    }else if(elem.mozRequestFullScreen){
-      elem.mozRequestFullScreen();
-    }else if(elem.msRequestFullscreen){
-      elem.msRequestFullscreen();
-    }
-  }else{
-    if(document.exitFullscreen){
-      document.exitFullscreen();
-    }else if(document.webkitExitFullscreen){
-      document.webkitExitFullscreen();
-    }else if(document.mozCancelFullScreen){
-      document.mozCancelFullScreen();
-    }else if(document.msExitFullscreen){
-      document.msExitFullscreen();
-    }
-  }
-}
-
-function showSettings(){
-  const modal=document.createElement('div');
-  modal.className='modal-bg';
-  modal.id='settingsModal';
-  const bw=localStorage.getItem('ym4_bodyweight')||'70';
-  modal.innerHTML=`
-    <div class="modal">
-      <div class="modal-title">Settings</div>
-      <div style="margin-bottom:16px">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Weight（カロリー計算用）</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="number" id="bodyWeightInput" value="${bw}" min="30" max="200" style="flex:1;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px">
-          <span style="color:var(--muted);font-size:13px">kg</span>
-          <button onclick="saveBodyWeight()" class="modal-ok" style="width:auto;padding:8px 14px">保存</button>
-        </div>
-      </div>
-      <div style="margin-bottom:16px">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">背景</div>
-        <button onclick="setBlackBackground()" class="modal-ok" style="width:100%;margin-bottom:8px">黒色（デフォルト）</button>
-        <input type="file" id="wallpaperInput" accept="image/*" style="display:none" onchange="changeWallpaper()">
-        <button onclick="document.getElementById('wallpaperInput').click()" class="modal-ok" style="width:100%;margin-bottom:8px">Select Image</button>
-        <button onclick="resetWallpaper()" class="modal-ok" style="width:100%;background:var(--surface);color:var(--text);margin-bottom:8px">Reset to default</button>
-      </div>
-      <button onclick="document.getElementById('settingsModal').remove()" class="modal-cancel" style="width:100%">Close</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.classList.add('open');
-}
-
-function saveBodyWeight(){
-  const bw=document.getElementById('bodyWeightInput').value;
-  if(bw&&+bw>0){
-    localStorage.setItem('ym4_bodyweight',bw);
-    alert('WeightをSaved（'+bw+'kg）');
-  }
-}
-
-function setBlackBackground(){
-  localStorage.setItem('ym4_wallpaper','black');
-  document.documentElement.style.setProperty('--wallpaper-url','none');
-  document.getElementById('settingsModal')?.remove();
-  alert('Black background set');
-}
-
-function changeWallpaper(){
-  const file=document.getElementById('wallpaperInput').files[0];
-  if(!file)return;
-  
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const imageData=e.target.result;
-    localStorage.setItem('ym4_wallpaper',imageData);
-    applyWallpaper(imageData);
-    document.getElementById('settingsModal')?.remove();
-    alert('Wallpaperを変更しました');
-  };
-  reader.readAsDataURL(file);
-}
-
-function applyWallpaper(imageData){
-  // Handle both "data:image/..." and "url('data:image/...')" formats
-  const isUrl=imageData.startsWith('url(');
-  const url=isUrl?imageData:`url('${imageData}')`;
-  document.documentElement.style.setProperty('--wallpaper-url',url);
-}
-
-function resetWallpaper(){
-  localStorage.removeItem('ym4_wallpaper');
-  const defaultImage='data:image/jpeg;base64,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';
-  applyWallpaper(defaultImage);
-  document.getElementById('settingsModal')?.remove();
-  alert('デフォルトWallpaperに戻しました');
-}
-
-function showExerciseGraph(type){
-  const modal=document.createElement('div');
-  modal.className='modal-bg';
-  modal.id='exerciseGraphModal';
-  
-  // Build exercise list for selection
-  const exercises=type==='strength'?strengthList:cardioList;
-  if(!exercises.length){
-    alert('Exerciseがありません');
-    return;
-  }
-  
-  const exOptions=exercises.map((ex,i)=>`<option value="${ex.id}">${ex.name}</option>`).join('');
-  const metricOptions=type==='strength'
-    ?`<option value="volume">Total Volume (reps×kg)</option><option value="reps">総reps数</option><option value="kcal">Calories Burned</option>`
-    :`<option value="distance">Distance (km)</option><option value="time">Time (m)</option><option value="kcal">Calories Burned</option>`;
-  
-  modal.innerHTML=`
-    <div class="modal" style="max-height:90vh;overflow-y:auto">
-      <button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;margin-bottom:8px" onclick="document.getElementById('exerciseGraphModal').remove()">←</button>
-      <div class="modal-title">${type==='strength'?'Strength':'Cardio'} グラフ</div>
-      
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-        <select id="graphExercise" style="padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:13px" onchange="renderExerciseGraph('${type}')">
-          ${exOptions}
-        </select>
-        <select id="graphMetric" style="padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:13px" onchange="renderExerciseGraph('${type}')">
-          ${metricOptions}
-        </select>
-      </div>
-      
-      <div style="display:flex;gap:6px;margin-bottom:12px">
-        <button class="record-filter-btn active" id="egp7" onclick="setExGraphPeriod(7,this)">7d</button>
-        <button class="record-filter-btn" id="egp30" onclick="setExGraphPeriod(30,this)">30d</button>
-        <button class="record-filter-btn" id="egp90" onclick="setExGraphPeriod(90,this)">90d</button>
-        <button class="record-filter-btn" id="egpall" onclick="setExGraphPeriod(0,this)">全Period</button>
-      </div>
-      
-      <div id="exerciseGraphArea" style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:12px">
-        <svg id="exGraphSvg" style="width:100%;height:200px" viewBox="0 0 360 200"></svg>
-      </div>
-      
-      <div id="exerciseGraphList" style="max-height:250px;overflow-y:auto"></div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.classList.add('open');
-  
-  window._exGraphPeriod=7;
-  renderExerciseGraph(type);
-}
-
-function setExGraphPeriod(days,btn){
-  window._exGraphPeriod=days;
-  document.querySelectorAll('#exerciseGraphModal .record-filter-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  const type=document.getElementById('exerciseGraphModal').dataset.type||
-    (document.getElementById('graphMetric').innerHTML.includes('負荷量')?'strength':'cardio');
-  renderExerciseGraph(type);
-}
-
-function getExGraphValue(r,exId,metric,type){
-  if(type==='strength'){
-    const d=r.strength?.[exId];
-    if(!d)return null;
-    if(metric==='volume')return (d.reps||0)*(d.weight||0);
-    if(metric==='reps')return d.reps||0;
-    if(metric==='kcal')return calcStrengthCalories(d.time||0,d.intensity||'moderate');
-  }else{
-    const d=r.cardio?.[exId];
-    if(!d)return null;
-    if(metric==='distance')return d.distance||0;
-    if(metric==='time')return d.time||0;
-    if(metric==='kcal')return calcCardioCalories(d.distance,d.time);
-  }
-  return null;
-}
-
-function renderExerciseGraph(type){
-  const exId=document.getElementById('graphExercise').value;
-  const metric=document.getElementById('graphMetric').value;
-  const period=window._exGraphPeriod||7;
-  
-  const exercises=type==='strength'?strengthList:cardioList;
-  const ex=exercises.find(e=>e.id===exId);
-  
-  // Collect data
-  const keys=Object.keys(allData).sort();
-  const now=new Date();
-  let filtered=keys;
-  if(period>0){
-    const cutoff=new Date(now.getTime()-period*24*60*60*1000).toISOString().slice(0,10);
-    filtered=keys.filter(k=>k>=cutoff);
-  }
-  
-  // Get data points (only days with data for this exercise)
-  const points=filtered.map(date=>{
-    const val=getExGraphValue(allData[date],exId,metric,type);
-    return {date,val};
-  }).filter(p=>p.val!==null&&p.val>0);
-  
-  // Draw SVG
-  const svg=document.getElementById('exGraphSvg');
-  svg.innerHTML='';
-  const W=360,H=200,pad={t:20,r:20,b:30,l:45};
-  const iW=W-pad.l-pad.r,iH=H-pad.t-pad.b;
-  
-  const metricLabel={volume:'Total Volume(kg)',reps:'reps数',kcal:'kcal',distance:'km',time:'m'};
-  
-  if(points.length<2){
-    svg.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="var(--muted)" font-size="13">データが少なすぎます</text>`;
-  }else{
-    const vals=points.map(p=>p.val);
-    const minV=Math.min(...vals);
-    const maxV=Math.max(...vals);
-    const range=maxV-minV||1;
-    
-    const xStep=iW/(points.length-1);
-    const toX=(i)=>pad.l+i*xStep;
-    const toY=(v)=>pad.t+iH-(((v-minV)/range)*iH);
-    
-    // Grid lines
-    for(let i=0;i<=4;i++){
-      const y=pad.t+(iH/4)*i;
-      const v=Math.round(maxV-((range/4)*i));
-      svg.innerHTML+=`<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="var(--border)" stroke-width="0.5"/>`;
-      svg.innerHTML+=`<text x="${pad.l-4}" y="${y+4}" text-anchor="end" fill="var(--muted)" font-size="9">${v}</text>`;
-    }
-    
-    // Line path
-    const pathD=points.map((p,i)=>`${i===0?'M':'L'}${toX(i)},${toY(p.val)}`).join(' ');
-    svg.innerHTML+=`<path d="${pathD}" stroke="var(--accent3)" stroke-width="2" fill="none"/>`;
-    
-    // Dots (clickable)
-    points.forEach((p,i)=>{
-      const cx=toX(i),cy=toY(p.val);
-      svg.innerHTML+=`<circle cx="${cx}" cy="${cy}" r="5" fill="var(--accent3)" style="cursor:pointer" onclick="showRecordDetail('${p.date}')"/>`;
-      // X label (dates - show every n)
-      const step=Math.ceil(points.length/6);
-      if(i%step===0||i===points.length-1){
-        const label=p.date.slice(5);
-        svg.innerHTML+=`<text x="${cx}" y="${H-pad.b+14}" text-anchor="middle" fill="var(--muted)" font-size="8">${label}</text>`;
-      }
-    });
-    
-    // Metric label
-    svg.innerHTML+=`<text x="8" y="${pad.t}" fill="var(--muted)" font-size="9" transform="rotate(-90,8,${pad.t}) translate(-${iH/2},0)">${metricLabel[metric]||''}</text>`;
-  }
-  
-  // List below graph
-  const listEl=document.getElementById('exerciseGraphList');
-  listEl.innerHTML='';
-  if(points.length===0){
-    listEl.innerHTML='<div style="color:var(--muted);text-align:center;padding:16px;font-size:12px">No record</div>';
-    return;
-  }
-  
-  // Sort newest first
-  [...points].reverse().forEach(p=>{
-    const r=allData[p.date];
-    const div=document.createElement('div');
-    div.className='card';
-    div.style.cssText='margin-bottom:6px;cursor:pointer';
-    div.onclick=()=>showRecordDetail(p.date);
-    
-    // Build detail string
-    let detail='';
-    if(type==='strength'){
-      const d=r.strength?.[exId]||{};
-      detail=`${d.reps||0}reps × ${d.weight||0}kg`;
-      if(d.time)detail+=` ${d.time}m`;
-    }else{
-      const d=r.cardio?.[exId]||{};
-      detail=`${d.distance||0}km ${d.time||0}m`;
-    }
-    
-    div.innerHTML=`
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:12px;color:var(--accent3)">${p.date}</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--accent2)">${p.val}${metric==='distance'?'km':metric==='time'?'m':metric==='kcal'?'kcal':''}</div>
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">${detail}</div>
-    `;
-    listEl.appendChild(div);
-  });
-}
-
-function showScoreBreakdown(){
-  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study?.[s.id]?.[b.id]||0),0),0);
-  const n=Math.max(1,checkItems.length);
-  const checkScore=(Object.values(state.checks||{}).filter(Boolean).length/n)*10;
-  const studyScore=Math.min(70,sm/6*7);
-  const exScore=Math.min(15,(state.health?.exercise||0)/30*15);
-  const diaryScore=(state.diary?.length||0)>0?5:0;
-  const otherScore=checkScore+diaryScore;
-  const total=Math.round(studyScore+exScore+otherScore);
-  
-  const modal=document.createElement('div');
-  modal.className='modal-bg';
-  modal.id='scoreModal';
-  modal.innerHTML=`
-    <div class="modal" style="max-width:300px">
-      <div class="modal-title">Score Breakdown</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-        <div class="card" style="margin-bottom:0;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Study</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(studyScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">70%</div>
-        </div>
-        <div class="card" style="margin-bottom:0;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Exercise</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(exScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">15%</div>
-        </div>
-        <div class="card" style="margin-bottom:0;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Checks</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(checkScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">10%</div>
-        </div>
-        <div class="card" style="margin-bottom:0;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Diary</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(diaryScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">5%</div>
-        </div>
-      </div>
-      <div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:12px;text-align:center">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">TOTAL</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent)">${total}</div>
-      </div>
-      <div style="font-size:11px;color:var(--muted);line-height:1.6">
-        <div>Study: ${Math.round(sm/6)}/360m</div>
-        <div>Exercise: ${state.health?.exercise||0}/30m</div>
-        <div>Checks: ${Object.values(state.checks||{}).filter(Boolean).length}/${n}</div>
-        <div>d記: ${(state.diary?.length||0)>0?'✓':'○'}</div>
-      </div>
-      <button class="modal-cancel" onclick="document.getElementById('scoreModal').remove()" style="margin-top:12px;width:100%">Close</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.classList.add('open');
-}
-
-function switchTab(id,btn){
-  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));
-  document.getElementById('tab-'+id).classList.add('active');
-  btn.classList.add('active');
-  if(id==='record') renderRecord();
-}
-
-function showStudyGraph(){
-  // Get last 7 days of study data
-  const dates=[];
-  const times=[];
-  const maxVal=6; // 360 minutes
-  
-  for(let i=6;i>=0;i--){
-    const d=new Date();
-    d.setDate(d.getDate()-i);
-    const key='ym4_'+d.getFullYear().toString().padStart(4,'0')+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0');
-    const dayData=JSON.parse(localStorage.getItem(key)||'{}');
-    const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
-    dates.push((d.getMonth()+1)+'/'+d.getDate());
-    times.push(Math.round(sm/60)); // Convert to hours
-  }
-  
-  const modal=document.createElement('div');
-  modal.className='modal-bg';
-  modal.id='graphModal';
-  
-  const maxTime=Math.max(...times,6);
-  const chartHeight=200;
-  const chartWidth=300;
-  const barWidth=chartWidth/7;
-  
-  let bars='';
-  times.forEach((t,i)=>{
-    const h=(t/maxTime)*chartHeight;
-    const x=i*barWidth+barWidth/2;
-    const y=chartHeight-h;
-    bars+=`<rect x="${x-barWidth/3}" y="${y}" width="${barWidth*0.6}" height="${h}" fill="var(--accent)" opacity="0.8"/>`;
-  });
-  
-  modal.innerHTML=`
-    <div class="modal" style="max-width:340px">
-      <div class="modal-title">勉強時間の推移</div>
-      <div style="margin:20px 0;background:var(--surface3);border-radius:4px;padding:20px">
-        <svg viewBox="0 0 320 240" style="width:100%;height:auto">
-          <!-- Grid lines -->
-          <line x1="30" y1="20" x2="30" y2="220" stroke="var(--muted)" stroke-width="1"/>
-          <line x1="30" y1="220" x2="310" y2="220" stroke="var(--muted)" stroke-width="1"/>
-          
-          <!-- Y-axis labels -->
-          <text x="25" y="225" font-size="11" fill="var(--muted)" text-anchor="end">0h</text>
-          <text x="25" y="135" font-size="11" fill="var(--muted)" text-anchor="end">${(maxTime/2).toFixed(1)}h</text>
-          <text x="25" y="25" font-size="11" fill="var(--muted)" text-anchor="end">${maxTime.toFixed(1)}h</text>
-          
-          <!-- Bars with transform -->
-          <g>
-            ${bars}
-          </g>
-          
-          <!-- X-axis labels -->
-          ${dates.map((d,i)=>{
-            const x=i*barWidth+barWidth/2;
-            return `<text x="${x}" y="235" font-size="10" fill="var(--muted)" text-anchor="middle">${d}</text>`;
-          }).join('')}
-        </svg>
-      </div>
-      
-      <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
-        <div>平均: ${(times.reduce((a,b)=>a+b,0)/7).toFixed(1)}時間</div>
-        <div>最高: ${Math.max(...times)}時間</div>
-        <div>合計: ${times.reduce((a,b)=>a+b,0)}時間</div>
-      </div>
-      
-      <button class="modal-cancel" onclick="document.getElementById('graphModal').remove()" style="width:100%">Close</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.classList.add('open');
-}
-
-function showGraphModal(){
-  const modal=document.createElement('div');
-  modal.className='modal-bg';
-  modal.id='graphModalFull';
-  modal.style.zIndex='2000';
-  
-  const today=new Date();
-  const startDate=new Date(today);
-  startDate.setDate(startDate.getDate()-6);
-  
-  const formatDate=(d)=>d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0');
-  
-  let currentStart=new Date(startDate);
-  let currentEnd=new Date(today);
-  let currentTab='7d';
-  
-  const renderGraph=(start,end,period)=>{
-    const dates=[];
-    const times=[];
-    let current=new Date(start);
-    
-    while(current<=end){
-      const key='ym4_'+formatDate(current);
-      const dayData=JSON.parse(localStorage.getItem(key)||'{}');
-      const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
-      dates.push(new Date(current));
-      times.push(Math.round(sm/60));
-      current.setDate(current.getDate()+1);
-    }
-    
-    if(period==='7d'){
-      return renderBarChart(dates,times);
-    }else{
-      return renderLineChart(dates,times);
-    }
-  };
-  
-  const renderBarChart=(dates,times)=>{
-    const maxTime=Math.max(...times,1)||1;
-    const chartHeight=180;
-    const chartWidth=280;
-    const numDays=Math.max(times.length,1);
-    const barWidth=chartWidth/numDays;
-    
-    let bars='';
-    times.forEach((t,i)=>{
-      const h=(t/maxTime)*chartHeight;
-      const x=i*barWidth+barWidth/2;
-      const y=chartHeight-h;
-      bars+=`<rect x="${x-barWidth/3}" y="${y}" width="${barWidth*0.6}" height="${h}" fill="var(--accent)" opacity="0.8"/>`;
-    });
-    
-    const getDateLabel=(d)=>(d.getMonth()+1)+'/'+(d.getDate()).toString().padStart(2,'0');
-    
-    const avg=times.length>0?(times.reduce((a,b)=>a+b,0)/times.length).toFixed(1):0;
-    const total=times.reduce((a,b)=>a+b,0);
-    
-    const svg=`
-      <svg viewBox="0 0 320 220" style="width:100%;height:auto">
-        <line x1="30" y1="10" x2="30" y2="190" stroke="var(--muted)" stroke-width="1"/>
-        <line x1="30" y1="190" x2="310" y2="190" stroke="var(--muted)" stroke-width="1"/>
-        <text x="25" y="195" font-size="10" fill="var(--muted)" text-anchor="end">0h</text>
-        <text x="25" y="15" font-size="10" fill="var(--muted)" text-anchor="end">${maxTime.toFixed(1)}h</text>
-        <g>${bars}</g>
-        ${dates.map((d,i)=>{
-          const x=i*barWidth+barWidth/2;
-          return `<text x="${x}" y="205" font-size="9" fill="var(--muted)" text-anchor="middle">${getDateLabel(d)}</text>`;
-        }).join('')}
-      </svg>
-    `;
-    
-    const stats=`
-      <div style="font-size:12px;color:var(--muted);display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div><div style="font-size:10px">平均</div><div style="color:var(--accent);font-size:16px">${avg}h</div></div>
-        <div><div style="font-size:10px">最高</div><div style="color:var(--accent);font-size:16px">${Math.max(...times,0)}h</div></div>
-        <div><div style="font-size:10px">合計</div><div style="color:var(--accent);font-size:16px">${total}h</div></div>
-        <div><div style="font-size:10px">日数</div><div style="color:var(--accent);font-size:16px">${times.length}</div></div>
-      </div>
-    `;
-    
-    return {svg,stats};
-  };
-  
-  const renderLineChart=(dates,times)=>{
-    const maxTime=Math.max(...times,1)||1;
-    const chartHeight=180;
-    const chartWidth=280;
-    const numDays=Math.max(times.length,1);
-    const pointSpacing=chartWidth/Math.max(numDays-1,1);
-    
-    // 日付ラベルの間隔を決定
-    let labelInterval=1;
-    if(numDays>90) labelInterval=14;
-    else if(numDays>30) labelInterval=7;
-    else labelInterval=Math.ceil(numDays/7);
-    
-    // ライン描画
-    let pathData='';
-    times.forEach((t,i)=>{
-      const x=30+i*pointSpacing;
-      const y=190-(t/maxTime)*chartHeight;
-      if(i===0) pathData+=`M${x},${y}`;
-      else pathData+=`L${x},${y}`;
-    });
-    
-    // 点描画
-    let points='';
-    times.forEach((t,i)=>{
-      const x=30+i*pointSpacing;
-      const y=190-(t/maxTime)*chartHeight;
-      points+=`<circle cx="${x}" cy="${y}" r="3" fill="var(--accent)" opacity="0.6"/>`;
-    });
-    
-    const getDateLabel=(d)=>(d.getMonth()+1)+'/'+(d.getDate()).toString().padStart(2,'0');
-    
-    const avg=times.length>0?(times.reduce((a,b)=>a+b,0)/times.length).toFixed(1):0;
-    const total=times.reduce((a,b)=>a+b,0);
-    
-    const svg=`
-      <svg viewBox="0 0 320 220" style="width:100%;height:auto">
-        <line x1="30" y1="10" x2="30" y2="190" stroke="var(--muted)" stroke-width="1"/>
-        <line x1="30" y1="190" x2="310" y2="190" stroke="var(--muted)" stroke-width="1"/>
-        <text x="25" y="195" font-size="10" fill="var(--muted)" text-anchor="end">0h</text>
-        <text x="25" y="15" font-size="10" fill="var(--muted)" text-anchor="end">${maxTime.toFixed(1)}h</text>
-        <polyline points="${pathData}" fill="none" stroke="var(--accent)" stroke-width="2" opacity="0.7"/>
-        <g>${points}</g>
-        ${dates.map((d,i)=>{
-          if(i%labelInterval===0 || i===dates.length-1){
-            const x=30+i*pointSpacing;
-            return `<text x="${x}" y="205" font-size="9" fill="var(--muted)" text-anchor="middle">${getDateLabel(d)}</text>`;
-          }
-          return '';
-        }).join('')}
-      </svg>
-    `;
-    
-    const stats=`
-      <div style="font-size:12px;color:var(--muted);display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div><div style="font-size:10px">平均</div><div style="color:var(--accent);font-size:16px">${avg}h</div></div>
-        <div><div style="font-size:10px">最高</div><div style="color:var(--accent);font-size:16px">${Math.max(...times,0)}h</div></div>
-        <div><div style="font-size:10px">合計</div><div style="color:var(--accent);font-size:16px">${total}h</div></div>
-        <div><div style="font-size:10px">日数</div><div style="color:var(--accent);font-size:16px">${times.length}</div></div>
-      </div>
-    `;
-    
-    return {svg,stats};
-  };
-  
-  const renderDatePicker=()=>{
-    const today=new Date();
-    const year=today.getFullYear();
-    const month=today.getMonth();
-    
-    const renderMonthCalendar=(y,m)=>{
-      const firstDay=new Date(y,m,1);
-      const lastDay=new Date(y,m+1,0);
-      const startDate=new Date(firstDay);
-      startDate.setDate(startDate.getDate()-firstDay.getDay());
-      
-      let days='';
-      for(let i=0;i<42;i++){
-        const d=new Date(startDate);
-        d.setDate(d.getDate()+i);
-        const isCurrentMonth=d.getMonth()===m;
-        const dateStr=d.getDate().toString().padStart(2,'0');
-        const fullDate=formatDate(d);
-        const dayData=JSON.parse(localStorage.getItem('ym4_'+fullDate)||'{}');
-        const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
-        const hasData=sm>0;
-        
-        const bgColor=isCurrentMonth?(hasData?'var(--surface2)':'var(--surface3)'):'var(--surface)';
-        const textColor=isCurrentMonth?'var(--text)':'var(--muted)';
-        
-        days+=`<div data-date="${fullDate}" style="padding:8px;background:${bgColor};color:${textColor};text-align:center;font-size:12px;cursor:pointer;border-radius:3px;border:1px solid transparent" onclick="selectDateRange(this)">${dateStr}</div>`;
-      }
-      
-      return `
-        <div style="margin-bottom:16px">
-          <div style="text-align:center;font-size:13px;font-weight:bold;margin-bottom:12px;color:var(--text)">${y}年${(m+1).toString().padStart(2,'0')}月</div>
-          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:9px;color:var(--muted);margin-bottom:8px">
-            <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${days}</div>
-        </div>
-      `;
-    };
-    
-    return renderMonthCalendar(year,month);
-  };
-  
-  const {svg:initialSvg,stats:initialStats}=renderGraph(currentStart,currentEnd,'7d');
-  
-  modal.innerHTML=`
-    <div class="modal" style="max-width:360px;max-height:90vh;overflow-y:auto;padding:0">
-      <div style="padding:20px;border-bottom:1px solid var(--surface3);position:sticky;top:0;background:var(--surface)">
-        <div class="modal-title">Study Graph</div>
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="period-btn" data-period="7d" onclick="updateGraphPeriod(7,'7d',this)" style="flex:1;background:none;border:1px solid var(--accent);color:var(--text);padding:6px;font-size:11px;border-radius:3px;cursor:pointer;font-weight:bold">7D</button>
-          <button class="period-btn" data-period="30d" onclick="updateGraphPeriod(30,'30d',this)" style="flex:1;background:none;border:1px solid var(--surface3);color:var(--text);padding:6px;font-size:11px;border-radius:3px;cursor:pointer">30D</button>
-          <button class="period-btn" data-period="90d" onclick="updateGraphPeriod(90,'90d',this)" style="flex:1;background:none;border:1px solid var(--surface3);color:var(--text);padding:6px;font-size:11px;border-radius:3px;cursor:pointer">90D</button>
-          <button class="period-btn" data-period="all" onclick="updateGraphPeriod('all','all',this)" style="flex:1;background:none;border:1px solid var(--surface3);color:var(--text);padding:6px;font-size:11px;border-radius:3px;cursor:pointer">ALL</button>
-        </div>
-      </div>
-      
-      <div style="padding:20px;border-bottom:1px solid var(--surface3)">
-        <div style="background:var(--surface2);border-radius:4px;padding:16px;margin-bottom:16px">
-          <div id="graphContainer">${initialSvg}</div>
-        </div>
-        <div id="statsContainer">${initialStats}</div>
-      </div>
-      
-      <div style="padding:20px;text-align:center;border-top:1px solid var(--surface3)">
-        <button class="modal-cancel" onclick="document.getElementById('graphModalFull').remove()" style="width:100%">Close</button>
-      </div>
-    </div>
-  `;
-  
-  document.body.appendChild(modal);
-  modal.classList.add('open');
-  
-  window.updateGraphPeriod=(days,period,btn)=>{
-    const end=new Date();
-    const start=new Date();
-    if(period==='all'){
-      start.setFullYear(start.getFullYear()-2);
-    }else if(typeof days==='number'){
-      start.setDate(start.getDate()-days+1);
-    }
-    
-    const {svg,stats}=renderGraph(start,end,period);
-    document.getElementById('graphContainer').innerHTML=svg;
-    document.getElementById('statsContainer').innerHTML=stats;
-    
-    document.querySelectorAll('.period-btn').forEach(b=>{
-      b.style.fontWeight='normal';
-      b.style.borderColor='var(--surface3)';
-    });
-    btn.style.fontWeight='bold';
-    btn.style.borderColor='var(--accent)';
-  };
-  
-  window.selectDateRange=(elem)=>{
-    const dateStr=elem.getAttribute('data-date');
-    const selected=document.querySelector('#datePickerContainer [style*="border: 1px solid var(--accent)"]');
-    if(selected){
-      selected.style.borderColor='transparent';
-    }
-    elem.style.borderColor='var(--accent)';
-    
-    document.getElementById('selectedStart').textContent=dateStr;
-    document.getElementById('selectedEnd').textContent=dateStr;
-    
-    const {svg,stats}=renderGraph(new Date(dateStr),new Date(dateStr),'custom');
-    document.getElementById('graphContainer').innerHTML=svg;
-    document.getElementById('statsContainer').innerHTML=stats;
-  };
-}
-
-function showStudyGraphRange(){
-  const startElem=document.getElementById('graphStartDate');
-  const endElem=document.getElementById('graphEndDate');
-  
-  if(!startElem.value||!endElem.value){
-    alert('日付を選択してください');
-    return;
-  }
-  
-  const startD=new Date(startElem.value);
-  const endD=new Date(endElem.value);
-  
-  if(startD>endD){
-    alert('開始日は終了日より前にしてください');
-    return;
-  }
-  
-  const dates=[];
-  const times=[];
-  let current=new Date(startD);
-  
-  while(current<=endD){
-    const key='ym4_'+current.getFullYear().toString().padStart(4,'0')+'-'+(current.getMonth()+1).toString().padStart(2,'0')+'-'+current.getDate().toString().padStart(2,'0');
-    const dayData=JSON.parse(localStorage.getItem(key)||'{}');
-    const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
-    dates.push((current.getMonth()+1)+'/'+(current.getDate()).toString().padStart(2,'0'));
-    times.push(Math.round(sm/60));
-    current.setDate(current.getDate()+1);
-  }
-  
-  const modal=document.createElement('div');
-  modal.className='modal-bg';
-  modal.id='graphRangeModal';
-  
-  const maxTime=Math.max(...times,1)||1;
-  const chartHeight=200;
-  const chartWidth=300;
-  const numDays=Math.max(times.length,1);
-  const barWidth=chartWidth/numDays;
-  
-  let bars='';
-  times.forEach((t,i)=>{
-    const h=(t/maxTime)*chartHeight;
-    const x=i*barWidth+barWidth/2;
-    const y=chartHeight-h;
-    bars+=`<rect x="${x-barWidth/3}" y="${y}" width="${barWidth*0.6}" height="${h}" fill="var(--accent)" opacity="0.8"/>`;
-  });
-  
-  const avg=times.length>0?(times.reduce((a,b)=>a+b,0)/times.length).toFixed(1):0;
-  const total=times.reduce((a,b)=>a+b,0);
-  
-  modal.innerHTML=`
-    <div class="modal" style="max-width:340px;max-height:80vh;overflow-y:auto">
-      <div class="modal-title">勉強時間 ${startElem.value} 〜 ${endElem.value}</div>
-      <div style="margin:20px 0;background:var(--surface3);border-radius:4px;padding:20px">
-        <svg viewBox="0 0 320 240" style="width:100%;height:auto">
-          <line x1="30" y1="20" x2="30" y2="220" stroke="var(--muted)" stroke-width="1"/>
-          <line x1="30" y1="220" x2="310" y2="220" stroke="var(--muted)" stroke-width="1"/>
-          <text x="25" y="225" font-size="11" fill="var(--muted)" text-anchor="end">0h</text>
-          <text x="25" y="25" font-size="11" fill="var(--muted)" text-anchor="end">${maxTime.toFixed(1)}h</text>
-          <g>${bars}</g>
-          ${dates.map((d,i)=>{
-            const x=i*barWidth+barWidth/2;
-            return dates.length<=14?`<text x="${x}" y="235" font-size="10" fill="var(--muted)" text-anchor="middle">${d}</text>`:'';
-          }).join('')}
-        </svg>
-      </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
-        <div>平均: ${avg}時間</div>
-        <div>最高: ${Math.max(...times,0)}時間</div>
-        <div>合計: ${total}時間</div>
-        <div>日数: ${times.length}日</div>
-      </div>
-      <button class="modal-cancel" onclick="document.getElementById('graphRangeModal').remove()" style="width:100%">Close</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.classList.add('open');
-}
-
-// Swipe gesture for tabs
-let touchStartX=0,touchEndX=0,touchStartY=0,touchEndY=0;
-let swipeEnabled=true;
-
-function handleSwipe(){
-  if(!swipeEnabled)return;
-  const dx=touchEndX-touchStartX;
-  const dy=touchEndY-touchStartY;
-  if(Math.abs(dx)<Math.abs(dy)||Math.abs(dx)<50)return;
-  
-  const btns=Array.from(document.querySelectorAll('.tab-btn'));
-  const idx=btns.findIndex(b=>b.classList.contains('active'));
-  if(dx<0&&idx<btns.length-1){
-    btns[idx+1].click();
-    btns[idx+1].scrollIntoView({inline:'center',behavior:'smooth'});
-  }else if(dx>0&&idx>0){
-    btns[idx-1].click();
-    btns[idx-1].scrollIntoView({inline:'center',behavior:'smooth'});
-  }
-}
-document.addEventListener('touchstart',e=>{touchStartX=e.changedTouches[0].screenX;touchStartY=e.changedTouches[0].screenY;},{passive:true});
-document.addEventListener('touchend',e=>{touchEndX=e.changedTouches[0].screenX;touchEndY=e.changedTouches[0].screenY;handleSwipe();},{passive:true});
-
-let modalMode='',modalSi=-1;
-function openModal(mode,si){modalMode=mode;modalSi=si??-1;const titles={subject:'Add Subject',book:'Add Textbook',check:'Add Checklist Item',cardio:'Add Cardio Exercise',strength:'Add Strength Exercise',goal:'Set Study Goal',quote:'Add Quote'};document.getElementById('modalTitle').textContent=titles[mode]||'Add';let body='';if(mode==='goal'){const gh=Math.floor(goalMins/60),gm=goalMins%60;body=`<div style="font-size:12px;color:var(--muted);margin-bottom:12px">現在のGoal: ${minsToStr(goalMins)}</div><div style="display:flex;gap:8px;margin-bottom:8px"><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time (h)</div><input class="modal-input" type="number" id="goalH" min="0" max="24" value="${gh}" style="margin-bottom:0"></div><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">m (min)</div><input class="modal-input" type="number" id="goalM" min="0" max="59" value="${gm}" style="margin-bottom:0"></div></div>`;}else if(mode==='quote'){body=`<textarea class="diary-area" id="modalInput" placeholder="Quoteを入力..." style="min-height:100px"></textarea>`;}else if(mode==='cardio'||mode==='strength'){const uOpts=mode==='cardio'?['km','m','reps','kcal']:['reps','kg','set'];body=`<input class="modal-input" id="modalInput" placeholder="${mode==='cardio'?'例: ランニング':'例: ベンチプレス'}"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Unit</div><select class="modal-input" id="modalUnit" style="cursor:pointer;color:var(--text)">${uOpts.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>`;}else{const ph={subject:'例: 物理',book:'例: 化学の新演習',check:'例: 読書 30m'};body=`<input class="modal-input" id="modalInput" placeholder="${ph[mode]||''}">`;}document.getElementById('modalBody').innerHTML=body;document.getElementById('modalOk').textContent=mode==='goal'?'Set':'Add';document.getElementById('modal').classList.add('open');setTimeout(()=>document.getElementById('modalInput')?.focus(),300);}
-function closeModal(){document.getElementById('modal').classList.remove('open');}
-function modalConfirm(){if(modalMode==='goal'){const h=parseInt(document.getElementById('goalH').value)||0;const m=parseInt(document.getElementById('goalM').value)||0;const tot=h*60+m;if(tot>0){goalMins=tot;localStorage.setItem('ym4_goal',tot);updateRing();}closeModal();return;}if(modalMode==='quote'){const text=document.getElementById('modalInput')?.value.trim();if(!text){closeModal();return;}quotes.push({id:'q'+Date.now(),text});saveQuotes();renderQuotesList();closeModal();return;}const val=document.getElementById('modalInput')?.value.trim();if(!val){closeModal();return;}if(modalMode==='subject'){subjects.push({id:'s'+Date.now(),name:val,books:[]});saveSubjects();renderStudy();}else if(modalMode==='book'){subjects[modalSi].books.push({id:'b'+Date.now(),name:val});saveSubjects();renderStudy();}else if(modalMode==='check'){checkItems.push({id:'c'+Date.now(),label:val});saveChecks();renderChecks();calcScore();}else if(modalMode==='cardio'){const u=document.getElementById('modalUnit')?.value||'km';cardioList.push({id:'ca'+Date.now(),name:val,unit:u});saveCardio();renderCardio();}else if(modalMode==='strength'){const u=document.getElementById('modalUnit')?.value||'reps';const id='st'+Date.now();strengthList.push({id,name:val,unit:u});state.strength[id]=[0,0,0];saveStrength();saveState();renderStrength();}closeModal();}
-document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
-
-// Initialize DB and load saved videos
-(async()=>{
-  try{
-    await initDB();
-    const savedVideos=await loadVideosFromIndexedDB();
-    videos=savedVideos;
-  }catch(e){console.error('Failed to load videos from IndexedDB:',e);}
-  
-  // Load saved wallpaper
-  const savedWallpaper=localStorage.getItem('ym4_wallpaper');
-  if(savedWallpaper){
-    if(savedWallpaper==='black'){
-      document.documentElement.style.setProperty('--wallpaper-url','none');
-    }else{
-      applyWallpaper(savedWallpaper);
-    }
-  }
-  
-  renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
-  
-  // Auto fullscreen on load
-  const elem=document.documentElement;
-  if(elem.requestFullscreen){
-    elem.requestFullscreen().catch(err=>console.log('フルスクリーン申請:',err));
-  }else if(elem.webkitRequestFullscreen){
-    elem.webkitRequestFullscreen();
-  }
 })();
 </script>
 </body>
