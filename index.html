@@ -26,7 +26,7 @@
 }
 html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;position:relative;font-weight:300;letter-spacing:0.02em}
 body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-url);background-size:cover;background-position:left top;-webkit-mask-image:linear-gradient(135deg,rgba(0,0,0,1) 0%,rgba(0,0,0,0.8) 30%,rgba(0,0,0,0.4) 60%,rgba(0,0,0,0) 100%);mask-image:linear-gradient(135deg,rgba(0,0,0,1) 0%,rgba(0,0,0,0.8) 30%,rgba(0,0,0,0.4) 60%,rgba(0,0,0,0) 100%);pointer-events:none;z-index:0}
-.app{max-width:430px;margin:0 auto;padding-bottom:80px;background:rgba(0,0,0,0.85);min-height:100vh;backdrop-filter:blur(2px)}
+.app{max-width:430px;margin:0 auto;padding-bottom:80px;background:rgba(0,0,0,0.85);min-height:100vh;backdrop-filter:blur(2px);position:relative;z-index:1}
 .ring-section{padding:28px 20px 16px;text-align:center}
 .widgets-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:12px;grid-auto-flow:dense}
 .widget{background:var(--surface);border:0.5px solid var(--border);border-radius:4px;padding:16px;position:relative}
@@ -193,7 +193,7 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 .hero-section:hover .hero-controls{opacity:1}
 .hero-btn{background:rgba(0,0,0,0.6);border:0.5px solid rgba(255,255,255,0.3);color:#fff;border-radius:4px;padding:6px 10px;font-size:10px;cursor:pointer;font-family:var(--sans);letter-spacing:.05em}
 .hero-btn:hover{background:rgba(0,0,0,0.8)}
-
+</style>
 </head>
 <body>
 <div class="app">
@@ -244,21 +244,18 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 </div>
 
 <div class="section active" id="tab-study">
-  <div id="heroStudy"></div>
   <div class="sec-label" data-num="01">Study Log</div>
   <div id="subjectList"></div>
   <button class="add-btn" onclick="openModal('subject')">+ Add Subject</button>
 </div>
 
 <div class="section" id="tab-check">
-  <div id="heroCheck"></div>
   <div class="sec-label" data-num="02">Daily Checklist</div>
   <div class="card" id="checklist"></div>
   <button class="add-btn" style="margin-top:0" onclick="openModal('check')">+ Add Item</button>
 </div>
 
 <div class="section" id="tab-health">
-  <div id="heroHealth"></div>
   <div class="sec-label" data-num="03">Health Log</div>
   
   <!-- Health subtabs -->
@@ -309,7 +306,6 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 </div>
 
 <div class="section" id="tab-diary">
-  <div id="heroDiary"></div>
   <div class="sec-label" data-num="04">Daily Journal</div>
   <div class="diary-date-row">
     <span class="diary-date-label">📅 Date</span>
