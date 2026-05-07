@@ -431,8 +431,7 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 
 <!-- Video fullscreen overlay (TikTok-style) -->
 <div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;overflow:hidden">
-  <button style="position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;cursor:pointer;z-index:1010;padding:6px 12px;border-radius:8px" onclick="closeVideoFullscreen()">←</button>
-  <div id="videoCounter" style="position:absolute;top:max(24px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);color:#fff;font-size:13px;background:rgba(0,0,0,.5);padding:6px 14px;border-radius:14px;z-index:1010"></div>
+  <button id="videoBackBtn" style="position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;cursor:pointer;z-index:1010;padding:6px 12px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s" onclick="closeVideoFullscreen()">←</button>
   <div id="videoStack" style="position:absolute;inset:0;will-change:transform">
     <div class="vid-slot" data-pos="prev" style="position:absolute;top:-100%;left:0;width:100%;height:100%"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video></div>
     <div class="vid-slot" data-pos="curr" style="position:absolute;top:0;left:0;width:100%;height:100%"><video class="vid-el" muted loop playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video></div>
@@ -594,7 +593,7 @@ function openHeroEditor(tabName){
       </div>
     </div>` : '';
   overlay.innerHTML=`
-    <div class="modal" style="max-height:90vh;overflow-y:auto">
+    <div class="modal" style="max-height:88vh;overflow-y:auto;padding-bottom:calc(32px + env(safe-area-inset-bottom))">
       <div class="modal-title" style="margin-bottom:16px">Edit Banner</div>
       <div style="margin-bottom:12px">
         ${previewHtml}
@@ -612,8 +611,8 @@ function openHeroEditor(tabName){
         <div style="font-size:11px;color:var(--muted);letter-spacing:.15em;margin-bottom:6px">SUBTITLE</div>
         <input id="heroSubtitleInput" value="${h.subtitle||''}" style="width:100%;padding:10px;background:var(--surface2);border:0.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;box-sizing:border-box" placeholder="e.g. Master Every Day">
       </div>
-      <button class="modal-ok" onclick="saveHeroEdit('${tabName}')">Save</button>
-      <button class="modal-cancel" onclick="document.getElementById('heroEditorOverlay').remove()">Cancel</button>
+      <button class="modal-ok" onclick="saveHeroEdit('${tabName}')" ontouchend="event.preventDefault();saveHeroEdit('${tabName}')">Save</button>
+      <button class="modal-cancel" onclick="document.getElementById('heroEditorOverlay').remove()" ontouchend="event.preventDefault();document.getElementById('heroEditorOverlay').remove()">Cancel</button>
     </div>`;
   document.body.appendChild(overlay);
 }
@@ -1464,13 +1463,7 @@ function refreshAllSlots(){
   loadSlot('prev',getVidIdxAtOffset(-1));
   loadSlot('curr',getVidIdxAtOffset(0));
   loadSlot('next',getVidIdxAtOffset(1));
-  updateVideoCounter();
-}
-
-function updateVideoCounter(){
-  const idx=getVidIdxAtOffset(0);
-  document.getElementById('videoCounter').textContent=`${idx+1}/${videos.length}`;
-  currentVideoIdx=idx;
+  currentVideoIdx=getVidIdxAtOffset(0);
 }
 
 function playVideoFullscreen(idx){
@@ -1513,6 +1506,18 @@ function shiftVideo(direction){
     refreshAllSlots();
     videoTransitioning=false;
   },300);
+}
+
+function toggleVideoBackBtn(){
+  const btn=document.getElementById('videoBackBtn');
+  if(!btn)return;
+  const visible=btn.style.opacity==='1';
+  btn.style.opacity=visible?'0':'1';
+  btn.style.pointerEvents=visible?'none':'auto';
+  clearTimeout(btn._hideTimer);
+  if(!visible){
+    btn._hideTimer=setTimeout(()=>{btn.style.opacity='0';btn.style.pointerEvents='none';},2500);
+  }
 }
 
 function closeVideoFullscreen(){
@@ -1589,6 +1594,24 @@ document.addEventListener('DOMContentLoaded',()=>{
       shiftVideo(1); // 上スワイプ→次へ
     }else if(dy>threshold){
       shiftVideo(-1); // 下スワイプ→前へ
+    }else if(Math.abs(dy)<8){
+      // タップ判定（ほぼ動いてない）
+      const t=e.changedTouches[0];
+      const w=window.innerWidth,h=window.innerHeight;
+      // 中央エリア = 画面中央の50%四方
+      const cxMin=w*0.25,cxMax=w*0.75;
+      const cyMin=h*0.25,cyMax=h*0.75;
+      const inCenter=t.clientX>=cxMin&&t.clientX<=cxMax&&t.clientY>=cyMin&&t.clientY<=cyMax;
+      if(inCenter){
+        // 一時停止/再生
+        const vid=document.querySelector('.vid-slot[data-pos="curr"] video');
+        if(vid){if(vid.paused)vid.play().catch(()=>{});else vid.pause();}
+      }else{
+        // 戻るボタン表示
+        toggleVideoBackBtn();
+      }
+      stack.style.transition='transform .25s cubic-bezier(.22,.61,.36,1)';
+      stack.style.transform='translateY(0)';
     }else{
       // 元に戻す
       stack.style.transition='transform .25s cubic-bezier(.22,.61,.36,1)';
