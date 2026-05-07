@@ -424,31 +424,11 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
   </div>
 </div>
 
-<!-- Video fullscreen overlay - Reels style -->
-<div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;overflow:hidden;touch-action:none">
-  <!-- 戻るボタン -->
-  <button onclick="closeVideoFullscreen()" style="position:absolute;top:20px;left:20px;z-index:1002;background:none;border:none;color:#fff;font-size:26px;cursor:pointer;padding:8px">←</button>
-  <!-- カウンター -->
-  <div id="videoCounter" style="position:absolute;top:24px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.7);font-size:12px;z-index:1002;font-family:'Bebas Neue',sans-serif;letter-spacing:.1em"></div>
-  <!-- スライドコンテナ -->
-  <div id="reelsContainer" style="width:100%;height:100%;position:relative;will-change:transform;transition:transform .0s">
-    <!-- 前の動画 -->
-    <div id="reelPrev" style="position:absolute;top:-100%;left:0;width:100%;height:100%;background:#000">
-      <video id="videoPrev" style="width:100%;height:100%;object-fit:cover" playsinline muted></video>
-    </div>
-    <!-- 現在の動画 -->
-    <div id="reelCurrent" style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000">
-      <video id="videoPlayer" style="width:100%;height:100%;object-fit:cover" autoplay loop playsinline></video>
-    </div>
-    <!-- 次の動画 -->
-    <div id="reelNext" style="position:absolute;top:100%;left:0;width:100%;height:100%;background:#000">
-      <video id="videoNext" style="width:100%;height:100%;object-fit:cover" playsinline muted></video>
-    </div>
-  </div>
-  <!-- コントロール（タップで表示） -->
-  <div id="videoControls" style="position:absolute;inset:0;z-index:1001;display:none;align-items:center;justify-content:center">
-    <button id="videoPlayBtn" onclick="reelTogglePlay()" style="background:rgba(0,0,0,.5);border:none;color:#fff;font-size:40px;width:72px;height:72px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center">⏸</button>
-  </div>
+<!-- Video fullscreen overlay (outside tabs, fixed positioning) -->
+<div id="videoFullscreen" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;flex-direction:column;align-items:center;justify-content:center">
+  <button style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:28px;cursor:pointer;z-index:1001;padding:8px 14px;border-radius:8px" onclick="closeVideoFullscreen()">←</button>
+  <video id="videoPlayer" style="width:100%;height:100%;object-fit:contain;background:#000" controls autoplay loop playsinline></video>
+  <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);color:#aaa;font-size:12px;text-align:center;background:rgba(0,0,0,.5);padding:4px 12px;border-radius:12px;z-index:1001" id="videoCounter"></div>
 </div>
 
 </div>
@@ -1412,140 +1392,76 @@ function renderVideoManagementList(){
 }
 
 
-// ===== REELS VIDEO =====
 let currentVideoIdx=0;
+let videoSwipeStartY=0;
+let videoSwipeStartX=0;
+let shownVideoIndices=[];
 let videoClosedByBackButton=false;
-let reelDragY=0;
-let reelDragging=false;
-let reelControlsTimer=null;
 
 function playVideoFullscreen(idx){
-  if(!videos.length) return;
-  if(idx===undefined) idx=Math.floor(Math.random()*videos.length);
-  if(!videos[idx]) return;
+  if(!videos.length)return;
+  if(idx===undefined){
+    idx=Math.floor(Math.random()*videos.length);
+  }
+  if(!videos[idx])return;
   currentVideoIdx=idx;
+  shownVideoIndices=[];
   window.history.pushState({videoOpen:true},'');
-  reelLoad(idx);
-  document.getElementById('videoFullscreen').style.display='block';
+  showVideoFullscreen(videos[idx].url,idx+1,videos.length);
+}
+
+function showVideoFullscreen(url,current,total){
+  const fullscreen=document.getElementById('videoFullscreen');
+  document.getElementById('videoPlayer').src=url;
+  document.getElementById('videoCounter').textContent=`${current}/${total}`;
+  currentVideoIdx=current-1;
+  fullscreen.style.display='flex';
   document.body.style.overflow='hidden';
   swipeEnabled=false;
 }
 
-function reelLoad(idx){
-  const cur=videos[idx];
-  const prev=videos[idx-1];
-  const next=videos[idx+1];
-  // 現在
-  const vp=document.getElementById('videoPlayer');
-  vp.src=cur.url; vp.play();
-  // 前
-  const vPrev=document.getElementById('videoPrev');
-  vPrev.src=prev?prev.url:'';
-  // 次
-  const vNext=document.getElementById('videoNext');
-  vNext.src=next?next.url:'';
-  // コンテナをリセット
-  const c=document.getElementById('reelsContainer');
-  c.style.transition='none';
-  c.style.transform='translateY(0)';
-  // カウンター
-  document.getElementById('videoCounter').textContent=`${idx+1} / ${videos.length}`;
-}
-
-function reelGo(dir){
-  // dir: 1=次, -1=前
-  const next=currentVideoIdx+dir;
-  if(next<0||next>=videos.length) return false;
-  const c=document.getElementById('reelsContainer');
-  c.style.transition='transform .32s cubic-bezier(.4,0,.2,1)';
-  c.style.transform=`translateY(${dir<0?'100%':'-100%'})`;
-  setTimeout(()=>{
-    currentVideoIdx=next;
-    reelLoad(next);
-  },320);
-  return true;
-}
-
-function showVideoFullscreen(url,current,total){
-  // 後方互換
-  playVideoFullscreen(current-1);
-}
-
-function reelTogglePlay(){
-  const v=document.getElementById('videoPlayer');
-  const btn=document.getElementById('videoPlayBtn');
-  if(v.paused){v.play();btn.textContent='⏸';}
-  else{v.pause();btn.textContent='▶';}
-}
-
 function nextRandomVideo(){
-  reelGo(1)||(currentVideoIdx=0,reelLoad(0));
+  if(videos.length===0)return;
+  const available=[];
+  for(let i=0;i<videos.length;i++){
+    if(!shownVideoIndices.includes(i)) available.push(i);
+  }
+  if(available.length===0){
+    shownVideoIndices=[];
+    for(let i=0;i<videos.length;i++) available.push(i);
+  }
+  const randomIdx=available[Math.floor(Math.random()*available.length)];
+  shownVideoIndices.push(randomIdx);
+  showVideoFullscreen(videos[randomIdx].url,randomIdx+1,videos.length);
 }
 
 function closeVideoFullscreen(){
-  document.getElementById('videoPlayer').pause();
-  document.getElementById('videoPlayer').src='';
   document.getElementById('videoFullscreen').style.display='none';
+  document.getElementById('videoPlayer').src='';
   document.body.style.overflow='auto';
   swipeEnabled=true;
   const home=document.getElementById('motivationHome');
   if(home)home.style.display='grid';
   document.getElementById('quotesView').style.display='none';
   document.getElementById('optionView').style.display='none';
-  if(!videoClosedByBackButton) window.history.back();
-}
-
-function toggleVideoControls(){
-  const ctrl=document.getElementById('videoControls');
-  ctrl.style.display='flex';
-  clearTimeout(reelControlsTimer);
-  reelControlsTimer=setTimeout(()=>ctrl.style.display='none',3000);
-}
-
-// Reels タッチ操作
-(function(){
-  const fs=document.getElementById('videoFullscreen');
-  if(!fs) return;
-  let startY=0,startTime=0,moved=false;
-  fs.addEventListener('touchstart',e=>{
-    startY=e.touches[0].clientY;
-    startTime=Date.now();
-    moved=false;
-    document.getElementById('reelsContainer').style.transition='none';
-  },{passive:true});
-  fs.addEventListener('touchmove',e=>{
-    const dy=e.touches[0].clientY-startY;
-    moved=true;
-    document.getElementById('reelsContainer').style.transform=`translateY(${dy}px)`;
-  },{passive:true});
-  fs.addEventListener('touchend',e=>{
-    const dy=e.changedTouches[0].clientY-startY;
-    const dt=Date.now()-startTime;
-    const fast=dt<300&&Math.abs(dy)>40;
-    const far=Math.abs(dy)>80;
-    if(moved&&(fast||far)){
-      reelGo(dy<0?1:-1);
-    } else {
-      const c=document.getElementById('reelsContainer');
-      c.style.transition='transform .2s ease';
-      c.style.transform='translateY(0)';
-      if(!moved||Math.abs(dy)<8) toggleVideoControls();
-    }
-  },{passive:true});
-})();
-
-window.addEventListener('load',()=>{
-  const loading=document.getElementById('loadingScreen');
-  const app=document.querySelector('.app');
-  if(loading && app){
-    loading.style.transition='opacity 0.6s ease-out';
-    loading.style.opacity='0';
-    setTimeout(()=>{
-      loading.style.display='none';
-      app.style.opacity='1';
-      app.style.pointerEvents='auto';
-    },600);
+  if(!videoClosedByBackButton){
+    window.history.back();
   }
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  setTimeout(()=>{
+    const loading=document.getElementById('loadingScreen');
+    if(loading){
+      loading.style.transition='opacity 0.8s ease-out';
+      loading.style.opacity='0';
+      setTimeout(()=>{
+        loading.style.display='none';
+        document.querySelector('.app').style.opacity='1';
+        document.querySelector('.app').style.pointerEvents='auto';
+      },800);
+    }
+  },1000);
   
   // Render all heroes
   ['study','check','health','diary','record','motivation'].forEach(t=>{
