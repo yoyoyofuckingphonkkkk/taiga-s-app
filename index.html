@@ -499,7 +499,48 @@ let heroData=JSON.parse(localStorage.getItem('ym4_heroes')||'null')||{
   motivation:{img:'',vid:'',title:'Ascend',subtitle:'Master Every Day',zoom:1,posX:50,posY:50}
 };
 
-function saveHeroData(){localStorage.setItem('ym4_heroes',JSON.stringify(heroData));}
+function saveHeroData(){
+  // blob URL(vid)は保存しない、vidIdから復元する
+  const cleaned={};
+  for(const k in heroData){
+    cleaned[k]={...heroData[k]};
+    if(cleaned[k].vidId) cleaned[k].vid=''; // 永続化時はvidは空に
+    // base64の古いデータが残ってたら削除（localStorage圧迫防止）
+    if(cleaned[k].vid&&cleaned[k].vid.startsWith('data:'))cleaned[k].vid='';
+    if(cleaned[k].img&&cleaned[k].img.length>2*1024*1024)cleaned[k].img=''; // 2MB超の画像も除外
+  }
+  try{
+    localStorage.setItem('ym4_heroes',JSON.stringify(cleaned));
+  }catch(e){
+    // QuotaExceeded → 全hero画像をクリアして再試行
+    alert('保存容量がいっぱいです。Hero画像をリセットします。');
+    for(const k in cleaned){cleaned[k].img='';cleaned[k].vid='';}
+    try{localStorage.setItem('ym4_heroes',JSON.stringify(cleaned));}catch(e2){}
+  }
+}
+
+async function restoreHeroVideos(){
+  if(!db)await initDB();
+  for(const tab in heroData){
+    const vidId=heroData[tab].vidId;
+    if(!vidId) continue;
+    try{
+      const tx=db.transaction(STORE_NAME,'readonly');
+      const req=tx.objectStore(STORE_NAME).get(vidId);
+      await new Promise((res,rej)=>{
+        req.onsuccess=()=>{
+          if(req.result&&req.result.blob){
+            heroData[tab].vid=URL.createObjectURL(req.result.blob);
+          }else{
+            heroData[tab].vidId=''; // データなしならクリア
+          }
+          res();
+        };
+        req.onerror=()=>rej(req.error);
+      });
+    }catch(e){console.error('restore hero video failed',tab,e);}
+  }
+}
 
 function renderHero(tabName){
   const h=heroData[tabName];
@@ -700,25 +741,32 @@ function uploadHeroVideo(tabName){
   const input=document.createElement('input');
   input.type='file';
   input.accept='video/mp4,video/mov,video/quicktime,video/*';
-  input.onchange=(e)=>{
+  input.onchange=async (e)=>{
     const file=e.target.files[0];
     if(!file) return;
-    // 動画サイズチェック (50MB上限)
-    if(file.size > 50*1024*1024){
-      alert('動画サイズは50MB以下にしてください');
+    if(file.size > 100*1024*1024){
+      alert('動画サイズは100MB以下にしてください');
       return;
     }
-    const reader=new FileReader();
-    reader.onload=(ev)=>{
-      heroData[tabName].vid=ev.target.result;
+    try{
+      const id='hero_'+tabName+'_'+Date.now();
+      // 古いHero動画を削除
+      const oldId=heroData[tabName].vidId;
+      if(oldId){await deleteVideoFromIndexedDB(oldId).catch(()=>{});}
+      // 新しい動画を保存
+      await saveVideoToIndexedDB(id,file.name,file);
+      const url=URL.createObjectURL(file);
+      heroData[tabName].vid=url;
+      heroData[tabName].vidId=id;
       heroData[tabName].img='';
       saveHeroData();
       const overlay=document.getElementById('heroEditorOverlay');
       if(overlay) overlay.remove();
       openHeroEditor(tabName);
       renderHeroToDOM(tabName);
-    };
-    reader.readAsDataURL(file);
+    }catch(err){
+      alert('動画の保存に失敗: '+err.message);
+    }
   };
   input.click();
 }
@@ -1539,10 +1587,12 @@ function closeVideoFullscreen(){
 
 // Vertical swipe inside video fullscreen (next video)
 document.addEventListener('DOMContentLoaded',()=>{
-  // Render all heroes
-  ['study','check','health','diary','record','motivation'].forEach(t=>{
-    const el=document.getElementById('hero-'+t);
-    if(el) el.innerHTML=renderHero(t);
+  // Hero動画をIndexedDBから復元してから表示
+  restoreHeroVideos().finally(()=>{
+    ['study','check','health','diary','record','motivation'].forEach(t=>{
+      const el=document.getElementById('hero-'+t);
+      if(el) el.innerHTML=renderHero(t);
+    });
   });
   // 初期wrapの高さセット
   setTimeout(()=>{
