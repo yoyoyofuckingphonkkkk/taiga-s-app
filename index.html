@@ -1522,6 +1522,8 @@ function playVideoFullscreen(idx){
   buildVideoQueue(idx);
   
   const fullscreen=document.getElementById('videoFullscreen');
+  // 明示的に高さセット（モバイルアドレスバー対策）
+  fullscreen.style.height=window.innerHeight+'px';
   fullscreen.style.display='block';
   document.body.style.overflow='hidden';
   swipeEnabled=false;
@@ -1674,6 +1676,13 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 // Back button to close video
+window.addEventListener('resize',()=>{
+  const fs=document.getElementById('videoFullscreen');
+  if(fs && fs.style.display==='block'){
+    fs.style.height=window.innerHeight+'px';
+  }
+});
+
 window.addEventListener('popstate',()=>{
   const fs=document.getElementById('videoFullscreen');
   if(fs && fs.style.display!=='none' && fs.style.display!==''){
