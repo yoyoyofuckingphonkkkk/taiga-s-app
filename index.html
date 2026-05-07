@@ -1541,8 +1541,9 @@ function shiftVideo(direction){
   if(videoTransitioning||videos.length===0)return;
   videoTransitioning=true;
   
+  const fs=document.getElementById('videoFullscreen');
   const stack=document.getElementById('videoStack');
-  const h=window.innerHeight;
+  const h=fs.clientHeight;
   
   stack.style.transition='transform .3s cubic-bezier(.22,.61,.36,1)';
   stack.style.transform=`translateY(${direction>0?-h:h}px)`;
@@ -1638,7 +1639,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!videoSwipeActive)return;
     videoSwipeActive=false;
     const dy=videoSwipeCurrentY-videoSwipeStartY;
-    const threshold=window.innerHeight*0.2;
+    const fsH=fs.clientHeight;
+    const threshold=fsH*0.2;
     
     if(dy<-threshold){
       shiftVideo(1); // 上スワイプ→次へ
@@ -1647,7 +1649,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     }else if(Math.abs(dy)<25){
       // タップ判定（25px以下なら動いてないとみなす）
       const t=e.changedTouches[0];
-      const w=window.innerWidth,h=window.innerHeight;
+      const w=fs.clientWidth,h=fsH;
       // 中央エリア = 画面中央の50%四方
       const cxMin=w*0.25,cxMax=w*0.75;
       const cyMin=h*0.3,cyMax=h*0.7;
