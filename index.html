@@ -1535,6 +1535,16 @@ function playVideoFullscreen(idx){
   
   refreshAllSlots();
   
+  // デバッグ表示
+  setTimeout(()=>{
+    const fs=document.getElementById('videoFullscreen');
+    const st=document.getElementById('videoStack');
+    const cur=document.querySelector('.vid-slot[data-pos="curr"]');
+    const vid=cur?.querySelector('video');
+    const dbg=document.getElementById('videoDebug')||(()=>{const d=document.createElement('div');d.id='videoDebug';d.style.cssText='position:absolute;bottom:80px;left:10px;color:#0f0;font-size:11px;background:rgba(0,0,0,.8);padding:6px;z-index:1020;font-family:monospace;line-height:1.4;pointer-events:none';fs.appendChild(d);return d;})();
+    dbg.innerHTML=`win:${window.innerWidth}×${window.innerHeight}<br>fs:${fs.clientWidth}×${fs.clientHeight}<br>stack:${st.clientWidth}×${st.clientHeight}<br>slot:${cur?.clientWidth}×${cur?.clientHeight}<br>video:${vid?.clientWidth}×${vid?.clientHeight}<br>vidNat:${vid?.videoWidth}×${vid?.videoHeight}<br>vidOffset:${vid?.offsetTop},${vid?.offsetLeft}`;
+  },500);
+  
   window.history.pushState({videoOpen:true},'');
 }
 
