@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yuimei-v4';
+const CACHE_NAME = 'yuimei-v1';
 const ASSETS = [
   '/',
   '/index.html',
