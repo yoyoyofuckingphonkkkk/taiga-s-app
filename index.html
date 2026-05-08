@@ -265,7 +265,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
   <button class="tab-btn" onclick="switchTab('record',this)">RECORD</button>
 </div>
 
-<div class="tab-content-wrap" id="tabContentWrap">
+<div class="tab-content-wrap" id="tabContentWrap" style="min-height:100vh">
 <div class="section active" id="tab-study">
   <div id="hero-study"></div>
   <button onclick="showGraphModal()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em;margin-bottom:12px">GRAPH</button>
@@ -1974,6 +1974,8 @@ async function openVideoPreview(idx){
   const player=document.getElementById('videoPreviewPlayer');
   overlay.style.display='flex';
   document.body.style.overflow='hidden';
+  document.body.style.position='fixed';
+  document.body.style.width='100%';
   
   let url=videos[idx].url;
   // ObjectURLが無効な場合IndexedDBから再取得
@@ -2003,6 +2005,8 @@ function closeVideoPreview(){
   overlay.style.display='none';
   player.pause();player.removeAttribute('src');player.load();
   document.body.style.overflow='auto';
+  document.body.style.position='';
+  document.body.style.width='';
 }
 
 let videoSelectMode=false;
@@ -2312,11 +2316,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
   });
   // 初期wrapの高さセット
-  setTimeout(()=>{
-    const activeSection=document.querySelector('.section.active');
-    const wrap=document.getElementById('tabContentWrap');
-    if(activeSection&&wrap) wrap.style.minHeight=activeSection.scrollHeight+'px';
-  },200);
+  setTimeout(()=>{},200);
   // Hide loading screen
   setTimeout(() => {
     const loading = document.getElementById('loadingScreen');
