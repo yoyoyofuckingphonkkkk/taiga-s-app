@@ -428,12 +428,12 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 </div>
 
 <!-- Video fullscreen overlay (TikTok-style) -->
-<div id="videoFullscreen" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;background:red;z-index:1000;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">
+<div id="videoFullscreen" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;background:#000;z-index:1000;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">
   <button id="videoBackBtn" style="position:fixed;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;z-index:1020;padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent" onclick="closeVideoFullscreen()">←</button>
   <div id="videoPlayIcon" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1015;opacity:0;pointer-events:none;transition:opacity .2s">
     <div style="width:0;height:0;border-left:24px solid #fff;border-top:16px solid transparent;border-bottom:16px solid transparent;margin-left:6px"></div>
   </div>
-  <div id="videoScroll" style="width:100%;display:flex;flex-direction:column;background:blue"></div>
+  <div id="videoScroll" style="width:100%;display:flex;flex-direction:column"></div>
 </div>
 
 </div>
@@ -1585,7 +1585,7 @@ function buildScrollItems(){
     const item=document.createElement('div');
     item.className='vid-item';
     item.dataset.idx=String(i);
-    item.style.cssText=`width:100%;height:${h}px;flex-shrink:0;scroll-snap-align:start;scroll-snap-stop:always;background:green;position:relative;overflow:hidden`;
+    item.style.cssText=`width:100%;height:${h}px;flex-shrink:0;scroll-snap-align:start;scroll-snap-stop:always;background:#000;position:relative;overflow:hidden`;
     const video=document.createElement('video');
     video.muted=true;video.loop=true;video.playsInline=true;
     video.setAttribute('playsinline','');
@@ -1618,15 +1618,16 @@ function playVideoFullscreen(idx){
   buildVideoQueue(idx);
   
   const fullscreen=document.getElementById('videoFullscreen');
-  const setH=()=>{
-    fullscreen.style.height=window.innerHeight+'px';
-    // 既存のアイテムも高さ追従
-    document.querySelectorAll('.vid-item').forEach(it=>{it.style.height=window.innerHeight+'px';});
-  };
-  setH();
   fullscreen.style.display='block';
   document.body.style.overflow='hidden';
   swipeEnabled=false;
+  
+  const setH=()=>{
+    const h=window.innerHeight;
+    fullscreen.style.height=h+'px';
+    document.querySelectorAll('.vid-item').forEach(it=>{it.style.height=h+'px';});
+  };
+  setH();
   
   buildScrollItems();
   fullscreen.scrollTop=0;
