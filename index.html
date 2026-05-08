@@ -295,7 +295,10 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
     <div class="health-section-label" style="margin-top:0">General</div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
       <span style="font-size:12px;color:var(--muted);flex:1">体重（カロリー計算用）</span>
-      <input type="number" id="bodyWeightInput" min="30" max="200" style="width:70px;padding:6px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;text-align:center" oninput="state.bodyWeight=+this.value;localStorage.setItem('ym4_bodyweight',this.value);saveState()">
+      <input type="number" id="bodyWeightInput" min="30" max="200" style="width:70px;padding:6px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;text-align:center" oninput="state.bodyWeight=+this.value;localStorage.setItem('ym4_bodyweight',this.value);saveState();renderWeightGraph()">
+      <span style="font-size:12px;color:var(--muted)">kg</span>
+    </div>
+    <div id="weightGraphContainer" style="margin-bottom:12px"></div>
       <span style="font-size:12px;color:var(--muted)">kg</span>
     </div>
     <div class="health-grid" id="healthGrid"></div>
@@ -338,10 +341,7 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 <div class="section" id="tab-diary">
   <div id="hero-diary"></div>
   <div class="sec-label" data-num="04">Daily Journal</div>
-  <div class="diary-date-row">
-    <span class="diary-date-label">📅 Date</span>
-    <input class="diary-date-input" type="date" id="diaryDate">
-  </div>
+
   <textarea class="diary-area" id="diaryText" placeholder="Todayの出来事、感じたこと、明dのGoal..."></textarea>
   <button class="diary-save" onclick="saveDiary()">SAVE ENTRY</button>
   <div class="diary-saved" id="diarySaved">Saved ✓</div>
@@ -930,7 +930,7 @@ function saveStrength(){localStorage.setItem('ym4_strength',JSON.stringify(stren
 
 const _d=new Date();
 document.getElementById('hdate').textContent=_d.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
-document.getElementById('diaryDate').value=state.diaryDate||TODAY_KEY;
+
 
 function minsToStr(m){const h=Math.floor(m/60),mn=m%60;return h+'h '+String(mn).padStart(2,'0')+'m'}
 function getTotalStudy(){return subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study[s.id]?.[b.id]||0),0),0);}
@@ -1132,7 +1132,7 @@ function renderCardio(){
   cardioList.forEach((ex,i)=>{
     const data=state.cardio[ex.id]||{distance:0,time:0};
     const kcal=calcCardioCalories(data.distance,data.time);
-    const div=document.createElement('div');div.className='ex-card';
+    const div=document.createElement('div');div.className='ex-card';div.dataset.cardioId=ex.id;
     div.innerHTML=`<div class="ex-header" onclick="this.nextElementSibling.classList.toggle('open')">
       <div class="ex-title">${ex.name}</div>
       <div style="display:flex;align-items:center;gap:8px">
@@ -1161,7 +1161,14 @@ function setCardio(id,field,v){
   if(!state.cardio[id])state.cardio[id]={distance:0,time:0};
   state.cardio[id][field]=Math.max(0,v||0);
   saveState();calcScore();
-  renderCardio();
+  // ヘッダーのサマリーだけ更新（inputフォーカスを維持するため再描画しない）
+  const ex=cardioList.find(e=>e.id===id);
+  if(ex){
+    const data=state.cardio[id];
+    const kcal=calcCardioCalories(data.distance,data.time);
+    const card=document.querySelector(`[data-cardio-id="${id}"] .ex-header span`);
+    if(card)card.textContent=`${data.distance||0}km ${data.time||0}m ${kcal?kcal+'kcal':''}`;
+  }
 }
 function delCardioEx(i){if(!confirm('Delete?'))return;cardioList.splice(i,1);saveCardio();renderCardio();}
 function calcStrengthCalories(time,intensity){
@@ -1209,10 +1216,6 @@ function renderStrength(){
           <div>
             <div style="font-size:10px;color:var(--muted);margin-bottom:2px">重量</div>
             <input type="number" min="0" value="${dailyData.weight||0}" style="width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--accent2);text-align:center;font-size:12px" oninput="setStrengthDaily('${id}','weight',+this.value)">
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Time（m）</div>
-            <input type="number" min="0" value="${dailyData.time||0}" style="width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--green);text-align:center;font-size:12px" oninput="setStrengthDaily('${id}','time',+this.value)">
           </div>
           <div>
             <div style="font-size:10px;color:var(--muted);margin-bottom:2px">強度</div>
@@ -1308,11 +1311,63 @@ function delStrEx(id){
 
 document.getElementById('diaryText').value=state.diary||'';
 document.getElementById('diaryText').addEventListener('input',e=>{state.diary=e.target.value;saveState()});
-document.getElementById('diaryDate').addEventListener('change',e=>{state.diaryDate=e.target.value;saveState()});
 document.getElementById('healthMemo').value=state.healthMemo||'';
 document.getElementById('healthMemo').addEventListener('input',e=>{state.healthMemo=e.target.value;saveState()});
 document.getElementById('bodyWeightInput').value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
-function saveDiary(){saveState();const el=document.getElementById('diarySaved');el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200);}
+renderWeightGraph();
+function renderWeightGraph(){
+  const el=document.getElementById('weightGraphContainer');
+  if(!el)return;
+  // allDataから体重データを収集
+  const entries=Object.keys(allData).sort().map(k=>({date:k,w:allData[k]?.bodyWeight})).filter(e=>e.w&&e.w>0);
+  // 今日のstateも反映
+  const todayW=state.bodyWeight||(+(document.getElementById('bodyWeightInput')?.value)||0);
+  if(todayW>0){
+    const existing=entries.find(e=>e.date===TODAY_KEY);
+    if(existing)existing.w=todayW;
+    else entries.push({date:TODAY_KEY,w:todayW});
+    entries.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  if(entries.length<2){
+    el.innerHTML='<div style="font-size:11px;color:var(--muted);text-align:center;padding:12px 0">データが2日分以上あるとグラフが表示されます</div>';
+    return;
+  }
+  const W=300,H=120,PL=32,PR=8,PT=10,PB=28;
+  const cW=W-PL-PR,cH=H-PT-PB;
+  const weights=entries.map(e=>e.w);
+  const minW=Math.min(...weights)-1,maxW=Math.max(...weights)+1;
+  const xStep=cW/(entries.length-1);
+  const yScale=v=>(1-(v-minW)/(maxW-minW))*cH+PT;
+  const xScale=i=>PL+i*xStep;
+  // ライン
+  let path='';
+  entries.forEach((e,i)=>{const x=xScale(i),y=yScale(e.w);path+=i===0?`M${x},${y}`:`L${x},${y}`;});
+  // ラベル間隔
+  const n=entries.length;
+  const li=n>60?14:n>30?7:n>14?4:n>7?2:1;
+  // ドットとラベル
+  let dots='',labels='';
+  entries.forEach((e,i)=>{
+    const x=xScale(i),y=yScale(e.w);
+    if(i%li===0||i===n-1){
+      dots+=`<circle cx="${x}" cy="${y}" r="3" fill="var(--accent)"/>`;
+      const d=e.date.slice(5);
+      labels+=`<text x="${x}" y="${H-2}" font-size="8" fill="var(--muted)" text-anchor="middle">${d}</text>`;
+    }
+  });
+  // 最新値ラベル
+  const last=entries[entries.length-1];
+  const lx=xScale(entries.length-1),ly=yScale(last.w);
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">
+    <line x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+cH}" stroke="var(--muted)" stroke-width="0.5"/>
+    <line x1="${PL}" y1="${PT+cH}" x2="${W-PR}" y2="${PT+cH}" stroke="var(--muted)" stroke-width="0.5"/>
+    <text x="${PL-2}" y="${PT+4}" font-size="8" fill="var(--muted)" text-anchor="end">${maxW.toFixed(1)}</text>
+    <text x="${PL-2}" y="${PT+cH}" font-size="8" fill="var(--muted)" text-anchor="end">${minW.toFixed(1)}</text>
+    <polyline points="${entries.map((e,i)=>`${xScale(i)},${yScale(e.w)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.8"/>
+    ${dots}${labels}
+    <text x="${lx+4}" y="${ly-4}" font-size="9" fill="var(--accent)" font-weight="bold">${last.w}kg</text>
+  </svg>`;
+}
 
 const FEEDS=[{tag:'GLOBAL POLITICS',title:'国連安保理の拒否権とは？',body:'常任理事国（米英仏露中）は1カ国の反対で決議を阻止できる。冷戦期から現在まで国際秩序を大きく左右する。'},{tag:'FINANCE',title:'Rule of 72 — 複利の法則',body:'「72 ÷ yr利率 ≒ 資産が2倍になるyr数」。yr利6%なら12yrで2倍。Timeを味方にする投資の基本法則。'},{tag:'ENGLISH WORD',title:'Resilience — reps復力',body:'"She showed remarkable resilience after the setback." 逆境から立ち直る力。受験にも人生にも必要な概念。'},{tag:'ECONOMICS',title:'円安とは何か？',body:'1ドル=100円→150円になると円の価値が下がる。輸出企業有利・輸入品（食料・エネルギー）が高騰する。'},{tag:'GLOBAL POLITICS',title:'NATOの存在意義',body:'1949yr、ソ連への対抗として結成。「1カ国への攻撃は全加盟国への攻撃」という集団的自衛権が核心。'},{tag:'FINANCE',title:'ETFとは何か',body:'上場投資信託。株のように売買できるm散投資商品。S&P500連動型は低コストで長期投資に人気。'},{tag:'ENGLISH WORD',title:'Pragmatic — 実際的な',body:'"A pragmatic approach to problem-solving." 現実主義的・実用的。政治・ビジネスで頻出の重要語。'},{tag:'GLOBAL POLITICS',title:'G7とG20の違い',body:'G7は主要先進7カ国、G20は新興国も含む20カ国。経済・安保の議論の場だが拘束力はない。'},{tag:'FINANCE',title:'インフレと金利の関係',body:'物価上昇→中央銀行が金利を上げてお金の流通を抑制。これが世界経済を動かす基本メカニズム。'},{tag:'ENGLISH WORD',title:'Nuance — 微妙なニュアンス',body:'"The nuance was lost in translation." 細かな意味の違い。英語力が上がるほど重要になる語彙。'},{tag:'GLOBAL POLITICS',title:'パレスチナ問題の基本',body:'1948yrイスラエル建国以来の領土紛争。ガザ地区に約200万人が暮らす中東情勢の核心的課題。'},{tag:'FINANCE',title:'株式と債券の違い',body:'株式は会社の所有権でリターン高・リスク大。債券は貸付で安定的・リターン低め。ポートフォリオの基本。'}];
 function loadFeed(){const c=document.getElementById('feedCards');if(!c)return;c.innerHTML='';const idxs=[];while(idxs.length<3){const i=Math.floor(Math.random()*FEEDS.length);if(!idxs.includes(i))idxs.push(i);}idxs.forEach(i=>{const f=FEEDS[i];const d=document.createElement('div');d.className='feed-card';d.innerHTML=`<div class="feed-tag">${f.tag}</div><div class="feed-title">${f.title}</div><div class="feed-body">${f.body}</div>`;c.appendChild(d);});}loadFeed();
@@ -1462,16 +1517,36 @@ function renderVideoManagementList(){
     el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Videosなし<br><span style="font-size:11px">+ Add VideoからAddしてください</span></div>';
     return;
   }
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px';
   videos.forEach((v,i)=>{
-    const div=document.createElement('div');
-    div.className='card';
-    div.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px';
-    div.innerHTML=`
-      <span style="font-size:13px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">▶ ${v.name}</span>
-      <button class="del-btn" onclick="delVideo(${i})">×</button>
-    `;
-    el.appendChild(div);
+    const card=document.createElement('div');
+    card.style.cssText='position:relative;border-radius:8px;overflow:hidden;background:#111;aspect-ratio:9/16;cursor:pointer';
+    // video要素でサムネ表示
+    const vid=document.createElement('video');
+    vid.src=v.url;
+    vid.muted=true;
+    vid.preload='metadata';
+    vid.style.cssText='width:100%;height:100%;object-fit:cover;display:block';
+    vid.addEventListener('loadedmetadata',()=>{vid.currentTime=0.5;});
+    // 再生ボタンオーバーレイ
+    const play=document.createElement('div');
+    play.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.3)';
+    play.innerHTML=`<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center"><div style="width:0;height:0;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:3px"></div></div><div style="color:#fff;font-size:10px;margin-top:6px;max-width:90%;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</div>`;
+    // 削除ボタン
+    const del=document.createElement('button');
+    del.textContent='×';
+    del.style.cssText='position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:24px;height:24px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2';
+    del.ontouchend=(e)=>{e.stopPropagation();e.preventDefault();delVideo(i);};
+    del.onclick=(e)=>{e.stopPropagation();delVideo(i);};
+    card.ontouchend=(e)=>{if(e.target===del)return;e.preventDefault();playVideoFullscreen(i);};
+    card.onclick=(e)=>{if(e.target===del)return;playVideoFullscreen(i);};
+    card.appendChild(vid);
+    card.appendChild(play);
+    card.appendChild(del);
+    grid.appendChild(card);
   });
+  el.appendChild(grid);
 }
 
 
@@ -2063,11 +2138,9 @@ function startEditMode(date){
   
   // 日記・健康・体重のUIも過去データに合わせる
   const diaryEl=document.getElementById('diaryText');
-  const diaryDateEl=document.getElementById('diaryDate');
   const healthMemoEl=document.getElementById('healthMemo');
   const bwEl=document.getElementById('bodyWeightInput');
   if(diaryEl) diaryEl.value=state.diary||'';
-  if(diaryDateEl) diaryDateEl.value=state.diaryDate||date;
   if(healthMemoEl) healthMemoEl.value=state.healthMemo||'';
   if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
   
@@ -2108,7 +2181,6 @@ function cancelEdit(){
   
   // 日記・健康・体重のUIも今日のデータに戻す
   const diaryEl=document.getElementById('diaryText');
-  const diaryDateEl=document.getElementById('diaryDate');
   const healthMemoEl=document.getElementById('healthMemo');
   const bwEl=document.getElementById('bodyWeightInput');
   if(diaryEl) diaryEl.value=state.diary||'';
