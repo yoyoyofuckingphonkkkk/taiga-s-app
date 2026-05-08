@@ -479,7 +479,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <textarea id="mealDetails" placeholder="Ingredients / details (optional)" rows="3" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;resize:none;font-family:inherit;margin-bottom:12px"></textarea>
     
     <!-- AI Analyze -->
-    <button onclick="analyzeMealNutrition()" id="analyzeBtn" style="width:100%;padding:10px;border:0.5px solid var(--accent);border-radius:8px;background:transparent;color:var(--accent);font-size:13px;cursor:pointer;margin-bottom:8px">✨ Analyze Nutrition with AI</button>
+    <button onclick="analyzeMealNutrition()" id="analyzeBtn" style="width:100%;padding:10px;border:0.5px solid var(--accent);border-radius:8px;background:transparent;color:var(--accent);font-size:13px;cursor:pointer;margin-bottom:8px">Analyze Nutrition with AI</button>
     
     <!-- Nutrition result -->
     <div id="mealNutritionResult" style="display:none;padding:10px 12px;border-radius:8px;background:var(--surface2);margin-bottom:12px;font-size:12px;line-height:1.8;color:var(--text2)"></div>
@@ -1486,13 +1486,24 @@ function saveMeal(){
   const name=document.getElementById('mealName').value.trim();
   if(!name){alert('Meal nameを入力してください');return;}
   if(!state.meals)state.meals=[];
-  state.meals.push({
-    id:'m'+Date.now(),name,
+  const mealId='meal_'+Date.now();
+  const meal={
+    id:mealId,name,
     details:document.getElementById('mealDetails').value.trim(),
-    photo:mealPhotoBase64?'data:image/jpeg;base64,'+mealPhotoBase64:null,
+    photoId:mealPhotoBase64?mealId+'_photo':null,
     nutrition:mealNutritionData||null,
     time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
-  });
+  };
+  // 写真はIndexedDBに保存（localStorageの容量節約）
+  if(mealPhotoBase64){
+    const byteStr=atob(mealPhotoBase64);
+    const arr=new Uint8Array(byteStr.length);
+    for(let i=0;i<byteStr.length;i++)arr[i]=byteStr.charCodeAt(i);
+    const blob=new Blob([arr],{type:'image/jpeg'});
+    saveVideoToIndexedDB(meal.photoId,'photo',blob).catch(e=>console.error('meal photo save failed',e));
+    meal.photoUrl=URL.createObjectURL(blob); // 今セッション用
+  }
+  state.meals.push(meal);
   saveState();closeAddMeal();renderMealList();
 }
 
@@ -1514,7 +1525,7 @@ function renderMealList(){
   el.innerHTML=meals.map(m=>{
     const n=m.nutrition;
     return `<div style="border:0.5px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden">
-      ${m.photo?`<img src="${m.photo}" style="width:100%;height:120px;object-fit:cover;display:block">`:''}
+      ${m.photoUrl||m.photo?`<img src="${m.photoUrl||m.photo}" style="width:100%;height:120px;object-fit:cover;display:block">`:''}
       <div style="padding:10px 12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div style="font-size:14px;font-weight:500">${m.name}</div>
