@@ -1037,9 +1037,17 @@ function renderWidgets(){
 
 function saveState(){
   const key=editDate||TODAY_KEY;
-  localStorage.setItem('ym4_'+key,JSON.stringify(state));
-  allData[key]=JSON.parse(JSON.stringify(state));
-  localStorage.setItem('ym4_all',JSON.stringify(allData));
+  try{
+    localStorage.setItem('ym4_'+key,JSON.stringify(state));
+    allData[key]=JSON.parse(JSON.stringify(state));
+    localStorage.setItem('ym4_all',JSON.stringify(allData));
+  }catch(e){
+    if(e.name==='QuotaExceededError'||e.code===22){
+      alert('⚠️ ストレージの容量が不足しています。\nSettingsからデータをバックアップして、古いデータを削除してください。');
+    }else{
+      console.error('saveState error:',e);
+    }
+  }
 }
 function saveSubjects(){saveState();}
 function saveChecks(){saveState();}
@@ -1179,9 +1187,30 @@ function delBook(si,bi){if(!confirm('Delete?'))return;subjects[si].books.splice(
 function delSubject(si){if(!confirm('SubjectごとDelete?'))return;subjects.splice(si,1);saveSubjects();renderStudy();updateRing();}
 
 let timerActive=false,timerRunning=false;let timerInterval=null,timerElapsed=0,timerAddedMins=0;let timerSi=-1,timerBi=-1;
+let timerSubjectId=null,timerBookId=null;
 function handleTimerBtn(si,bi){if(timerActive&&timerSi===si&&timerBi===bi){showTimer();return;}if(timerActive){if(!confirm('別の参考書のタイマーに切り替えますか？'))return;stopTimer(false);}startTimer(si,bi);}
-function startTimer(si,bi){timerSi=si;timerBi=bi;timerElapsed=0;timerAddedMins=0;timerActive=true;timerRunning=true;const s=subjects[si],b=s.books[bi];document.getElementById('timerSubjectName').textContent=s.name.toUpperCase();document.getElementById('timerBookName').textContent=b.name;document.getElementById('timerPlayPause').textContent='⏸';document.getElementById('timerPauseNote').textContent='';showTimer();clearInterval(timerInterval);timerInterval=setInterval(tick,1000);renderStudy();}
-function tick(){if(!timerRunning)return;timerElapsed++;updateTimerUI();const mins=Math.floor(timerElapsed/60);if(mins>timerAddedMins){timerAddedMins=mins;changeBook(timerSi,timerBi,1);calcScore();}}
+function startTimer(si,bi){
+  timerSi=si;timerBi=bi;
+  timerSubjectId=subjects[si]?.id;timerBookId=subjects[si]?.books[bi]?.id;
+  timerElapsed=0;timerAddedMins=0;timerActive=true;timerRunning=true;
+  const s=subjects[si],b=s.books[bi];
+  document.getElementById('timerSubjectName').textContent=s.name.toUpperCase();
+  document.getElementById('timerBookName').textContent=b.name;
+  document.getElementById('timerPlayPause').textContent='⏸';
+  document.getElementById('timerPauseNote').textContent='';
+  showTimer();clearInterval(timerInterval);timerInterval=setInterval(tick,1000);renderStudy();
+}
+function tick(){
+  if(!timerRunning)return;timerElapsed++;updateTimerUI();
+  const mins=Math.floor(timerElapsed/60);
+  if(mins>timerAddedMins){
+    timerAddedMins=mins;
+    // IDで科目・参考書を特定して加算（並び替え対応）
+    const si=subjects.findIndex(s=>s.id===timerSubjectId);
+    const bi=si>=0?subjects[si].books.findIndex(b=>b.id===timerBookId):-1;
+    if(si>=0&&bi>=0){changeBook(si,bi,1);calcScore();}
+  }
+}
 function updateTimerUI(){const m=Math.floor(timerElapsed/60),s=timerElapsed%60;const str=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');document.getElementById('timerDisplay').textContent=str;document.getElementById('timerMiniTime').textContent=str;const cyc=25*60,pct=(timerElapsed%cyc)/cyc,circ=2*Math.PI*105;document.getElementById('timerRingFill').style.strokeDashoffset=circ*(1-pct);}
 function toggleTimer(){timerRunning=!timerRunning;document.getElementById('timerPlayPause').textContent=timerRunning?'⏸':'▶';document.getElementById('timerPauseNote').textContent=timerRunning?'':'一h停止中 — Minimizeでタブに戻れます';}
 function confirmResetTimer(){if(confirm('タイマーをリセット（記録は保持）しますか？')){timerElapsed=0;timerAddedMins=0;updateTimerUI();}}
@@ -1747,6 +1776,10 @@ async function restoreMealPhotos(){
         deleteVideoFromIndexedDB(meal.photoId).catch(()=>{});
         meal.photoId=null;
         meal.photoUrl=null;
+        // localStorageに反映
+        if(allData[dateKey]){
+          localStorage.setItem('ym4_'+dateKey, JSON.stringify(allData[dateKey]));
+        }
       }else{
         // 3日以内 → URLを復元
         try{
@@ -2807,9 +2840,7 @@ function saveEdit(){
 
 function cancelEdit(){
   if(!editMode)return;
-  
-  // Restore today's state
-  state=editStateBackup;
+  state=JSON.parse(JSON.stringify(editStateBackup));
   editMode=false;
   editDate=null;
   editStateBackup=null;
