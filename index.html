@@ -428,9 +428,9 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 </div>
 
 <!-- Simple video preview (from option view) -->
-<div id="videoPreviewOverlay" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;flex-direction:column">
+<div id="videoPreviewOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:1000;align-items:center;justify-content:center;flex-direction:column">
   <button onclick="closeVideoPreview()" style="position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;z-index:1010;padding:8px 14px;border-radius:8px">←</button>
-  <video id="videoPreviewPlayer" controls playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video>
+  <video id="videoPreviewPlayer" controls playsinline style="max-width:100%;max-height:100%;object-fit:contain;background:#000"></video>
 </div>
 
 <!-- Video fullscreen overlay (TikTok-style) -->
@@ -1042,7 +1042,7 @@ function delSubject(si){if(!confirm('SubjectごとDelete?'))return;subjects.spli
 let timerActive=false,timerRunning=false;let timerInterval=null,timerElapsed=0,timerAddedMins=0;let timerSi=-1,timerBi=-1;
 function handleTimerBtn(si,bi){if(timerActive&&timerSi===si&&timerBi===bi){showTimer();return;}if(timerActive){if(!confirm('別の参考書のタイマーに切り替えますか？'))return;stopTimer(false);}startTimer(si,bi);}
 function startTimer(si,bi){timerSi=si;timerBi=bi;timerElapsed=0;timerAddedMins=0;timerActive=true;timerRunning=true;const s=subjects[si],b=s.books[bi];document.getElementById('timerSubjectName').textContent=s.name.toUpperCase();document.getElementById('timerBookName').textContent=b.name;document.getElementById('timerPlayPause').textContent='⏸';document.getElementById('timerPauseNote').textContent='';showTimer();clearInterval(timerInterval);timerInterval=setInterval(tick,1000);renderStudy();}
-function tick(){if(!timerRunning)return;timerElapsed++;updateTimerUI();const mins=Math.floor(timerElapsed/60);if(mins>timerAddedMins){timerAddedMins=mins;changeBook(timerSi,timerBi,1);}}
+function tick(){if(!timerRunning)return;timerElapsed++;updateTimerUI();const mins=Math.floor(timerElapsed/60);if(mins>timerAddedMins){timerAddedMins=mins;changeBook(timerSi,timerBi,1);calcScore();}}
 function updateTimerUI(){const m=Math.floor(timerElapsed/60),s=timerElapsed%60;const str=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');document.getElementById('timerDisplay').textContent=str;document.getElementById('timerMiniTime').textContent=str;const cyc=25*60,pct=(timerElapsed%cyc)/cyc,circ=2*Math.PI*105;document.getElementById('timerRingFill').style.strokeDashoffset=circ*(1-pct);}
 function toggleTimer(){timerRunning=!timerRunning;document.getElementById('timerPlayPause').textContent=timerRunning?'⏸':'▶';document.getElementById('timerPauseNote').textContent=timerRunning?'':'一h停止中 — Minimizeでタブに戻れます';}
 function confirmResetTimer(){if(confirm('タイマーをリセット（記録は保持）しますか？')){timerElapsed=0;timerAddedMins=0;updateTimerUI();}}
