@@ -513,9 +513,9 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 <!-- Simple video preview (from option view) -->
-<div id="videoPreviewOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1200;flex-direction:column;align-items:center;justify-content:center">
-  <video id="videoPreviewPlayer" controls playsinline style="max-width:100%;max-height:calc(100% - 70px);object-fit:contain;background:#000;display:block"></video>
-  <button onclick="closeVideoPreview()" style="position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(255,255,255,.15);border:none;color:#fff;font-size:15px;padding:10px 32px;border-radius:20px;z-index:10;cursor:pointer;white-space:nowrap">← 戻る</button>
+<div id="videoPreviewOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1200;align-items:center;justify-content:center">
+  <video id="videoPreviewPlayer" controls playsinline style="max-width:100%;max-height:100%;display:block"></video>
+  <button onclick="closeVideoPreview()" style="position:absolute;top:max(16px,env(safe-area-inset-top));left:16px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:22px;padding:6px 12px;border-radius:8px;z-index:10;cursor:pointer">←</button>
 </div>
 
 <!-- Video fullscreen overlay (TikTok-style) -->
