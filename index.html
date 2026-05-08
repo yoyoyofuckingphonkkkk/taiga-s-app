@@ -441,7 +441,19 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <button class="add-btn" onclick="document.getElementById('videoUpload').click()">+ Add Video</button>
     <input type="file" id="videoUpload" accept="video/mp4" multiple style="display:none" onchange="uploadVideo();this.value=''">
     <div style="margin-top:16px">
-      <div class="sec-label">Current Videos <span id="videoCount" style="color:var(--muted);font-size:12px;font-weight:normal"></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="sec-label" style="margin:0">Current Videos <span id="videoCount" style="color:var(--muted);font-size:12px;font-weight:normal"></span></div>
+        <div style="display:flex;gap:6px">
+          <button id="selectModeBtn" onclick="toggleVideoSelectMode()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 10px;cursor:pointer">選択</button>
+          <button onclick="deleteAllVideos()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:#f44;font-size:12px;padding:5px 10px;cursor:pointer">全削除</button>
+        </div>
+      </div>
+      <!-- 選択モード時のツールバー -->
+      <div id="selectToolbar" style="display:none;margin-bottom:8px;display:none;gap:8px;align-items:center">
+        <span id="selectCount" style="font-size:12px;color:var(--muted);flex:1">0件選択中</span>
+        <button onclick="selectAllVideos()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 10px;cursor:pointer">全選択</button>
+        <button onclick="deleteSelectedVideos()" style="background:#f44;border:none;border-radius:8px;color:#fff;font-size:12px;padding:5px 10px;cursor:pointer">削除</button>
+      </div>
       <div id="videoManagementList"></div>
     </div>
   </div>
@@ -501,9 +513,9 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 <!-- Simple video preview (from option view) -->
-<div id="videoPreviewOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:1200;align-items:center;justify-content:center;flex-direction:column">
-  <video id="videoPreviewPlayer" controls playsinline style="max-width:100%;max-height:90%;object-fit:contain;background:#000"></video>
-  <button onclick="closeVideoPreview()" style="margin-top:12px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:15px;z-index:1010;padding:10px 28px;border-radius:20px;letter-spacing:.05em">← 戻る</button>
+<div id="videoPreviewOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1200;flex-direction:column;align-items:center;justify-content:center">
+  <video id="videoPreviewPlayer" controls playsinline style="width:100%;height:100%;object-fit:contain;background:#000;display:block"></video>
+  <button onclick="closeVideoPreview()" style="position:absolute;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(255,255,255,.15);border:none;color:#fff;font-size:15px;padding:10px 32px;border-radius:20px;z-index:10;cursor:pointer">← 戻る</button>
 </div>
 
 <!-- Video fullscreen overlay (TikTok-style) -->
@@ -1929,14 +1941,34 @@ function uploadVideo(){
   renderVideoManagementList();
 }
 
-function openVideoPreview(idx){
+async function openVideoPreview(idx){
   if(!videos[idx])return;
   const overlay=document.getElementById('videoPreviewOverlay');
   const player=document.getElementById('videoPreviewPlayer');
   overlay.style.display='flex';
-  player.src=videos[idx].url;
-  player.play().catch(()=>{});
   document.body.style.overflow='hidden';
+  
+  let url=videos[idx].url;
+  // ObjectURLが無効な場合IndexedDBから再取得
+  if(!url||url.startsWith('blob:')){
+    try{
+      if(!db)await initDB();
+      const tx=db.transaction(STORE_NAME,'readonly');
+      const req=tx.objectStore(STORE_NAME).get(videos[idx].id);
+      await new Promise(res=>{
+        req.onsuccess=()=>{
+          if(req.result?.blob){
+            url=URL.createObjectURL(req.result.blob);
+            videos[idx].url=url;
+          }
+          res();
+        };
+        req.onerror=()=>res();
+      });
+    }catch(e){console.error(e);}
+  }
+  player.src=url;
+  player.play().catch(()=>{});
 }
 function closeVideoPreview(){
   const overlay=document.getElementById('videoPreviewOverlay');
@@ -1944,6 +1976,55 @@ function closeVideoPreview(){
   overlay.style.display='none';
   player.pause();player.removeAttribute('src');player.load();
   document.body.style.overflow='auto';
+}
+
+let videoSelectMode=false;
+let videoSelected=new Set();
+
+function toggleVideoSelectMode(){
+  videoSelectMode=!videoSelectMode;
+  videoSelected.clear();
+  document.getElementById('selectModeBtn').textContent=videoSelectMode?'キャンセル':'選択';
+  document.getElementById('selectModeBtn').style.color=videoSelectMode?'var(--accent)':'var(--muted)';
+  const tb=document.getElementById('selectToolbar');
+  tb.style.display=videoSelectMode?'flex':'none';
+  renderVideoManagementList();
+}
+
+function selectAllVideos(){
+  videos.forEach((_,i)=>videoSelected.add(i));
+  updateSelectCount();
+  renderVideoManagementList();
+}
+
+function updateSelectCount(){
+  const el=document.getElementById('selectCount');
+  if(el)el.textContent=`${videoSelected.size}件選択中`;
+}
+
+function deleteSelectedVideos(){
+  if(videoSelected.size===0)return;
+  if(!confirm(`${videoSelected.size}件の動画を削除しますか？`))return;
+  const toDelete=[...videoSelected].sort((a,b)=>b-a);
+  toDelete.forEach(i=>{
+    const v=videos[i];
+    if(v)deleteVideoFromIndexedDB(v.id).catch(()=>{});
+    videos.splice(i,1);
+  });
+  videoSelected.clear();
+  videoSelectMode=false;
+  document.getElementById('selectModeBtn').textContent='選択';
+  document.getElementById('selectModeBtn').style.color='var(--muted)';
+  document.getElementById('selectToolbar').style.display='none';
+  renderVideoManagementList();
+}
+
+function deleteAllVideos(){
+  if(videos.length===0)return;
+  if(!confirm(`全${videos.length}件の動画を削除しますか？`))return;
+  videos.forEach(v=>deleteVideoFromIndexedDB(v.id).catch(()=>{}));
+  videos=[];
+  renderVideoManagementList();
 }
 
 function renderVideoManagementList(){
@@ -1962,11 +2043,30 @@ function renderVideoManagementList(){
     card.style.cssText='position:relative;border-radius:8px;overflow:hidden;background:#111;aspect-ratio:9/16;cursor:pointer';
     // video要素でサムネ表示
     const vid=document.createElement('video');
-    vid.src=v.url;
     vid.muted=true;
     vid.preload='metadata';
     vid.style.cssText='width:100%;height:100%;object-fit:cover;display:block';
     vid.addEventListener('loadedmetadata',()=>{vid.currentTime=0.5;});
+    // URLが無効ならIndexedDBから再取得
+    const loadThumb=(url)=>{vid.src=url;};
+    if(v.url){
+      loadThumb(v.url);
+    }else{
+      (async()=>{
+        try{
+          if(!db)await initDB();
+          const tx=db.transaction(STORE_NAME,'readonly');
+          const req=tx.objectStore(STORE_NAME).get(v.id);
+          req.onsuccess=()=>{
+            if(req.result?.blob){
+              const url=URL.createObjectURL(req.result.blob);
+              videos[i].url=url;
+              loadThumb(url);
+            }
+          };
+        }catch(e){}
+      })();
+    }
     // 再生ボタンオーバーレイ
     const play=document.createElement('div');
     play.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.3)';
@@ -1978,16 +2078,31 @@ function renderVideoManagementList(){
     del.ontouchend=(e)=>{e.stopPropagation();e.preventDefault();delVideo(i);};
     del.onclick=(e)=>{e.stopPropagation();delVideo(i);};
     card.addEventListener('touchstart',e=>{touchStartY=e.changedTouches[0].clientY;},{passive:true});
-    card.addEventListener('click',e=>{
-      if(e.target===del)return;
-      openVideoPreview(i);
-    });
-    card.addEventListener('touchend',e=>{
-      if(e.target===del)return;
-      if(Math.abs(e.changedTouches[0].clientY-touchStartY)>10)return;
-      e.preventDefault();
-      openVideoPreview(i);
-    });
+    // 選択オーバーレイ
+    if(videoSelectMode){
+      const sel=document.createElement('div');
+      const checked=videoSelected.has(i);
+      sel.style.cssText=`position:absolute;inset:0;z-index:3;background:${checked?'rgba(255,200,0,.3)':'transparent'};display:flex;align-items:flex-start;justify-content:flex-start;padding:6px`;
+      sel.innerHTML=`<div style="width:20px;height:20px;border-radius:50%;border:2px solid #fff;background:${checked?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:12px">${checked?'✓':''}</div>`;
+      card.appendChild(sel);
+      card.addEventListener('click',()=>{
+        if(videoSelected.has(i))videoSelected.delete(i);
+        else videoSelected.add(i);
+        updateSelectCount();
+        renderVideoManagementList();
+      });
+    }else{
+      card.addEventListener('click',e=>{
+        if(e.target===del)return;
+        openVideoPreview(i);
+      });
+      card.addEventListener('touchend',e=>{
+        if(e.target===del)return;
+        if(Math.abs(e.changedTouches[0].clientY-touchStartY)>10)return;
+        e.preventDefault();
+        openVideoPreview(i);
+      });
+    }
     card.appendChild(vid);
     card.appendChild(play);
     card.appendChild(del);
