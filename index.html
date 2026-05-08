@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#0a0a0a">
+<meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="YUIMEI">
@@ -214,6 +214,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 <style>
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 </style>
+
 <div class="app">
 <div class="ring-section">
   <div class="top-row">
@@ -267,33 +268,29 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 <div class="tab-content-wrap" id="tabContentWrap">
 <div class="section active" id="tab-study">
   <div id="hero-study"></div>
-  <div class="sec-label" data-num="01">Study Log</div>
   <button onclick="showGraphModal()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em;margin-bottom:12px">GRAPH</button>
   <div id="subjectList"></div>
 </div>
 
 <div class="section" id="tab-check">
   <div id="hero-check"></div>
-  <div class="sec-label" data-num="02">Daily Checklist</div>
   <div class="card" id="checklist"></div>
   <button class="add-btn" style="margin-top:0" onclick="openModal('check')">+ Add Item</button>
 </div>
 
 <div class="section" id="tab-health">
   <div id="hero-health"></div>
-  <div class="sec-label" data-num="03">Health Log</div>
   
   <!-- Health subtabs -->
   <div style="display:flex;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px;overflow-x:auto">
-    <button class="health-subtab-btn active" onclick="switchHealthView('overview')">Overview</button>
-    <button class="health-subtab-btn" onclick="switchHealthView('strength')">Strength</button>
+    <button class="health-subtab-btn active" onclick="switchHealthView('overview')">General</button>
+    <button class="health-subtab-btn" onclick="switchHealthView('strength')">Workout</button>
     <button class="health-subtab-btn" onclick="switchHealthView('cardio')">Cardio</button>
     <button class="health-subtab-btn" onclick="switchHealthView('nutrition')">Nutrition</button>
   </div>
   
   <!-- Overview tab -->
   <div id="healthOverview">
-    <div class="health-section-label" style="margin-top:0">General</div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
       <span style="font-size:12px;color:var(--muted);flex:1">体重（カロリー計算用）</span>
       <input type="number" id="bodyWeightInput" min="30" max="200" style="width:70px;padding:6px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;text-align:center" oninput="state.bodyWeight=+this.value;localStorage.setItem('ym4_bodyweight',this.value);saveState();renderWeightGraph()">
@@ -307,29 +304,27 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     </div>
   </div>
   
-  <!-- Strength tab -->
+  <!-- Workout tab -->
   <div id="healthStrength" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div class="health-section-label" style="margin:0">ExerciseをAdd</div>
+      <div class="health-section-label" style="margin:0">Today's Workout</div>
       <button onclick="showExerciseGraph('strength')" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--accent3);font-size:12px;padding:5px 10px;cursor:pointer">📈 グラフ</button>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input type="text" id="strengthExerciseName" placeholder="Exercise名（腕立て伏せなど）" style="flex:1;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:13px">
-      <input type="text" id="strengthExerciseUnit" placeholder="Unit（reps/kg等）" style="width:60px;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:13px">
-      <button class="add-btn" style="width:auto;margin:0;padding:8px 12px" onclick="addStrengthExercise()">Add</button>
-    </div>
-    
-    <div class="health-section-label">TodayのStrength</div>
     <div id="strengthDailyList"></div>
     
-    <div class="health-section-label" style="margin-top:14px">Exerciseマスター</div>
+    <div class="health-section-label" style="margin-top:14px">Workout Menu</div>
     <div id="strengthMasterList" style="max-height:300px;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input type="text" id="strengthExerciseName" placeholder="Exercise name" style="flex:1;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:13px">
+      <input type="text" id="strengthExerciseUnit" placeholder="Unit" style="width:60px;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:13px">
+      <button class="add-btn" style="width:auto;margin:0;padding:8px 12px" onclick="addStrengthExercise()">Add</button>
+    </div>
   </div>
   
   <!-- Cardio tab -->
   <div id="healthCardio" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div class="health-section-label" style="margin:0">CardioExercise — Cardio</div>
+      <div class="health-section-label" style="margin:0">Cardio</div>
       <button onclick="showExerciseGraph('cardio')" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--accent3);font-size:12px;padding:5px 10px;cursor:pointer">📈 グラフ</button>
     </div>
     <div id="cardioList"></div>
@@ -358,9 +353,8 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 
 <div class="section" id="tab-diary">
   <div id="hero-diary"></div>
-  <div class="sec-label" data-num="04">Daily Journal</div>
 
-  <textarea class="diary-area" id="diaryText" placeholder="Todayの出来事、感じたこと、明dのGoal..."></textarea>
+  <textarea class="diary-area" id="diaryText" placeholder=""></textarea>
   <button class="diary-save" onclick="saveDiary()">SAVE ENTRY</button>
   <div class="diary-saved" id="diarySaved">Saved ✓</div>
 </div>
@@ -368,12 +362,11 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 
 <div class="section" id="tab-record">
   <div id="hero-record"></div>
-  <div class="sec-label" data-num="05">Life Score Trend</div>
   <div style="display:flex;gap:6px;margin-bottom:12px">
     <button class="record-filter-btn active" onclick="setRecordPeriod(7)">7d</button>
     <button class="record-filter-btn" onclick="setRecordPeriod(30)">30d</button>
     <button class="record-filter-btn" onclick="setRecordPeriod(90)">90d</button>
-    <button class="record-filter-btn" onclick="setRecordPeriod(0)">全Period</button>
+    <button class="record-filter-btn" onclick="setRecordPeriod(0)">All</button>
   </div>
   <div id="recordGraph" style="background:var(--surface);border:0.5px solid var(--border);border-radius:15px;padding:20px;height:300px;position:relative;margin-bottom:20px">
     <svg id="scoreChart" style="width:100%;height:100%" viewBox="0 0 400 300"></svg>
@@ -405,7 +398,6 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 
 <div class="section" id="tab-motivation">
   <div id="hero-motivation"></div>
-  <div class="sec-label" data-num="06">Motivation</div>
   
   <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:12px">
     
@@ -598,6 +590,7 @@ let allData=JSON.parse(localStorage.getItem('ym4_all')||'{}');
 // checkItemsはstate.checkItemsから取得（日別管理）
 const DEFAULT_CHECK_ITEMS=[{id:'c1',label:'Breakfast — 朝食'},{id:'c2',label:'Teeth / Skincare — 身だしなみ'},{id:'c3',label:'Study — Studyした'},{id:'c4',label:'Exercise — Exerciseした'},{id:'c5',label:'No Doomscrolling — SNS制限'},{id:'c6',label:'Sleep 7h+ — 7Time以上睡眠'},{id:'c7',label:'Evening Review — 夜の振り返り'}];
 const DEFAULT_GOAL_MINS=+localStorage.getItem('ym4_goal')||360;
+const DEFAULT_SUBJECTS=[{id:'s1',name:'英語',books:[{id:'b1',name:'ターゲット1900'},{id:'b2',name:'ネクステージ'}]},{id:'s2',name:'数学',books:[{id:'b1',name:'青チャート'}]},{id:'s3',name:'国語',books:[{id:'b1',name:'現代文読解'}]}];
 
 // 今日のstateがない場合、前日のchecks状態を引き継ぐ
 function getInitialState(){
@@ -610,14 +603,19 @@ function getInitialState(){
   Object.keys(prevChecks).forEach(id=>{inheritedChecks[id]=false;});
   const prevItems=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.checkItems||DEFAULT_CHECK_ITEMS)):JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS));
   const prevGoal=prevKey?(allData[prevKey]?.goalMins||DEFAULT_GOAL_MINS):DEFAULT_GOAL_MINS;
-  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null};
+  const prevSubjects=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.subjects||DEFAULT_SUBJECTS)):JSON.parse(JSON.stringify(DEFAULT_SUBJECTS));
+  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null};
 }
 
 let state=getInitialState();
 let editMode=false;
 let editDate=null;
 let editStateBackup=null;
-let subjects=JSON.parse(localStorage.getItem('ym4_subjects')||'null')||[{id:'s1',name:'英語',books:[{id:'b1',name:'ターゲット1900'},{id:'b2',name:'ネクステージ'}]},{id:'s2',name:'数学',books:[{id:'b1',name:'青チャート'}]},{id:'s3',name:'国語',books:[{id:'b1',name:'現代文読解'}]}];
+// subjectsはstate.subjectsから取得（日別管理）
+Object.defineProperty(window,'subjects',{
+  get:()=>state.subjects||(state.subjects=JSON.parse(JSON.stringify(DEFAULT_SUBJECTS))),
+  set:v=>{state.subjects=v;}
+});
 Object.defineProperty(window,'checkItems',{get:()=>state.checkItems||(state.checkItems=JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS))),set:v=>{state.checkItems=v;}});
 let cardioList=JSON.parse(localStorage.getItem('ym4_cardio')||'null')||[{id:'ca1',name:'ランニング',unit:'km'},{id:'ca2',name:'ウォーキング',unit:'m'}];
 let strengthList=JSON.parse(localStorage.getItem('ym4_strength')||'null')||[{id:'st1',name:'腕立て伏せ',unit:'reps'},{id:'st2',name:'スクワット',unit:'reps'},{id:'st3',name:'腹筋',unit:'reps'}];
@@ -1043,7 +1041,7 @@ function saveState(){
   allData[key]=JSON.parse(JSON.stringify(state));
   localStorage.setItem('ym4_all',JSON.stringify(allData));
 }
-function saveSubjects(){localStorage.setItem('ym4_subjects',JSON.stringify(subjects));}
+function saveSubjects(){saveState();}
 function saveChecks(){saveState();}
 function saveCardio(){localStorage.setItem('ym4_cardio',JSON.stringify(cardioList));}
 function saveStrength(){localStorage.setItem('ym4_strength',JSON.stringify(strengthList));}
@@ -1073,10 +1071,10 @@ function renderStudy(){
   subjects.forEach((s,si)=>{
     const tot=s.books.reduce((a,b)=>a+(state.study[s.id]?.[b.id]||0),0);
     const div=document.createElement('div');div.className='card';div.style.marginBottom='10px';
+    div.draggable=true;div.dataset.si=si;div.style.cursor='grab';
     const bHtml=s.books.map((b,bi)=>{
       const m=state.study[s.id]?.[b.id]||0;
-      const h=Math.floor(m/60);
-      const mn=m%60;
+      const h=Math.floor(m/60);const mn=m%60;
       const running=timerActive&&timerSi===si&&timerBi===bi;
       return `<div class="book-row"><span class="book-name" title="${b.name}">${b.name}</span><div class="book-ctrl">
         <div style="display:flex;gap:4px;align-items:center">
@@ -1089,10 +1087,21 @@ function renderStudy(){
         <button class="del-btn" onclick="delBook(${si},${bi})">×</button>
       </div></div>`;
     }).join('');
-    div.innerHTML=`<div class="subj-header" onclick="toggleSubj(${si})"><div class="subj-name">${s.name}</div><div style="display:flex;align-items:center;gap:6px"><span id="stot_${si}" style="font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--accent)">${minsToStr(tot)}</span><span id="sarr_${si}" class="subj-arrow">▶</span></div></div><div class="subj-books" id="books_${si}">${bHtml}<button class="add-btn" onclick="openModal('book',${si})">+ Add Textbook</button><button class="add-btn" style="border-color:var(--red);color:var(--red);margin-top:4px" onclick="delSubject(${si})">Delete Subject</button></div>`;
+    div.innerHTML=`<div class="subj-header"><div class="subj-name" style="flex:1;cursor:pointer" onclick="toggleSubj(${si})">${s.name}</div><div style="display:flex;align-items:center;gap:6px"><span id="stot_${si}" style="font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--accent)">${minsToStr(tot)}</span><span id="sarr_${si}" class="subj-arrow" onclick="toggleSubj(${si})">▶</span></div></div><div class="subj-books" id="books_${si}"><div style="padding-bottom:10px;margin-bottom:8px;border-bottom:0.5px solid var(--border)"><span onclick="editSubjectName(${si})" style="font-size:18px;font-weight:600;cursor:pointer;color:var(--text)">${s.name}</span></div>${bHtml}<button class="add-btn" onclick="openModal('book',${si})">+ Add Textbook</button><button class="add-btn" style="border-color:var(--red);color:var(--red);margin-top:4px" onclick="delSubject(${si})">Delete Subject</button></div>`;
     el.appendChild(div);
-    
-    // Add event listeners after elements are added
+    div.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',String(si));div.style.opacity='0.4';});
+    div.addEventListener('dragend',()=>{div.style.opacity='1';});
+    div.addEventListener('dragover',e=>{e.preventDefault();div.style.background='var(--surface2)';});
+    div.addEventListener('dragleave',()=>{div.style.background='';});
+    div.addEventListener('drop',e=>{
+      e.preventDefault();div.style.background='';
+      const fromSi=parseInt(e.dataTransfer.getData('text/plain'));
+      const toSi=parseInt(div.dataset.si);
+      if(fromSi===toSi)return;
+      const moved=subjects.splice(fromSi,1)[0];
+      subjects.splice(toSi,0,moved);
+      saveSubjects();renderStudy();
+    });
     s.books.forEach((b,bi)=>{
       const hInp=document.getElementById('bh_'+si+'_'+bi);
       const mInp=document.getElementById('bm_'+si+'_'+bi);
@@ -1100,13 +1109,31 @@ function renderStudy(){
       if(mInp)mInp.addEventListener('input',()=>setBookTime(si,bi));
     });
   });
-  // Add button
-  const addBtn = document.createElement('button');
-  addBtn.className = 'add-btn';
-  addBtn.textContent = '+ Add Subject';
-  addBtn.onclick = () => openModal('subject');
-  el.appendChild(addBtn);
-  updateRing();
+  const addBtn=document.createElement('button');
+  addBtn.className='add-btn';addBtn.textContent='+ Add Subject';
+  addBtn.onclick=()=>openModal('subject');
+  el.appendChild(addBtn);updateRing();
+}
+
+function editSubjectName(si){
+  const cur=subjects[si].name;
+  const modal=document.createElement('div');
+  modal.className='modal-bg';
+  modal.innerHTML=`<div class="modal">
+    <div class="modal-title">Rename Subject</div>
+    <input class="modal-input" id="renameInput" value="${cur}" placeholder="科目名">
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+      <button class="modal-ok" style="flex:1" onclick="
+        const v=document.getElementById('renameInput').value.trim();
+        if(v){subjects[${si}].name=v;saveSubjects();renderStudy();}
+        this.closest('.modal-bg').remove();
+      ">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.classList.add('open');
+  setTimeout(()=>document.getElementById('renameInput')?.focus(),100);
 }
 function setBookTime(si,bi){
   const h=parseInt(document.getElementById('bh_'+si+'_'+bi).value)||0;
@@ -1359,7 +1386,7 @@ function renderStrength(){
       dailyEl.insertBefore(totalDiv,dailyEl.firstChild);
     }
   }else{
-    dailyEl.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px">ExerciseマスターからAddしてください</div>';
+    dailyEl.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px">Add from Workout Menu</div>';
   }
   
   // Render master list
@@ -2417,7 +2444,7 @@ function renderRecord(){
   filteredKeys.forEach(k=>{
     const r=allData[k];
     const sc=calcScoreFor(r);
-    const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
+    const _subs=r.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
     const ch=Object.values(r.checks||{}).filter(Boolean).length;
     const div=document.createElement('div');
     div.className='record-day';
@@ -2542,7 +2569,7 @@ function nextCalMonth(){
 }
 
 function calcScoreFor(r){
-  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
+  const _subs=r.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
   
   // 65% Study
   const _goal=r.goalMins||DEFAULT_GOAL_MINS;
@@ -2606,7 +2633,7 @@ function showRecordDetail(date){
   }
   const r=allData[date];
   
-  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
+  const _subs=r.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
   const ch=Object.values(r.checks||{}).filter(Boolean).length;
   const sc=calcScoreFor(r);
   
@@ -3092,7 +3119,7 @@ function showExerciseGraph(type){
         <button class="record-filter-btn active" id="egp7" onclick="setExGraphPeriod(7,this)">7d</button>
         <button class="record-filter-btn" id="egp30" onclick="setExGraphPeriod(30,this)">30d</button>
         <button class="record-filter-btn" id="egp90" onclick="setExGraphPeriod(90,this)">90d</button>
-        <button class="record-filter-btn" id="egpall" onclick="setExGraphPeriod(0,this)">全Period</button>
+        <button class="record-filter-btn" id="egpall" onclick="setExGraphPeriod(0,this)">All</button>
       </div>
       
       <div id="exerciseGraphArea" style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:12px">
@@ -3331,7 +3358,7 @@ function showStudyGraph(){
     d.setDate(d.getDate()-i);
     const key='ym4_'+d.getFullYear().toString().padStart(4,'0')+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0');
     const dayData=JSON.parse(localStorage.getItem(key)||'{}');
-    const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
+    const _subs=dayData.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
     dates.push((d.getMonth()+1)+'/'+d.getDate());
     times.push(Math.round(sm/60)); // Convert to hours
   }
@@ -3417,7 +3444,7 @@ function showGraphModal(){
     while(current<=end){
       const key='ym4_'+formatDate(current);
       const dayData=JSON.parse(localStorage.getItem(key)||'{}');
-      const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
+      const _subs=dayData.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
       dates.push(new Date(current));
       times.push(Math.round(sm/60));
       current.setDate(current.getDate()+1);
@@ -3571,7 +3598,7 @@ function showGraphModal(){
         const dateStr=d.getDate().toString().padStart(2,'0');
         const fullDate=formatDate(d);
         const dayData=JSON.parse(localStorage.getItem('ym4_'+fullDate)||'{}');
-        const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
+        const _subs=dayData.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
         const hasData=sm>0;
         
         const bgColor=isCurrentMonth?(hasData?'var(--surface2)':'var(--surface3)'):'var(--surface)';
@@ -3686,7 +3713,7 @@ function showStudyGraphRange(){
   while(current<=endD){
     const key='ym4_'+current.getFullYear().toString().padStart(4,'0')+'-'+(current.getMonth()+1).toString().padStart(2,'0')+'-'+current.getDate().toString().padStart(2,'0');
     const dayData=JSON.parse(localStorage.getItem(key)||'{}');
-    const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
+    const _subs=dayData.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(dayData.study?.[s.id]?.[b.id]||0),0),0);
     dates.push((current.getMonth()+1)+'/'+(current.getDate()).toString().padStart(2,'0'));
     times.push(Math.round(sm/60));
     current.setDate(current.getDate()+1);
