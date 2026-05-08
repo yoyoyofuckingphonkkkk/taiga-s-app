@@ -2011,31 +2011,37 @@ async function openVideoPreview(idx){
   document.body.style.width='100%';
   
   let url=videos[idx].url;
-  // ObjectURLが無効な場合IndexedDBから再取得
-  if(!url||url.startsWith('blob:')){
+
+  const setAndPlay=async(src)=>{
+    player.src=src;
+    player.load();
+    player.play().catch(()=>{});
+  };
+
+  // srcのエラー（URL無効）を検知してIndexedDBから再取得
+  player.onerror=async()=>{
     try{
       if(!db)await initDB();
       const tx=db.transaction(STORE_NAME,'readonly');
       const req=tx.objectStore(STORE_NAME).get(videos[idx].id);
-      await new Promise(res=>{
-        req.onsuccess=()=>{
-          if(req.result?.blob){
-            url=URL.createObjectURL(req.result.blob);
-            videos[idx].url=url;
-          }
-          res();
-        };
-        req.onerror=()=>res();
-      });
+      req.onsuccess=()=>{
+        if(req.result?.blob){
+          const newUrl=URL.createObjectURL(req.result.blob);
+          videos[idx].url=newUrl;
+          player.onerror=null;
+          setAndPlay(newUrl);
+        }
+      };
     }catch(e){console.error(e);}
-  }
-  player.src=url;
-  player.play().catch(()=>{});
+  };
+
+  await setAndPlay(url);
 }
 function closeVideoPreview(){
   const overlay=document.getElementById('videoPreviewOverlay');
   const player=document.getElementById('videoPreviewPlayer');
   overlay.style.display='none';
+  player.onerror=null;
   player.pause();player.removeAttribute('src');player.load();
   document.body.style.overflow='auto';
   document.body.style.position='';
@@ -2113,23 +2119,25 @@ function renderVideoManagementList(){
     vid.addEventListener('loadedmetadata',()=>{vid.currentTime=0.5;});
     // URLが無効ならIndexedDBから再取得
     const loadThumb=(url)=>{vid.src=url;};
+    const loadFromDB=async()=>{
+      try{
+        if(!db)await initDB();
+        const tx=db.transaction(STORE_NAME,'readonly');
+        const req=tx.objectStore(STORE_NAME).get(v.id);
+        req.onsuccess=()=>{
+          if(req.result?.blob){
+            const url=URL.createObjectURL(req.result.blob);
+            videos[i].url=url;
+            loadThumb(url);
+          }
+        };
+      }catch(e){}
+    };
     if(v.url){
       loadThumb(v.url);
+      vid.onerror=()=>loadFromDB(); // URL無効時に再取得
     }else{
-      (async()=>{
-        try{
-          if(!db)await initDB();
-          const tx=db.transaction(STORE_NAME,'readonly');
-          const req=tx.objectStore(STORE_NAME).get(v.id);
-          req.onsuccess=()=>{
-            if(req.result?.blob){
-              const url=URL.createObjectURL(req.result.blob);
-              videos[i].url=url;
-              loadThumb(url);
-            }
-          };
-        }catch(e){}
-      })();
+      loadFromDB();
     }
     // 再生ボタンオーバーレイ
     const play=document.createElement('div');
