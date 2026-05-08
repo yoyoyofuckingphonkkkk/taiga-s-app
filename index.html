@@ -501,7 +501,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 <!-- Simple video preview (from option view) -->
-<div id="videoPreviewOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:1000;align-items:center;justify-content:center;flex-direction:column">
+<div id="videoPreviewOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:1200;align-items:center;justify-content:center;flex-direction:column">
   <video id="videoPreviewPlayer" controls playsinline style="max-width:100%;max-height:90%;object-fit:contain;background:#000"></video>
   <button onclick="closeVideoPreview()" style="margin-top:12px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:15px;z-index:1010;padding:10px 28px;border-radius:20px;letter-spacing:.05em">← 戻る</button>
 </div>
@@ -1468,7 +1468,7 @@ function renderNutritionGoalInputs(){
   
   // スタイル: トグル黒白にする
   document.querySelectorAll('[data-show-key]').forEach(cb=>{
-    cb.style.cssText='appearance:none;-webkit-appearance:none;width:16px;height:16px;border:1px solid #ccc;border-radius:3px;cursor:pointer;background:#fff;accent-color:#000';
+    cb.style.cssText='width:16px;height:16px;cursor:pointer;accent-color:#000';
   });
 }
 
