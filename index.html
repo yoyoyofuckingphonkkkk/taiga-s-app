@@ -299,8 +299,6 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
       <span style="font-size:12px;color:var(--muted)">kg</span>
     </div>
     <div id="weightGraphContainer" style="margin-bottom:12px"></div>
-      <span style="font-size:12px;color:var(--muted)">kg</span>
-    </div>
     <div class="health-grid" id="healthGrid"></div>
     <div style="margin-top:14px">
       <div class="sec-label">Body Memo</div>
@@ -479,18 +477,22 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 const TODAY_KEY=new Date().toISOString().slice(0,10);
 let allData=JSON.parse(localStorage.getItem('ym4_all')||'{}');
 
+// checkItemsはstate.checkItemsから取得（日別管理）
+const DEFAULT_CHECK_ITEMS=[{id:'c1',label:'Breakfast — 朝食'},{id:'c2',label:'Teeth / Skincare — 身だしなみ'},{id:'c3',label:'Study — Studyした'},{id:'c4',label:'Exercise — Exerciseした'},{id:'c5',label:'No Doomscrolling — SNS制限'},{id:'c6',label:'Sleep 7h+ — 7Time以上睡眠'},{id:'c7',label:'Evening Review — 夜の振り返り'}];
+const DEFAULT_GOAL_MINS=+localStorage.getItem('ym4_goal')||360;
+
 // 今日のstateがない場合、前日のchecks状態を引き継ぐ
 function getInitialState(){
   const saved=localStorage.getItem('ym4_'+TODAY_KEY);
   if(saved) return JSON.parse(saved);
-  // 前日のchecksを引き継ぐ
   const sortedKeys=Object.keys(allData).sort();
   const prevKey=sortedKeys.filter(k=>k<TODAY_KEY).pop();
   const prevChecks=prevKey ? JSON.parse(JSON.stringify(allData[prevKey]?.checks||{})) : {};
-  // 全チェックをfalseでリセット（項目自体は引き継ぐ）
   const inheritedChecks={};
   Object.keys(prevChecks).forEach(id=>{inheritedChecks[id]=false;});
-  return {study:{},checks:inheritedChecks,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null};
+  const prevItems=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.checkItems||DEFAULT_CHECK_ITEMS)):JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS));
+  const prevGoal=prevKey?(allData[prevKey]?.goalMins||DEFAULT_GOAL_MINS):DEFAULT_GOAL_MINS;
+  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null};
 }
 
 let state=getInitialState();
@@ -498,10 +500,10 @@ let editMode=false;
 let editDate=null;
 let editStateBackup=null;
 let subjects=JSON.parse(localStorage.getItem('ym4_subjects')||'null')||[{id:'s1',name:'英語',books:[{id:'b1',name:'ターゲット1900'},{id:'b2',name:'ネクステージ'}]},{id:'s2',name:'数学',books:[{id:'b1',name:'青チャート'}]},{id:'s3',name:'国語',books:[{id:'b1',name:'現代文読解'}]}];
-let checkItems=JSON.parse(localStorage.getItem('ym4_checks')||'null')||[{id:'c1',label:'Breakfast — 朝食'},{id:'c2',label:'Teeth / Skincare — 身だしなみ'},{id:'c3',label:'Study — Studyした'},{id:'c4',label:'Exercise — Exerciseした'},{id:'c5',label:'No Doomscrolling — SNS制限'},{id:'c6',label:'Sleep 7h+ — 7Time以上睡眠'},{id:'c7',label:'Evening Review — 夜の振り返り'}];
+Object.defineProperty(window,'checkItems',{get:()=>state.checkItems||(state.checkItems=JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS))),set:v=>{state.checkItems=v;}});
 let cardioList=JSON.parse(localStorage.getItem('ym4_cardio')||'null')||[{id:'ca1',name:'ランニング',unit:'km'},{id:'ca2',name:'ウォーキング',unit:'m'}];
 let strengthList=JSON.parse(localStorage.getItem('ym4_strength')||'null')||[{id:'st1',name:'腕立て伏せ',unit:'reps'},{id:'st2',name:'スクワット',unit:'reps'},{id:'st3',name:'腹筋',unit:'reps'}];
-let goalMins=+localStorage.getItem('ym4_goal')||360;
+Object.defineProperty(window,'goalMins',{get:()=>state.goalMins||DEFAULT_GOAL_MINS,set:v=>{state.goalMins=v;saveState();}});
 
 // ===== HERO IMAGES & TEXT =====
 let heroData=JSON.parse(localStorage.getItem('ym4_heroes')||'null')||{
@@ -924,7 +926,7 @@ function saveState(){
   localStorage.setItem('ym4_all',JSON.stringify(allData));
 }
 function saveSubjects(){localStorage.setItem('ym4_subjects',JSON.stringify(subjects));}
-function saveChecks(){localStorage.setItem('ym4_checks',JSON.stringify(checkItems));}
+function saveChecks(){saveState();}
 function saveCardio(){localStorage.setItem('ym4_cardio',JSON.stringify(cardioList));}
 function saveStrength(){localStorage.setItem('ym4_strength',JSON.stringify(strengthList));}
 
@@ -1977,13 +1979,14 @@ function calcScoreFor(r){
   const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
   
   // 70% Study - based on goal percentage
-  const studyScore=Math.min(70,(sm/goalMins)*70);
+  const _goal=r.goalMins||DEFAULT_GOAL_MINS;
+  const studyScore=Math.min(70,(sm/_goal)*70);
   
   // 15% Exercise (increased from 10)
   const exScore=Math.min(15,(r.health?.exercise||0)/30*15);
   
   // 15% Other (checks + diary, increased from 10)
-  const n=Math.max(1,checkItems.length);
+  const n=Math.max(1,(r.checkItems||checkItems).length);
   const checkScore=(Object.values(r.checks||{}).filter(Boolean).length/n)*10;
   const diaryScore=(r.diary?.length||0)>0?5:0;
   const otherScore=checkScore+diaryScore;
@@ -1995,7 +1998,7 @@ function calcScore(){document.getElementById('topScore').textContent=calcScoreFo
 function showRecordDetail(date){
   // Create or get record for this date
   if(!allData[date]){
-    allData[date]={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:'',bodyWeight:null};
+    allData[date]={study:{},checks:{},checkItems:JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS)),goalMins:DEFAULT_GOAL_MINS,health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:'',bodyWeight:null};
   }
   const r=allData[date];
   
@@ -2019,7 +2022,7 @@ function showRecordDetail(date){
   
   // Checks details
   let checksDetail='';
-  checkItems.forEach((item,i)=>{
+  (r.checkItems||checkItems).forEach((item,i)=>{
     const done=r.checks?.[item.id];
     checksDetail+=`<div style="font-size:11px;color:var(--text2);margin-bottom:4px">${done?'✓':'○'} ${item.label}</div>`;
   });
@@ -2055,7 +2058,7 @@ function showRecordDetail(date){
       </div>
       
       <div style="margin-bottom:12px">
-        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">CHECKS (${ch}/${checkItems.length})</div>
+        <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">CHECKS (${ch}/${(r.checkItems||checkItems).length})</div>
         <div style="background:var(--surface);border-radius:12px;padding:12px;font-size:11px">
           ${checksDetail||'<div style="color:var(--muted)">No record</div>'}
         </div>
@@ -2109,7 +2112,7 @@ function showRecordDetail(date){
 function startEditMode(date){
   // Create record if doesn't exist
   if(!allData[date]){
-    allData[date]={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:'',bodyWeight:null};
+    allData[date]={study:{},checks:{},checkItems:JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS)),goalMins:DEFAULT_GOAL_MINS,health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:'',bodyWeight:null};
   }
   
   // Close detail modal
@@ -2121,7 +2124,7 @@ function startEditMode(date){
   editMode=true;
   
   // Load past date's state into current state
-  const defaultState={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:'',bodyWeight:null};
+  const defaultState={study:{},checks:{},checkItems:JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS)),goalMins:DEFAULT_GOAL_MINS,health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:'',bodyWeight:null};
   state=JSON.parse(JSON.stringify(allData[date]||defaultState));
   
   // Show banner
@@ -2184,7 +2187,6 @@ function cancelEdit(){
   const healthMemoEl=document.getElementById('healthMemo');
   const bwEl=document.getElementById('bodyWeightInput');
   if(diaryEl) diaryEl.value=state.diary||'';
-  if(diaryDateEl) diaryDateEl.value=state.diaryDate||TODAY_KEY;
   if(healthMemoEl) healthMemoEl.value=state.healthMemo||'';
   if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
   
@@ -2984,7 +2986,7 @@ document.addEventListener('touchend',e=>{touchEndX=e.changedTouches[0].screenX;t
 let modalMode='',modalSi=-1;
 function openModal(mode,si){modalMode=mode;modalSi=si??-1;const titles={subject:'Add Subject',book:'Add Textbook',check:'Add Checklist Item',cardio:'Add Cardio Exercise',strength:'Add Strength Exercise',goal:'Set Study Goal',quote:'Add Quote'};document.getElementById('modalTitle').textContent=titles[mode]||'Add';let body='';if(mode==='goal'){const gh=Math.floor(goalMins/60),gm=goalMins%60;body=`<div style="font-size:12px;color:var(--muted);margin-bottom:12px">現在のGoal: ${minsToStr(goalMins)}</div><div style="display:flex;gap:8px;margin-bottom:8px"><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time (h)</div><input class="modal-input" type="number" id="goalH" min="0" max="24" value="${gh}" style="margin-bottom:0"></div><div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">m (min)</div><input class="modal-input" type="number" id="goalM" min="0" max="59" value="${gm}" style="margin-bottom:0"></div></div>`;}else if(mode==='quote'){body=`<textarea class="diary-area" id="modalInput" placeholder="Quoteを入力..." style="min-height:100px"></textarea>`;}else if(mode==='cardio'||mode==='strength'){const uOpts=mode==='cardio'?['km','m','reps','kcal']:['reps','kg','set'];body=`<input class="modal-input" id="modalInput" placeholder="${mode==='cardio'?'例: ランニング':'例: ベンチプレス'}"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Unit</div><select class="modal-input" id="modalUnit" style="cursor:pointer;color:var(--text)">${uOpts.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>`;}else{const ph={subject:'例: 物理',book:'例: 化学の新演習',check:'例: 読書 30m'};body=`<input class="modal-input" id="modalInput" placeholder="${ph[mode]||''}">`;}document.getElementById('modalBody').innerHTML=body;document.getElementById('modalOk').textContent=mode==='goal'?'Set':'Add';document.getElementById('modal').classList.add('open');setTimeout(()=>document.getElementById('modalInput')?.focus(),300);}
 function closeModal(){document.getElementById('modal').classList.remove('open');}
-function modalConfirm(){if(modalMode==='goal'){const h=parseInt(document.getElementById('goalH').value)||0;const m=parseInt(document.getElementById('goalM').value)||0;const tot=h*60+m;if(tot>0){goalMins=tot;localStorage.setItem('ym4_goal',tot);updateRing();}closeModal();return;}if(modalMode==='quote'){const text=document.getElementById('modalInput')?.value.trim();if(!text){closeModal();return;}quotes.push({id:'q'+Date.now(),text});saveQuotes();renderQuotesList();closeModal();return;}const val=document.getElementById('modalInput')?.value.trim();if(!val){closeModal();return;}if(modalMode==='subject'){subjects.push({id:'s'+Date.now(),name:val,books:[]});saveSubjects();renderStudy();}else if(modalMode==='book'){subjects[modalSi].books.push({id:'b'+Date.now(),name:val});saveSubjects();renderStudy();}else if(modalMode==='check'){checkItems.push({id:'c'+Date.now(),label:val});saveChecks();renderChecks();calcScore();}else if(modalMode==='cardio'){const u=document.getElementById('modalUnit')?.value||'km';cardioList.push({id:'ca'+Date.now(),name:val,unit:u});saveCardio();renderCardio();}else if(modalMode==='strength'){const u=document.getElementById('modalUnit')?.value||'reps';const id='st'+Date.now();strengthList.push({id,name:val,unit:u});state.strength[id]=[0,0,0];saveStrength();saveState();renderStrength();}closeModal();}
+function modalConfirm(){if(modalMode==='goal'){const h=parseInt(document.getElementById('goalH').value)||0;const m=parseInt(document.getElementById('goalM').value)||0;const tot=h*60+m;if(tot>0){goalMins=tot;updateRing();}closeModal();return;}if(modalMode==='quote'){const text=document.getElementById('modalInput')?.value.trim();if(!text){closeModal();return;}quotes.push({id:'q'+Date.now(),text});saveQuotes();renderQuotesList();closeModal();return;}const val=document.getElementById('modalInput')?.value.trim();if(!val){closeModal();return;}if(modalMode==='subject'){subjects.push({id:'s'+Date.now(),name:val,books:[]});saveSubjects();renderStudy();}else if(modalMode==='book'){subjects[modalSi].books.push({id:'b'+Date.now(),name:val});saveSubjects();renderStudy();}else if(modalMode==='check'){checkItems.push({id:'c'+Date.now(),label:val});saveChecks();renderChecks();calcScore();}else if(modalMode==='cardio'){const u=document.getElementById('modalUnit')?.value||'km';cardioList.push({id:'ca'+Date.now(),name:val,unit:u});saveCardio();renderCardio();}else if(modalMode==='strength'){const u=document.getElementById('modalUnit')?.value||'reps';const id='st'+Date.now();strengthList.push({id,name:val,unit:u});state.strength[id]=[0,0,0];saveStrength();saveState();renderStrength();}closeModal();}
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 
 // Initialize DB and load saved videos
