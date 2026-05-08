@@ -295,7 +295,7 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
     <div class="health-section-label" style="margin-top:0">General</div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
       <span style="font-size:12px;color:var(--muted);flex:1">体重（カロリー計算用）</span>
-      <input type="number" id="bodyWeightInput" min="30" max="200" style="width:70px;padding:6px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;text-align:center" oninput="localStorage.setItem('ym4_bodyweight',this.value)">
+      <input type="number" id="bodyWeightInput" min="30" max="200" style="width:70px;padding:6px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;text-align:center" oninput="state.bodyWeight=+this.value;localStorage.setItem('ym4_bodyweight',this.value);saveState()">
       <span style="font-size:12px;color:var(--muted)">kg</span>
     </div>
     <div class="health-grid" id="healthGrid"></div>
@@ -477,8 +477,23 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
 
 <script>
 const TODAY_KEY=new Date().toISOString().slice(0,10);
-let state=JSON.parse(localStorage.getItem('ym4_'+TODAY_KEY)||'null')||{study:{},checks:{},health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:''};
 let allData=JSON.parse(localStorage.getItem('ym4_all')||'{}');
+
+// 今日のstateがない場合、前日のchecks状態を引き継ぐ
+function getInitialState(){
+  const saved=localStorage.getItem('ym4_'+TODAY_KEY);
+  if(saved) return JSON.parse(saved);
+  // 前日のchecksを引き継ぐ
+  const sortedKeys=Object.keys(allData).sort();
+  const prevKey=sortedKeys.filter(k=>k<TODAY_KEY).pop();
+  const prevChecks=prevKey ? JSON.parse(JSON.stringify(allData[prevKey]?.checks||{})) : {};
+  // 全チェックをfalseでリセット（項目自体は引き継ぐ）
+  const inheritedChecks={};
+  Object.keys(prevChecks).forEach(id=>{inheritedChecks[id]=false;});
+  return {study:{},checks:inheritedChecks,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null};
+}
+
+let state=getInitialState();
 let editMode=false;
 let editDate=null;
 let editStateBackup=null;
@@ -902,7 +917,12 @@ function renderWidgets(){
   });
 }
 
-function saveState(){localStorage.setItem('ym4_'+TODAY_KEY,JSON.stringify(state));allData[TODAY_KEY]=JSON.parse(JSON.stringify(state));localStorage.setItem('ym4_all',JSON.stringify(allData));}
+function saveState(){
+  const key=editDate||TODAY_KEY;
+  localStorage.setItem('ym4_'+key,JSON.stringify(state));
+  allData[key]=JSON.parse(JSON.stringify(state));
+  localStorage.setItem('ym4_all',JSON.stringify(allData));
+}
 function saveSubjects(){localStorage.setItem('ym4_subjects',JSON.stringify(subjects));}
 function saveChecks(){localStorage.setItem('ym4_checks',JSON.stringify(checkItems));}
 function saveCardio(){localStorage.setItem('ym4_cardio',JSON.stringify(cardioList));}
@@ -1291,7 +1311,7 @@ document.getElementById('diaryText').addEventListener('input',e=>{state.diary=e.
 document.getElementById('diaryDate').addEventListener('change',e=>{state.diaryDate=e.target.value;saveState()});
 document.getElementById('healthMemo').value=state.healthMemo||'';
 document.getElementById('healthMemo').addEventListener('input',e=>{state.healthMemo=e.target.value;saveState()});
-document.getElementById('bodyWeightInput').value=localStorage.getItem('ym4_bodyweight')||'70';
+document.getElementById('bodyWeightInput').value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
 function saveDiary(){saveState();const el=document.getElementById('diarySaved');el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200);}
 
 const FEEDS=[{tag:'GLOBAL POLITICS',title:'国連安保理の拒否権とは？',body:'常任理事国（米英仏露中）は1カ国の反対で決議を阻止できる。冷戦期から現在まで国際秩序を大きく左右する。'},{tag:'FINANCE',title:'Rule of 72 — 複利の法則',body:'「72 ÷ yr利率 ≒ 資産が2倍になるyr数」。yr利6%なら12yrで2倍。Timeを味方にする投資の基本法則。'},{tag:'ENGLISH WORD',title:'Resilience — reps復力',body:'"She showed remarkable resilience after the setback." 逆境から立ち直る力。受験にも人生にも必要な概念。'},{tag:'ECONOMICS',title:'円安とは何か？',body:'1ドル=100円→150円になると円の価値が下がる。輸出企業有利・輸入品（食料・エネルギー）が高騰する。'},{tag:'GLOBAL POLITICS',title:'NATOの存在意義',body:'1949yr、ソ連への対抗として結成。「1カ国への攻撃は全加盟国への攻撃」という集団的自衛権が核心。'},{tag:'FINANCE',title:'ETFとは何か',body:'上場投資信託。株のように売買できるm散投資商品。S&P500連動型は低コストで長期投資に人気。'},{tag:'ENGLISH WORD',title:'Pragmatic — 実際的な',body:'"A pragmatic approach to problem-solving." 現実主義的・実用的。政治・ビジネスで頻出の重要語。'},{tag:'GLOBAL POLITICS',title:'G7とG20の違い',body:'G7は主要先進7カ国、G20は新興国も含む20カ国。経済・安保の議論の場だが拘束力はない。'},{tag:'FINANCE',title:'インフレと金利の関係',body:'物価上昇→中央銀行が金利を上げてお金の流通を抑制。これが世界経済を動かす基本メカニズム。'},{tag:'ENGLISH WORD',title:'Nuance — 微妙なニュアンス',body:'"The nuance was lost in translation." 細かな意味の違い。英語力が上がるほど重要になる語彙。'},{tag:'GLOBAL POLITICS',title:'パレスチナ問題の基本',body:'1948yrイスラエル建国以来の領土紛争。ガザ地区に約200万人が暮らす中東情勢の核心的課題。'},{tag:'FINANCE',title:'株式と債券の違い',body:'株式は会社の所有権でリターン高・リスク大。債券は貸付で安定的・リターン低め。ポートフォリオの基本。'}];
@@ -1565,19 +1585,21 @@ function setupVideoScrollObserver(){
       if(entry.intersectionRatio>0.7){
         // この動画が画面の大半を占めてる→再生
         loadVideoForItem(item);
-        video.play().catch(()=>{});
+        video.muted=false;
+        video.play().catch(()=>{video.muted=true;video.play().catch(()=>{});});
         currentVideoIdx=+video.dataset.vidIdx;
-        // 前後もプリロード
+        // 前後もプリロード（ただしmute）
         const prevSibling=item.previousElementSibling;
         const nextSibling=item.nextElementSibling;
-        if(prevSibling)loadVideoForItem(prevSibling);
-        if(nextSibling)loadVideoForItem(nextSibling);
+        if(prevSibling){loadVideoForItem(prevSibling);prevSibling.querySelector('video').muted=true;}
+        if(nextSibling){loadVideoForItem(nextSibling);nextSibling.querySelector('video').muted=true;}
         // 再生アイコン消す
         const playIcon=document.getElementById('videoPlayIcon');
         if(playIcon)playIcon.style.opacity='0';
       }else if(entry.intersectionRatio<0.3){
         // 画面外→停止
         video.pause();
+        video.muted=true;
       }
     });
   },{root:fs,threshold:[0.3,0.7]});
@@ -1683,6 +1705,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       if(inCenter && curVid){
         const playIcon=document.getElementById('videoPlayIcon');
         if(curVid.paused){
+          curVid.muted=false;
           curVid.play().catch(()=>{});
           if(playIcon)playIcon.style.opacity='0';
         }else{
@@ -1897,7 +1920,7 @@ function calcScore(){document.getElementById('topScore').textContent=calcScoreFo
 function showRecordDetail(date){
   // Create or get record for this date
   if(!allData[date]){
-    allData[date]={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:''};
+    allData[date]={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:'',bodyWeight:null};
   }
   const r=allData[date];
   
@@ -2011,7 +2034,7 @@ function showRecordDetail(date){
 function startEditMode(date){
   // Create record if doesn't exist
   if(!allData[date]){
-    allData[date]={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:''};
+    allData[date]={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:'',bodyWeight:null};
   }
   
   // Close detail modal
@@ -2023,7 +2046,8 @@ function startEditMode(date){
   editMode=true;
   
   // Load past date's state into current state
-  state=JSON.parse(JSON.stringify(allData[date]||{study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:''}));
+  const defaultState={study:{},checks:{},health:{sleep:7,exercise:0},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:date,healthMemo:'',bodyWeight:null};
+  state=JSON.parse(JSON.stringify(allData[date]||defaultState));
   
   // Show banner
   const banner=document.getElementById('editBanner');
@@ -2036,6 +2060,16 @@ function startEditMode(date){
   renderExercise();
   updateRing();
   calcScore();
+  
+  // 日記・健康・体重のUIも過去データに合わせる
+  const diaryEl=document.getElementById('diaryText');
+  const diaryDateEl=document.getElementById('diaryDate');
+  const healthMemoEl=document.getElementById('healthMemo');
+  const bwEl=document.getElementById('bodyWeightInput');
+  if(diaryEl) diaryEl.value=state.diary||'';
+  if(diaryDateEl) diaryDateEl.value=state.diaryDate||date;
+  if(healthMemoEl) healthMemoEl.value=state.healthMemo||'';
+  if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
   
   // Switch to study tab
   const studyBtn=Array.from(document.querySelectorAll('.tab-btn')).find(b=>b.textContent==='STUDY');
@@ -2071,6 +2105,16 @@ function cancelEdit(){
   renderExercise();
   updateRing();
   calcScore();
+  
+  // 日記・健康・体重のUIも今日のデータに戻す
+  const diaryEl=document.getElementById('diaryText');
+  const diaryDateEl=document.getElementById('diaryDate');
+  const healthMemoEl=document.getElementById('healthMemo');
+  const bwEl=document.getElementById('bodyWeightInput');
+  if(diaryEl) diaryEl.value=state.diary||'';
+  if(diaryDateEl) diaryDateEl.value=state.diaryDate||TODAY_KEY;
+  if(healthMemoEl) healthMemoEl.value=state.healthMemo||'';
+  if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
   
   // Go back to record tab
   const recordBtn=Array.from(document.querySelectorAll('.tab-btn')).find(b=>b.textContent==='RECORD');
@@ -2537,6 +2581,13 @@ function showGraphModal(){
     const numDays=Math.max(times.length,1);
     const barWidth=chartWidth/numDays;
     
+    let labelInterval=1;
+    if(numDays>180) labelInterval=30;
+    else if(numDays>60) labelInterval=14;
+    else if(numDays>30) labelInterval=7;
+    else if(numDays>14) labelInterval=4;
+    else if(numDays>7) labelInterval=2;
+
     let bars='';
     times.forEach((t,i)=>{
       const h=(t/maxTime)*chartHeight;
@@ -2558,6 +2609,7 @@ function showGraphModal(){
         <text x="25" y="15" font-size="10" fill="var(--muted)" text-anchor="end">${maxTime.toFixed(1)}h</text>
         <g>${bars}</g>
         ${dates.map((d,i)=>{
+          if(i%labelInterval!==0 && i!==dates.length-1) return '';
           const x=i*barWidth+barWidth/2;
           return `<text x="${x}" y="205" font-size="9" fill="var(--muted)" text-anchor="middle">${getDateLabel(d)}</text>`;
         }).join('')}
@@ -2585,9 +2637,11 @@ function showGraphModal(){
     
     // 日付ラベルの間隔を決定
     let labelInterval=1;
-    if(numDays>90) labelInterval=14;
+    if(numDays>180) labelInterval=30;
+    else if(numDays>60) labelInterval=14;
     else if(numDays>30) labelInterval=7;
-    else labelInterval=Math.ceil(numDays/7);
+    else if(numDays>14) labelInterval=4;
+    else if(numDays>7) labelInterval=2;
     
     // ライン描画
     let pathData='';
@@ -2598,9 +2652,10 @@ function showGraphModal(){
       else pathData+=`L${x},${y}`;
     });
     
-    // 点描画
+    // 点描画（ラベルと同じ間隔のみ）
     let points='';
     times.forEach((t,i)=>{
+      if(i%labelInterval!==0 && i!==times.length-1) return;
       const x=30+i*pointSpacing;
       const y=190-(t/maxTime)*chartHeight;
       points+=`<circle cx="${x}" cy="${y}" r="3" fill="var(--accent)" opacity="0.6"/>`;
@@ -2865,7 +2920,7 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
   try{
     await initDB();
     const savedVideos=await loadVideosFromIndexedDB();
-    videos=savedVideos;
+    videos=savedVideos.filter(v=>!v.id.startsWith('hero_'));
   }catch(e){console.error('Failed to load videos from IndexedDB:',e);}
   
   // Load saved wallpaper
