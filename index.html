@@ -427,6 +427,12 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
   </div>
 </div>
 
+<!-- Simple video preview (from option view) -->
+<div id="videoPreviewOverlay" style="display:none;position:fixed;inset:0;background:#000;z-index:1000;flex-direction:column">
+  <button onclick="closeVideoPreview()" style="position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;z-index:1010;padding:8px 14px;border-radius:8px">←</button>
+  <video id="videoPreviewPlayer" controls playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video>
+</div>
+
 <!-- Video fullscreen overlay (TikTok-style) -->
 <div id="videoFullscreen" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;background:#000;z-index:1000;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">
   <button id="videoBackBtn" style="position:fixed;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;z-index:1020;padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent" onclick="closeVideoFullscreen()">←</button>
@@ -1512,6 +1518,23 @@ function uploadVideo(){
   renderVideoManagementList();
 }
 
+function openVideoPreview(idx){
+  if(!videos[idx])return;
+  const overlay=document.getElementById('videoPreviewOverlay');
+  const player=document.getElementById('videoPreviewPlayer');
+  overlay.style.display='flex';
+  player.src=videos[idx].url;
+  player.play().catch(()=>{});
+  document.body.style.overflow='hidden';
+}
+function closeVideoPreview(){
+  const overlay=document.getElementById('videoPreviewOverlay');
+  const player=document.getElementById('videoPreviewPlayer');
+  overlay.style.display='none';
+  player.pause();player.removeAttribute('src');player.load();
+  document.body.style.overflow='auto';
+}
+
 function renderVideoManagementList(){
   const el=document.getElementById('videoManagementList');
   el.innerHTML='';
@@ -1541,8 +1564,15 @@ function renderVideoManagementList(){
     del.style.cssText='position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:24px;height:24px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2';
     del.ontouchend=(e)=>{e.stopPropagation();e.preventDefault();delVideo(i);};
     del.onclick=(e)=>{e.stopPropagation();delVideo(i);};
-    card.ontouchend=(e)=>{if(e.target===del)return;e.preventDefault();playVideoFullscreen(i);};
-    card.onclick=(e)=>{if(e.target===del)return;playVideoFullscreen(i);};
+    let touchStartY=0;
+    card.addEventListener('touchstart',e=>{touchStartY=e.changedTouches[0].clientY;},{passive:true});
+    card.ontouchend=(e)=>{
+      if(e.target===del)return;
+      if(Math.abs(e.changedTouches[0].clientY-touchStartY)>10)return;
+      e.preventDefault();
+      openVideoPreview(i);
+    };
+    card.onclick=(e)=>{if(e.target===del)return;openVideoPreview(i);};
     card.appendChild(vid);
     card.appendChild(play);
     card.appendChild(del);
@@ -1789,6 +1819,9 @@ document.addEventListener('DOMContentLoaded',()=>{
         }else{
           curVid.pause();
           if(playIcon)playIcon.style.opacity='1';
+          // 一時停止時に戻るボタンも表示
+          const btn=document.getElementById('videoBackBtn');
+          if(btn){btn.style.opacity='1';btn.style.pointerEvents='auto';clearTimeout(btn._hideTimer);}
         }
       }else if(!inCenter){
         toggleVideoBackBtn();
