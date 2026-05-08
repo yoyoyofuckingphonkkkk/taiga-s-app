@@ -1604,12 +1604,25 @@ function renderMealList(){
           </div>
         </div>
         ${m.details?`<div style="font-size:11px;color:var(--muted);margin-bottom:6px">${m.details}</div>`:''}
-        ${n?`<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px">
-          <span style="color:var(--accent)">${n.calories}kcal</span>
-          <span style="color:#4fc">P:${n.protein}g</span>
-          <span style="color:#f4a">C:${n.carbs}g</span>
-          <span style="color:#fa4">F:${n.fat}g</span>
-          <span style="color:#8f8">Fiber:${n.fiber}g</span>
+        ${n?`<div style="font-size:11px;margin-top:4px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:3px">
+            <span style="color:var(--accent)">${n.calories}kcal</span>
+            <span style="color:#4fc">P:${n.protein}g</span>
+            <span style="color:#f4a">C:${n.carbs}g</span>
+            <span style="color:#fa4">F:${n.fat}g</span>
+            <span style="color:#8f8">Fiber:${n.fiber}g</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;color:var(--muted);font-size:10px">
+            ${n.sugar!=null?`<span>Sugar:${n.sugar}g</span>`:''}
+            ${n.sodium!=null?`<span>Na:${n.sodium}mg</span>`:''}
+            ${n.vitaminC!=null?`<span>VitC:${n.vitaminC}μg</span>`:''}
+            ${n.vitaminD!=null?`<span>VitD:${n.vitaminD}μg</span>`:''}
+            ${n.calcium!=null?`<span>Ca:${n.calcium}mg</span>`:''}
+            ${n.iron!=null?`<span>Fe:${n.iron}mg</span>`:''}
+            ${n.zinc!=null?`<span>Zn:${n.zinc}mg</span>`:''}
+            ${n.magnesium!=null?`<span>Mg:${n.magnesium}mg</span>`:''}
+            ${n.potassium!=null?`<span>K:${n.potassium}mg</span>`:''}
+          </div>
         </div>`:'<div style="font-size:11px;color:var(--muted)">No nutrition data</div>'}
       </div>
     </div>`;
@@ -1618,28 +1631,67 @@ function renderMealList(){
   if(withN.length>0&&sumEl){
     const t=calcMealTotals(meals);
     const goals=state.nutritionGoals||{};
-    const mainFields=[
-      {key:'calories',label:'kcal',color:'var(--accent)'},
-      {key:'protein',label:'Protein',color:'#4fc'},
-      {key:'carbs',label:'Carbs',color:'#f4a'},
-      {key:'fat',label:'Fat',color:'#fa4'},
-      {key:'fiber',label:'Fiber',color:'#8f8'},
+    const allFields=[
+      {key:'calories',label:'Calories',unit:'kcal',color:'var(--accent)'},
+      {key:'protein',label:'Protein',unit:'g',color:'#4fc'},
+      {key:'carbs',label:'Carbs',unit:'g',color:'#f4a'},
+      {key:'fat',label:'Fat',unit:'g',color:'#fa4'},
+      {key:'fiber',label:'Fiber',unit:'g',color:'#8f8'},
+      {key:'sugar',label:'Sugar',unit:'g',color:'#aaa'},
+      {key:'sodium',label:'Sodium(Na)',unit:'mg',color:'#fa8'},
+      {key:'vitaminA',label:'Vit A',unit:'μg',color:'#f96'},
+      {key:'vitaminC',label:'Vit C',unit:'μg',color:'#f60'},
+      {key:'vitaminD',label:'Vit D',unit:'μg',color:'#ff0'},
+      {key:'vitaminB12',label:'Vit B12',unit:'μg',color:'#6af'},
+      {key:'calcium',label:'Calcium(Ca)',unit:'mg',color:'#fff'},
+      {key:'iron',label:'Iron(Fe)',unit:'mg',color:'#f44'},
+      {key:'zinc',label:'Zinc(Zn)',unit:'mg',color:'#8cf'},
+      {key:'magnesium',label:'Magnesium(Mg)',unit:'mg',color:'#4d8'},
+      {key:'potassium',label:'Potassium(K)',unit:'mg',color:'#a8f'},
     ];
+    // 実際に食事データに含まれる栄養素だけ表示
+    const visibleFields=allFields.filter(f=>(t[f.key]||0)>0||goals[f.key]>0);
     sumEl.innerHTML=`<div class="health-section-label">Daily Total</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px">
-        ${mainFields.map(f=>{
-          const val=Math.round(t[f.key]||0);
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+        ${visibleFields.map(f=>{
+          const val=t[f.key]||0;
           const goal=goals[f.key];
-          const pct=goal?Math.min(100,Math.round(val/goal*100)):null;
-          return `<div style="text-align:center;padding:8px 4px;background:var(--surface2);border-radius:8px">
-            <div style="font-size:15px;color:${f.color};font-weight:bold">${val}</div>
-            <div style="font-size:9px;color:var(--muted)">${f.label}</div>
-            ${goal?`<div style="font-size:9px;color:${pct>=90&&pct<=110?'#4f4':'var(--muted)'}">${pct}%</div>`:''}
+          const pct=goal?Math.min(200,Math.round(val/goal*100)):null;
+          const pctColor=pct!=null?(pct>=90&&pct<=110?'#4f4':pct>110?'#f44':'var(--muted)'):'';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--surface2);border-radius:8px">
+            <div>
+              <div style="font-size:11px;color:${f.color};font-weight:500">${f.label}</div>
+              ${goal?`<div style="font-size:9px;color:${pctColor}">${pct}% of goal</div>`:''}
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:13px;font-weight:bold;color:var(--text)">${Number.isInteger(val)?val:val.toFixed(1)}</div>
+              <div style="font-size:9px;color:var(--muted)">${f.unit}${goal?` / ${goal}`:''}</div>
+            </div>
           </div>`;
         }).join('')}
       </div>`;
     calcScore();
   }else if(sumEl){sumEl.innerHTML='';}
+}
+
+async function restoreMealPhotos(){
+  if(!db)await initDB();
+  const meals=state.meals||[];
+  for(const meal of meals){
+    if(meal.photoId&&!meal.photoUrl){
+      try{
+        const tx=db.transaction(STORE_NAME,'readonly');
+        const req=tx.objectStore(STORE_NAME).get(meal.photoId);
+        await new Promise((res)=>{
+          req.onsuccess=()=>{
+            if(req.result?.blob) meal.photoUrl=URL.createObjectURL(req.result.blob);
+            res();
+          };
+          req.onerror=()=>res();
+        });
+      }catch(e){console.error('meal photo restore failed',e);}
+    }
+  }
 }
 
 function renderWeightGraph(){
@@ -3568,6 +3620,7 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
     await initDB();
     const savedVideos=await loadVideosFromIndexedDB();
     videos=savedVideos.filter(v=>!v.id.startsWith('hero_'));
+    await restoreMealPhotos();
   }catch(e){console.error('Failed to load videos from IndexedDB:',e);}
   
   renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
