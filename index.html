@@ -433,7 +433,7 @@ body::before{content:'';position:fixed;inset:0;background-image:var(--wallpaper-
   <div id="videoPlayIcon" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1015;opacity:0;pointer-events:none;transition:opacity .2s">
     <div style="width:0;height:0;border-left:24px solid #fff;border-top:16px solid transparent;border-bottom:16px solid transparent;margin-left:6px"></div>
   </div>
-  <div id="videoScroll" style="width:100%"></div>
+  <div id="videoScroll" style="width:100%;display:flex;flex-direction:column"></div>
 </div>
 
 </div>
@@ -1585,7 +1585,7 @@ function buildScrollItems(){
     const item=document.createElement('div');
     item.className='vid-item';
     item.dataset.idx=String(i);
-    item.style.cssText=`width:100%;height:${h}px;scroll-snap-align:start;scroll-snap-stop:always;background:#000;position:relative;overflow:hidden`;
+    item.style.cssText=`width:100%;height:${h}px;flex-shrink:0;scroll-snap-align:start;scroll-snap-stop:always;background:#000;position:relative;overflow:hidden`;
     const video=document.createElement('video');
     video.muted=true;video.loop=true;video.playsInline=true;
     video.setAttribute('playsinline','');
@@ -1800,7 +1800,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 window.addEventListener('resize',()=>{
   const fs=document.getElementById('videoFullscreen');
   if(fs && fs.style.display==='block'){
-    fs.style.height=window.innerHeight+'px';
+    const h=window.innerHeight;
+    fs.style.height=h+'px';
+    document.querySelectorAll('.vid-item').forEach(it=>it.style.height=h+'px');
   }
 });
 
