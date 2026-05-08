@@ -1585,7 +1585,7 @@ function buildScrollItems(){
     const item=document.createElement('div');
     item.className='vid-item';
     item.dataset.idx=String(i);
-    item.style.cssText=`width:100%;height:${h}px;flex-shrink:0;scroll-snap-align:start;scroll-snap-stop:always;background:#000;position:relative;overflow:hidden`;
+    item.style.cssText=`width:100%;height:${h}px;flex-shrink:0;scroll-snap-align:start;scroll-snap-stop:always;background:green;position:relative;overflow:hidden`;
     const video=document.createElement('video');
     video.muted=true;video.loop=true;video.playsInline=true;
     video.setAttribute('playsinline','');
