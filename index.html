@@ -1452,21 +1452,33 @@ function toggleNutritionGoals(){
 
 function renderNutritionGoalInputs(){
   const goals=state.nutritionGoals||{};
+  const shown=state.nutritionShown||{};
   document.getElementById('nutritionGoalInputs').innerHTML=NUTRITION_GOAL_FIELDS.map(f=>`
-    <div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:3px">${f.label} (${f.unit})</div>
-      <input type="number" min="0" data-goal-key="${f.key}" value="${goals[f.key]||''}" placeholder="−"
-        style="width:100%;padding:6px 8px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box">
+    <div style="background:var(--surface2);border-radius:8px;padding:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-size:11px;color:var(--text2)">${f.label} <span style="color:var(--muted)">(${f.unit})</span></div>
+        <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);cursor:pointer">
+          表示
+          <input type="checkbox" data-show-key="${f.key}" ${shown[f.key]!==false?'checked':''} style="cursor:pointer">
+        </label>
+      </div>
+      <input type="number" min="0" data-goal-key="${f.key}" value="${goals[f.key]||''}" placeholder="目標値（空欄=スコア影響なし）"
+        style="width:100%;padding:5px 8px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:12px;box-sizing:border-box">
     </div>`).join('');
 }
 
 function saveNutritionGoals(){
   const goals={};
+  const shown={};
   document.querySelectorAll('[data-goal-key]').forEach(input=>{
     const v=parseFloat(input.value);
     if(v>0)goals[input.dataset.goalKey]=v;
   });
+  document.querySelectorAll('[data-show-key]').forEach(cb=>{
+    shown[cb.dataset.showKey]=cb.checked;
+  });
   state.nutritionGoals=goals;
+  state.nutritionShown=shown;
   saveState();
   calcScore();
   document.getElementById('nutritionGoalsPanel').style.display='none';
@@ -1649,8 +1661,9 @@ function renderMealList(){
       {key:'magnesium',label:'Magnesium(Mg)',unit:'mg',color:'#4d8'},
       {key:'potassium',label:'Potassium(K)',unit:'mg',color:'#a8f'},
     ];
-    // 実際に食事データに含まれる栄養素だけ表示
-    const visibleFields=allFields.filter(f=>(t[f.key]||0)>0||goals[f.key]>0);
+    // 表示設定でフィルター（デフォルトは全表示）
+    const shown=state.nutritionShown||{};
+    const visibleFields=allFields.filter(f=>shown[f.key]!==false&&((t[f.key]||0)>0||goals[f.key]>0));
     sumEl.innerHTML=`<div class="health-section-label">Daily Total</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
         ${visibleFields.map(f=>{
@@ -1676,20 +1689,41 @@ function renderMealList(){
 
 async function restoreMealPhotos(){
   if(!db)await initDB();
-  const meals=state.meals||[];
-  for(const meal of meals){
-    if(meal.photoId&&!meal.photoUrl){
-      try{
-        const tx=db.transaction(STORE_NAME,'readonly');
-        const req=tx.objectStore(STORE_NAME).get(meal.photoId);
-        await new Promise((res)=>{
-          req.onsuccess=()=>{
-            if(req.result?.blob) meal.photoUrl=URL.createObjectURL(req.result.blob);
-            res();
-          };
-          req.onerror=()=>res();
-        });
-      }catch(e){console.error('meal photo restore failed',e);}
+  const threeDaysAgo=new Date();
+  threeDaysAgo.setDate(threeDaysAgo.getDate()-3);
+  const cutoffKey=threeDaysAgo.toISOString().slice(0,10);
+  
+  // 全日のmealを対象に復元 or 削除
+  for(const dateKey of Object.keys(allData)){
+    const meals=allData[dateKey]?.meals||[];
+    for(const meal of meals){
+      if(!meal.photoId)continue;
+      if(dateKey<cutoffKey){
+        // 3日以上前 → IndexedDBから削除
+        deleteVideoFromIndexedDB(meal.photoId).catch(()=>{});
+        meal.photoId=null;
+        meal.photoUrl=null;
+      }else{
+        // 3日以内 → URLを復元
+        try{
+          const tx=db.transaction(STORE_NAME,'readonly');
+          const req=tx.objectStore(STORE_NAME).get(meal.photoId);
+          await new Promise((res)=>{
+            req.onsuccess=()=>{
+              if(req.result?.blob)meal.photoUrl=URL.createObjectURL(req.result.blob);
+              res();
+            };
+            req.onerror=()=>res();
+          });
+        }catch(e){console.error('meal photo restore failed',e);}
+      }
+    }
+  }
+  // 今日のstateにも反映
+  if(state.meals){
+    for(const meal of state.meals){
+      const dayData=allData[TODAY_KEY]?.meals?.find(m=>m.id===meal.id);
+      if(dayData?.photoUrl)meal.photoUrl=dayData.photoUrl;
     }
   }
 }
@@ -2509,6 +2543,7 @@ function showRecordDetail(date){
         <div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">NUTRITION (${r.meals.length} meals)</div>
         <div style="background:var(--surface);border-radius:12px;padding:12px">
           ${r.meals.map(m=>`<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:0.5px solid var(--border)">
+            ${m.photoUrl?`<img src="${m.photoUrl}" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block">`:''}
             <div style="font-size:12px;font-weight:500;margin-bottom:3px">${m.name}</div>
             ${m.nutrition?`<div style="font-size:11px;color:var(--muted)">${m.nutrition.calories}kcal P:${m.nutrition.protein}g C:${m.nutrition.carbs}g F:${m.nutrition.fat}g</div>`:''}
           </div>`).join('')}
