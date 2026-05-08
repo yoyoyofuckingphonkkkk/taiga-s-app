@@ -505,9 +505,9 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 <!-- Simple video preview (from option view) -->
-<div id="videoPreviewOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1200;align-items:center;justify-content:center">
-  <video id="videoPreviewPlayer" controls playsinline style="max-width:100%;max-height:100%;display:block"></video>
-  <button onclick="closeVideoPreview()" style="position:absolute;top:max(16px,env(safe-area-inset-top));left:16px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:22px;padding:6px 12px;border-radius:8px;z-index:10;cursor:pointer">←</button>
+<div id="videoPreviewOverlay" style="display:none;position:fixed;inset:0;z-index:1200;background:#000">
+  <video id="videoPreviewPlayer" controls playsinline style="width:100%;height:100%;display:block"></video>
+  <button onclick="closeVideoPreview()" style="position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:20px;padding:6px 14px;border-radius:8px;z-index:10;cursor:pointer">←</button>
 </div>
 
 <!-- Video fullscreen overlay (TikTok-style) -->
@@ -2003,46 +2003,42 @@ function uploadVideo(){
 
 async function openVideoPreview(idx){
   if(!videos[idx])return;
+  const v=videos[idx];
   const overlay=document.getElementById('videoPreviewOverlay');
   const player=document.getElementById('videoPreviewPlayer');
-  overlay.style.display='flex';
+
+  // IndexedDBからblobを直接取得してsrcにセット
+  try{
+    if(!db)await initDB();
+    const tx=db.transaction(STORE_NAME,'readonly');
+    const req=tx.objectStore(STORE_NAME).get(v.id);
+    req.onsuccess=()=>{
+      if(req.result?.blob){
+        const url=URL.createObjectURL(req.result.blob);
+        player.src=url;
+        player.load();
+        player.play().catch(()=>{});
+      }
+    };
+  }catch(e){
+    // fallback: 既存URLを使う
+    if(v.url){player.src=v.url;player.load();player.play().catch(()=>{});}
+  }
+
+  overlay.style.display='block';
   document.body.style.overflow='hidden';
   document.body.style.position='fixed';
   document.body.style.width='100%';
-  
-  let url=videos[idx].url;
-
-  const setAndPlay=async(src)=>{
-    player.src=src;
-    player.load();
-    player.play().catch(()=>{});
-  };
-
-  // srcのエラー（URL無効）を検知してIndexedDBから再取得
-  player.onerror=async()=>{
-    try{
-      if(!db)await initDB();
-      const tx=db.transaction(STORE_NAME,'readonly');
-      const req=tx.objectStore(STORE_NAME).get(videos[idx].id);
-      req.onsuccess=()=>{
-        if(req.result?.blob){
-          const newUrl=URL.createObjectURL(req.result.blob);
-          videos[idx].url=newUrl;
-          player.onerror=null;
-          setAndPlay(newUrl);
-        }
-      };
-    }catch(e){console.error(e);}
-  };
-
-  await setAndPlay(url);
 }
+
 function closeVideoPreview(){
   const overlay=document.getElementById('videoPreviewOverlay');
   const player=document.getElementById('videoPreviewPlayer');
   overlay.style.display='none';
-  player.onerror=null;
-  player.pause();player.removeAttribute('src');player.load();
+  player.pause();
+  if(player.src.startsWith('blob:'))URL.revokeObjectURL(player.src);
+  player.removeAttribute('src');
+  player.load();
   document.body.style.overflow='auto';
   document.body.style.position='';
   document.body.style.width='';
