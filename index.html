@@ -340,7 +340,16 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
   <div id="healthNutrition" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="health-section-label" style="margin:0">Today's Meals</div>
-      <button onclick="openAddMeal()" class="add-btn" style="width:auto;margin:0;padding:7px 14px;font-size:12px">+ Add Meal</button>
+      <div style="display:flex;gap:8px">
+        <button onclick="toggleNutritionGoals()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 10px;cursor:pointer">Goals</button>
+        <button onclick="openAddMeal()" class="add-btn" style="width:auto;margin:0;padding:7px 14px;font-size:12px">+ Add Meal</button>
+      </div>
+    </div>
+    <!-- Goals panel -->
+    <div id="nutritionGoalsPanel" style="display:none;border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;background:var(--surface)">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">目標値を設定（空欄=スコアに影響なし）</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="nutritionGoalInputs"></div>
+      <button onclick="saveNutritionGoals()" class="modal-ok" style="width:100%;margin-top:10px">Save Goals</button>
     </div>
     <div id="mealList"></div>
     <div id="nutritionSummary" style="margin-top:12px"></div>
@@ -1414,6 +1423,56 @@ document.getElementById('healthMemo').value=state.healthMemo||'';
 document.getElementById('healthMemo').addEventListener('input',e=>{state.healthMemo=e.target.value;saveState()});
 document.getElementById('bodyWeightInput').value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
 renderWeightGraph();
+const NUTRITION_GOAL_FIELDS=[
+  {key:'calories',label:'Calories',unit:'kcal'},
+  {key:'protein',label:'Protein',unit:'g'},
+  {key:'carbs',label:'Carbs',unit:'g'},
+  {key:'fat',label:'Fat',unit:'g'},
+  {key:'fiber',label:'Fiber',unit:'g'},
+  {key:'sugar',label:'Sugar',unit:'g'},
+  {key:'sodium',label:'Sodium',unit:'mg'},
+  {key:'vitaminC',label:'Vit C',unit:'μg'},
+  {key:'vitaminD',label:'Vit D',unit:'μg'},
+  {key:'calcium',label:'Calcium',unit:'mg'},
+  {key:'iron',label:'Iron',unit:'mg'},
+  {key:'zinc',label:'Zinc',unit:'mg'},
+  {key:'magnesium',label:'Magnesium',unit:'mg'},
+  {key:'potassium',label:'Potassium',unit:'mg'},
+];
+
+function toggleNutritionGoals(){
+  const p=document.getElementById('nutritionGoalsPanel');
+  if(p.style.display==='none'){
+    p.style.display='block';
+    renderNutritionGoalInputs();
+  }else{
+    p.style.display='none';
+  }
+}
+
+function renderNutritionGoalInputs(){
+  const goals=state.nutritionGoals||{};
+  document.getElementById('nutritionGoalInputs').innerHTML=NUTRITION_GOAL_FIELDS.map(f=>`
+    <div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:3px">${f.label} (${f.unit})</div>
+      <input type="number" min="0" data-goal-key="${f.key}" value="${goals[f.key]||''}" placeholder="−"
+        style="width:100%;padding:6px 8px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box">
+    </div>`).join('');
+}
+
+function saveNutritionGoals(){
+  const goals={};
+  document.querySelectorAll('[data-goal-key]').forEach(input=>{
+    const v=parseFloat(input.value);
+    if(v>0)goals[input.dataset.goalKey]=v;
+  });
+  state.nutritionGoals=goals;
+  saveState();
+  calcScore();
+  document.getElementById('nutritionGoalsPanel').style.display='none';
+  renderMealList();
+}
+
 // ===== NUTRITION =====
 let mealPhotoBase64=null;
 let mealNutritionData=null;
@@ -1455,7 +1514,7 @@ async function analyzeMealNutrition(){
   const btn=document.getElementById('analyzeBtn');
   btn.textContent='Analyzing...';btn.disabled=true;
   try{
-    const prompt=`以下の食事の栄養素を分析してください。\n食事名: ${name||'(写真参照)'}\n${details?'詳細: '+details:''}\n\nJSON onlyで返してください（前後に文章不要）:\n{"calories":数字,"protein":数字,"carbs":数字,"fat":数字,"fiber":数字,"summary":"一言コメント"}\n単位はkcalとgram。推定で構いません。`;
+    const prompt=`以下の食事の栄養素を詳しく分析してください。\n食事名: ${name||'(写真参照)'}\n${details?'詳細: '+details:''}\n\nJSON onlyで返してください（前後に文章不要）:\n{"calories":数字,"protein":数字,"carbs":数字,"fat":数字,"fiber":数字,"sugar":数字,"sodium":数字,"vitaminA":数字,"vitaminC":数字,"vitaminD":数字,"vitaminB12":数字,"calcium":数字,"iron":数字,"zinc":数字,"magnesium":数字,"potassium":数字,"summary":"一言コメント"}\n単位: calories=kcal, protein/carbs/fat/fiber/sugar=g, sodium/calcium/iron/zinc/magnesium/potassium=mg, vitaminA=μg, vitaminC/D/B12=μg。推定で構いません。`;
     const parts=mealPhotoBase64
       ?[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:mealPhotoBase64}}]
       :[{text:prompt}];
@@ -1470,12 +1529,22 @@ async function analyzeMealNutrition(){
     const r=mealNutritionData;
     document.getElementById('mealNutritionResult').style.display='block';
     document.getElementById('mealNutritionResult').innerHTML=`
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
-        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:16px;color:var(--accent);font-weight:bold">${r.calories}</div><div style="font-size:10px;color:var(--muted)">kcal</div></div>
-        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:16px;color:#4fc;font-weight:bold">${r.protein}g</div><div style="font-size:10px;color:var(--muted)">Protein</div></div>
-        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:16px;color:#f4a;font-weight:bold">${r.carbs}g</div><div style="font-size:10px;color:var(--muted)">Carbs</div></div>
-        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:16px;color:#fa4;font-weight:bold">${r.fat}g</div><div style="font-size:10px;color:var(--muted)">Fat</div></div>
-        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:16px;color:#8f8;font-weight:bold">${r.fiber}g</div><div style="font-size:10px;color:var(--muted)">Fiber</div></div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Macros</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:10px">
+        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:15px;color:var(--accent);font-weight:bold">${r.calories}</div><div style="font-size:9px;color:var(--muted)">kcal</div></div>
+        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:15px;color:#4fc;font-weight:bold">${r.protein}g</div><div style="font-size:9px;color:var(--muted)">Protein</div></div>
+        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:15px;color:#f4a;font-weight:bold">${r.carbs}g</div><div style="font-size:9px;color:var(--muted)">Carbs</div></div>
+        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:15px;color:#fa4;font-weight:bold">${r.fat}g</div><div style="font-size:9px;color:var(--muted)">Fat</div></div>
+        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:15px;color:#8f8;font-weight:bold">${r.fiber}g</div><div style="font-size:9px;color:var(--muted)">Fiber</div></div>
+        <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:15px;color:#aaa;font-weight:bold">${r.sugar}g</div><div style="font-size:9px;color:var(--muted)">Sugar</div></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Vitamins & Minerals</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">
+        ${[['Vit A',r.vitaminA,'μg','#f96','(ビタミンA)'],['Vit C',r.vitaminC,'μg','#f60','(ビタミンC)'],['Vit D',r.vitaminD,'μg','#ff0','(ビタミンD)'],['Vit B12',r.vitaminB12,'μg','#6af','(ビタミンB12)'],['Calcium',r.calcium,'mg','#fff','(カルシウム)'],['Iron',r.iron,'mg','#f44','(鉄)'],['Zinc',r.zinc,'mg','#8cf','(亜鉛)'],['Magnesium',r.magnesium,'mg','#4d8','(マグネシウム)'],['Potassium',r.potassium,'mg','#a8f','(カリウム)'],['Sodium',r.sodium,'mg','#fa8','(ナトリウム)']].map(([label,val,unit,color,jp])=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--surface);border-radius:6px">
+            <div><div style="font-size:11px;color:var(--muted)">${label}</div><div style="font-size:9px;color:var(--muted);opacity:.6">${jp}</div></div>
+            <span style="font-size:11px;color:${color};font-weight:500">${val||0}${unit}</span>
+          </div>`).join('')}
       </div>
       <div style="color:var(--muted);font-size:11px">${r.summary||''}</div>`;
   }catch(err){alert('分析エラー: '+err.message);}
@@ -1547,15 +1616,29 @@ function renderMealList(){
   }).join('');
   const withN=meals.filter(m=>m.nutrition);
   if(withN.length>0&&sumEl){
-    const t=withN.reduce((a,m)=>({calories:a.calories+(m.nutrition.calories||0),protein:a.protein+(m.nutrition.protein||0),carbs:a.carbs+(m.nutrition.carbs||0),fat:a.fat+(m.nutrition.fat||0),fiber:a.fiber+(m.nutrition.fiber||0)}),{calories:0,protein:0,carbs:0,fat:0,fiber:0});
+    const t=calcMealTotals(meals);
+    const goals=state.nutritionGoals||{};
+    const mainFields=[
+      {key:'calories',label:'kcal',color:'var(--accent)'},
+      {key:'protein',label:'Protein',color:'#4fc'},
+      {key:'carbs',label:'Carbs',color:'#f4a'},
+      {key:'fat',label:'Fat',color:'#fa4'},
+      {key:'fiber',label:'Fiber',color:'#8f8'},
+    ];
     sumEl.innerHTML=`<div class="health-section-label">Daily Total</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
-        <div style="text-align:center;padding:8px 4px;background:var(--surface2);border-radius:8px"><div style="font-size:15px;color:var(--accent);font-weight:bold">${Math.round(t.calories)}</div><div style="font-size:9px;color:var(--muted)">kcal</div></div>
-        <div style="text-align:center;padding:8px 4px;background:var(--surface2);border-radius:8px"><div style="font-size:15px;color:#4fc;font-weight:bold">${Math.round(t.protein)}</div><div style="font-size:9px;color:var(--muted)">Protein</div></div>
-        <div style="text-align:center;padding:8px 4px;background:var(--surface2);border-radius:8px"><div style="font-size:15px;color:#f4a;font-weight:bold">${Math.round(t.carbs)}</div><div style="font-size:9px;color:var(--muted)">Carbs</div></div>
-        <div style="text-align:center;padding:8px 4px;background:var(--surface2);border-radius:8px"><div style="font-size:15px;color:#fa4;font-weight:bold">${Math.round(t.fat)}</div><div style="font-size:9px;color:var(--muted)">Fat</div></div>
-        <div style="text-align:center;padding:8px 4px;background:var(--surface2);border-radius:8px"><div style="font-size:15px;color:#8f8;font-weight:bold">${Math.round(t.fiber)}</div><div style="font-size:9px;color:var(--muted)">Fiber</div></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px">
+        ${mainFields.map(f=>{
+          const val=Math.round(t[f.key]||0);
+          const goal=goals[f.key];
+          const pct=goal?Math.min(100,Math.round(val/goal*100)):null;
+          return `<div style="text-align:center;padding:8px 4px;background:var(--surface2);border-radius:8px">
+            <div style="font-size:15px;color:${f.color};font-weight:bold">${val}</div>
+            <div style="font-size:9px;color:var(--muted)">${f.label}</div>
+            ${goal?`<div style="font-size:9px;color:${pct>=90&&pct<=110?'#4f4':'var(--muted)'}">${pct}%</div>`:''}
+          </div>`;
+        }).join('')}
       </div>`;
+    calcScore();
   }else if(sumEl){sumEl.innerHTML='';}
 }
 
@@ -2253,22 +2336,60 @@ function nextCalMonth(){
 function calcScoreFor(r){
   const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
   
-  // 70% Study - based on goal percentage
+  // 65% Study
   const _goal=r.goalMins||DEFAULT_GOAL_MINS;
-  const studyScore=Math.min(70,(sm/_goal)*70);
+  const studyScore=Math.min(65,(sm/_goal)*65);
   
-  // 15% Exercise (increased from 10)
-  const exScore=Math.min(15,(r.health?.exercise||0)/30*15);
+  // 10% Exercise (30min = 100%)
+  const exScore=Math.min(10,(r.health?.exercise||0)/30*10);
   
-  // 15% Other (checks + diary, increased from 10)
+  // 10% Nutrition
+  let nutritionScore=0;
+  const goals=r.nutritionGoals||{};
+  const goalKeys=Object.keys(goals).filter(k=>goals[k]>0);
+  if(goalKeys.length>0&&(r.meals||[]).length>0){
+    const totals=calcMealTotals(r.meals||[]);
+    const scores=goalKeys.map(k=>{
+      const goal=goals[k];
+      const actual=totals[k]||0;
+      // 目標に近いほど高スコア（超過は0.8倍でペナルティ）
+      if(actual<=goal) return actual/goal;
+      else return Math.max(0,1-(actual-goal)/goal*0.5);
+    });
+    nutritionScore=Math.min(10,(scores.reduce((a,b)=>a+b,0)/scores.length)*10);
+  }
+  
+  // 10% Checks
   const n=Math.max(1,(r.checkItems||checkItems).length);
   const checkScore=(Object.values(r.checks||{}).filter(Boolean).length/n)*10;
-  const diaryScore=(r.diary?.length||0)>0?5:0;
-  const otherScore=checkScore+diaryScore;
   
-  return Math.min(100,Math.round(studyScore+exScore+otherScore));
+  // 5% Diary
+  const diaryScore=(r.diary?.length||0)>0?5:0;
+  
+  return Math.min(100,Math.round(studyScore+exScore+nutritionScore+checkScore+diaryScore));
 }
 function calcScore(){document.getElementById('topScore').textContent=calcScoreFor(state);}
+
+function calcMealTotals(meals){
+  return meals.filter(m=>m.nutrition).reduce((a,m)=>({
+    calories:a.calories+(m.nutrition.calories||0),
+    protein:a.protein+(m.nutrition.protein||0),
+    carbs:a.carbs+(m.nutrition.carbs||0),
+    fat:a.fat+(m.nutrition.fat||0),
+    fiber:a.fiber+(m.nutrition.fiber||0),
+    sugar:a.sugar+(m.nutrition.sugar||0),
+    sodium:a.sodium+(m.nutrition.sodium||0),
+    vitaminA:a.vitaminA+(m.nutrition.vitaminA||0),
+    vitaminC:a.vitaminC+(m.nutrition.vitaminC||0),
+    vitaminD:a.vitaminD+(m.nutrition.vitaminD||0),
+    vitaminB12:a.vitaminB12+(m.nutrition.vitaminB12||0),
+    calcium:a.calcium+(m.nutrition.calcium||0),
+    iron:a.iron+(m.nutrition.iron||0),
+    zinc:a.zinc+(m.nutrition.zinc||0),
+    magnesium:a.magnesium+(m.nutrition.magnesium||0),
+    potassium:a.potassium+(m.nutrition.potassium||0),
+  }),{calories:0,protein:0,carbs:0,fat:0,fiber:0,sugar:0,sodium:0,vitaminA:0,vitaminC:0,vitaminD:0,vitaminB12:0,calcium:0,iron:0,zinc:0,magnesium:0,potassium:0});
+}
 
 function showRecordDetail(date){
   // Create or get record for this date
@@ -2916,13 +3037,21 @@ function renderExerciseGraph(type){
 
 function showScoreBreakdown(){
   const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study?.[s.id]?.[b.id]||0),0),0);
+  const _goal=state.goalMins||DEFAULT_GOAL_MINS;
+  const studyScore=Math.min(65,(sm/_goal)*65);
+  const exScore=Math.min(10,(state.health?.exercise||0)/30*10);
   const n=Math.max(1,checkItems.length);
   const checkScore=(Object.values(state.checks||{}).filter(Boolean).length/n)*10;
-  const studyScore=Math.min(70,sm/6*7);
-  const exScore=Math.min(15,(state.health?.exercise||0)/30*15);
   const diaryScore=(state.diary?.length||0)>0?5:0;
-  const otherScore=checkScore+diaryScore;
-  const total=Math.round(studyScore+exScore+otherScore);
+  const goals=state.nutritionGoals||{};
+  const goalKeys=Object.keys(goals).filter(k=>goals[k]>0);
+  let nutritionScore=0;
+  if(goalKeys.length>0&&(state.meals||[]).length>0){
+    const totals=calcMealTotals(state.meals||[]);
+    const scores=goalKeys.map(k=>{const goal=goals[k];const actual=totals[k]||0;return actual<=goal?actual/goal:Math.max(0,1-(actual-goal)/goal*0.5);});
+    nutritionScore=Math.min(10,(scores.reduce((a,b)=>a+b,0)/scores.length)*10);
+  }
+  const total=Math.round(studyScore+exScore+nutritionScore+checkScore+diaryScore);
   
   const modal=document.createElement('div');
   modal.className='modal-bg';
@@ -2934,12 +3063,17 @@ function showScoreBreakdown(){
         <div class="card" style="margin-bottom:0;text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Study</div>
           <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(studyScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">70%</div>
+          <div style="font-size:9px;color:var(--muted)">65%</div>
         </div>
         <div class="card" style="margin-bottom:0;text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Exercise</div>
           <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(exScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">15%</div>
+          <div style="font-size:9px;color:var(--muted)">10%</div>
+        </div>
+        <div class="card" style="margin-bottom:0;text-align:center">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Nutrition</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(nutritionScore)}</div>
+          <div style="font-size:9px;color:var(--muted)">10%</div>
         </div>
         <div class="card" style="margin-bottom:0;text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Checks</div>
