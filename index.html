@@ -450,7 +450,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 <div class="section" id="tab-motivation">
   <div id="hero-motivation"></div>
   
-  <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;gap:12px">
+  <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:12px">
     
     <!-- Tap to Play - big left -->
     <div style="grid-column:1;grid-row:1/3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px;cursor:pointer" onclick="switchMotivationView('videos')">
@@ -469,15 +469,6 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
       <div id="motivQuotePreview" style="font-size:13px;color:var(--accent);font-style:italic;line-height:1.5"></div>
     </div>
 
-    <!-- AI Coach - full width bottom -->
-    <div style="grid-column:1/3;grid-row:3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;cursor:pointer" onclick="openAICoach()">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.1em">AI COACH</div>
-        <div id="aiCoachDot" style="width:8px;height:8px;border-radius:50%;background:var(--muted)"></div>
-      </div>
-      <div id="aiCoachPreview" style="font-size:12px;color:var(--muted);line-height:1.5">今日のフィードバックを受け取る</div>
-    </div>
-    
   </div>
   
   <!-- Quotes view -->
@@ -511,18 +502,6 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
   </div>
 </div>
 
-<!-- AI Coach overlay -->
-<div id="aiCoachOverlay" style="display:none;position:fixed;inset:0;width:100%;height:100%;background:#000;z-index:1100;flex-direction:column">
-  <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border);padding-top:max(14px,env(safe-area-inset-top));flex-shrink:0">
-    <button onclick="closeAICoach()" style="background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px 10px">←</button>
-    <div style="flex:1;text-align:center;font-family:var(--serif);font-style:italic;font-size:18px;letter-spacing:.1em">AI Coach</div>
-    <div id="aiCoachDate" style="font-size:11px;color:var(--muted);padding-right:10px"></div>
-  </div>
-  <div id="aiCoachContent" style="flex:1;overflow-y:auto;padding:20px 16px;overscroll-behavior:contain"></div>
-  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));border-top:0.5px solid var(--border);flex-shrink:0">
-    <button id="aiCoachBtn" onclick="requestAICoach()" style="width:100%;padding:14px;background:var(--accent);border:none;color:#000;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.1em;border-radius:10px;cursor:pointer">今日のフィードバックを受け取る</button>
-  </div>
-</div>
 
 <!-- Goals overlay -->
 <div id="goalsOverlay" style="display:none;position:fixed;inset:0;background:#000;z-index:1100;flex-direction:column">
@@ -1941,120 +1920,6 @@ async function restoreMealPhotos(){
   }
 }
 
-// ===== AI COACH =====
-function openAICoach(){
-  const overlay=document.getElementById('aiCoachOverlay');
-  overlay.style.display='flex';
-  document.body.style.overflow='hidden';
-  document.getElementById('aiCoachDate').textContent=TODAY_KEY;
-  
-  const saved=JSON.parse(localStorage.getItem('ym4_coach_'+TODAY_KEY)||'null');
-  if(saved){
-    renderCoachFeedback(saved);
-    document.getElementById('aiCoachBtn').textContent='再取得する';
-  }else{
-    document.getElementById('aiCoachContent').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:60px 20px;line-height:1.8">下のボタンを押すと、<br>今日の記録をもとにAIが<br>フィードバックをくれます。</div>';
-    document.getElementById('aiCoachBtn').textContent='今日のフィードバックを受け取る';
-  }
-}
-
-function closeAICoach(){
-  document.getElementById('aiCoachOverlay').style.display='none';
-  document.body.style.overflow='auto';
-  // プレビュー更新
-  const saved=JSON.parse(localStorage.getItem('ym4_coach_'+TODAY_KEY)||'null');
-  const dot=document.getElementById('aiCoachDot');
-  const preview=document.getElementById('aiCoachPreview');
-  if(saved){
-    if(dot)dot.style.background='var(--accent)';
-    if(preview)preview.textContent=saved.summary||'フィードバック済み';
-  }
-}
-
-async function requestAICoach(){
-  const key=localStorage.getItem('ym4_ai_key');
-  if(!key){alert('AIチャットからAPIキーを設定してください');return;}
-  
-  const btn=document.getElementById('aiCoachBtn');
-  btn.textContent='分析中...';btn.disabled=true;
-  
-  // 今日のデータ集計
-  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study?.[s.id]?.[b.id]||0),0),0);
-  const checks=Object.values(state.checks||{});
-  const checkDone=checks.filter(Boolean).length;
-  const checkTotal=checkItems.length;
-  const meals=state.meals||[];
-  const hasMeals=meals.length>0;
-  const totalCal=meals.filter(m=>m.nutrition).reduce((a,m)=>a+(m.nutrition.calories||0),0);
-  const score=calcScoreFor(state);
-  
-  const studyDetails=subjects.map(s=>{
-    const tot=s.books.reduce((a,b)=>a+(state.study?.[s.id]?.[b.id]||0),0);
-    if(tot===0)return null;
-    return `${s.name}: ${Math.floor(tot/60)}h${tot%60}m`;
-  }).filter(Boolean).join('、');
-  
-  const prompt=`あなたは厳しくも温かいパーソナルコーチです。以下は今日の記録です。日本語で、簡潔に3つのセクションに分けてフィードバックしてください。
-
-【今日の記録】
-- LIFE SCORE: ${score}点
-- 勉強時間: ${Math.floor(sm/60)}時間${sm%60}分${studyDetails?`（${studyDetails}）`:''}
-- 目標達成率: ${Math.round(sm/(state.goalMins||360)*100)}%
-- チェック: ${checkDone}/${checkTotal}完了
-- 運動: ${state.health?.exercise||0}分
-${hasMeals?`- 食事: ${meals.length}食、合計${Math.round(totalCal)}kcal`:'- 食事: 記録なし'}
-${state.diary?`- 日記: あり（${state.diary.length}文字）`:'- 日記: なし'}
-
-以下のJSON形式のみで返答してください（前後に文章不要）:
-{
-  "summary": "一言で今日を表す（20文字以内）",
-  "good": "良かった点（2〜3文、具体的に）",
-  "improve": "改善点・明日への提案（2〜3文、具体的に）",
-  "message": "明日への一言メッセージ（力強く、短く）"
-}`;
-
-  try{
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}]})
-    });
-    const data=await res.json();
-    if(data.error)throw new Error(data.error.message);
-    const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    const json=JSON.parse(text.replace(/```json|```/g,'').trim());
-    localStorage.setItem('ym4_coach_'+TODAY_KEY,JSON.stringify(json));
-    renderCoachFeedback(json);
-    btn.textContent='再取得する';
-    // プレビュー更新
-    const dot=document.getElementById('aiCoachDot');
-    const preview=document.getElementById('aiCoachPreview');
-    if(dot)dot.style.background='var(--accent)';
-    if(preview)preview.textContent=json.summary||'フィードバック済み';
-  }catch(e){
-    alert('エラー: '+e.message);
-    btn.textContent='今日のフィードバックを受け取る';
-  }finally{
-    btn.disabled=false;
-  }
-}
-
-function renderCoachFeedback(f){
-  document.getElementById('aiCoachContent').innerHTML=`
-    <div style="font-family:var(--serif);font-style:italic;font-size:22px;text-align:center;color:var(--accent);margin-bottom:24px;line-height:1.3">"${f.summary}"</div>
-    <div style="margin-bottom:18px">
-      <div style="font-size:10px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">GOOD</div>
-      <div style="background:var(--surface);border-radius:12px;padding:14px;font-size:13px;line-height:1.8;color:var(--text);border-left:2px solid var(--green)">${f.good}</div>
-    </div>
-    <div style="margin-bottom:18px">
-      <div style="font-size:10px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">IMPROVE</div>
-      <div style="background:var(--surface);border-radius:12px;padding:14px;font-size:13px;line-height:1.8;color:var(--text);border-left:2px solid var(--accent)">${f.improve}</div>
-    </div>
-    <div style="margin-bottom:8px">
-      <div style="font-size:10px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">TOMORROW</div>
-      <div style="background:var(--surface);border-radius:12px;padding:14px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.05em;color:var(--text);text-align:center">${f.message}</div>
-    </div>
-  `;
-}
 
 // ===== STUDY GOALS =====
 let studyGoals=JSON.parse(localStorage.getItem('ym4_study_goals')||'[]');
@@ -3543,7 +3408,53 @@ async function aiSend(){
   document.getElementById('aiSendBtn').disabled=true;
   
   try{
-    // Gemini APIに送信
+    // 今日のデータをシステムプロンプトに含める
+    const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study?.[s.id]?.[b.id]||0),0),0);
+    const checks=Object.values(state.checks||{});
+    const checkDone=checks.filter(Boolean).length;
+    const meals=state.meals||[];
+    const totalCal=meals.filter(m=>m.nutrition).reduce((a,m)=>a+(m.nutrition.calories||0),0);
+    const score=calcScoreFor(state);
+    const studyDetails=subjects.map(s=>{
+      const tot=s.books.reduce((a,b)=>a+(state.study?.[s.id]?.[b.id]||0),0);
+      if(!tot)return null;
+      return `${s.name}: ${Math.floor(tot/60)}h${tot%60}m`;
+    }).filter(Boolean).join('、');
+
+    // 過去14日分のデータを集計
+    const pastDays=[];
+    for(let i=1;i<=14;i++){
+      const d=new Date();
+      if(d.getHours()<4)d.setDate(d.getDate()-1);
+      d.setDate(d.getDate()-i);
+      const key=d.toISOString().slice(0,10);
+      const day=allData[key];
+      if(!day)continue;
+      const sm2=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(day.study?.[s.id]?.[b.id]||0),0),0);
+      pastDays.push({
+        date:key,
+        score:calcScoreFor(day),
+        studyMins:sm2,
+        exercise:day.health?.exercise||0,
+        checkDone:Object.values(day.checks||{}).filter(Boolean).length,
+        checkTotal:(day.checkItems||checkItems).length,
+        hasDiary:!!(day.diary?.length),
+        weight:day.bodyWeight||null,
+      });
+    }
+    const pastSummary=pastDays.length?pastDays.map(d=>
+      `${d.date}: スコア${d.score}点 勉強${Math.floor(d.studyMins/60)}h${d.studyMins%60}m 運動${d.exercise}分 チェック${d.checkDone}/${d.checkTotal}${d.weight?` 体重${d.weight}kg`:''}`
+    ).join('\n'):'（過去データなし）';
+
+    const systemPrompt=`あなたはASCENDというライフ最適化アプリのパーソナルAIアシスタントです。ユーザーの今日と過去14日のデータにアクセスできます。日本語で丁寧に答えてください。推移や傾向についても分析できます。
+
+【今日（${TODAY_KEY}）のデータ】
+LIFE SCORE: ${score}点 / 勉強: ${Math.floor(sm/60)}h${sm%60}m${studyDetails?`（${studyDetails}）`:''} / 目標達成率: ${Math.round(sm/(state.goalMins||360)*100)}% / チェック: ${checkDone}/${checkItems.length} / 運動: ${state.health?.exercise||0}分 / 体重: ${state.bodyWeight||'未記録'}kg / 食事: ${meals.length?meals.length+'食 '+Math.round(totalCal)+'kcal':'未記録'} / 日記: ${state.diary?'あり':'なし'}
+科目: ${subjects.map(s=>s.name).join('、')} / 目標: ${Math.floor((state.goalMins||360)/60)}h/日
+
+【過去14日間の記録】
+${pastSummary}`;
+
     const contents=aiHistory.map(m=>({
       role:m.role==='user'?'user':'model',
       parts:[{text:m.text}]
@@ -3551,7 +3462,10 @@ async function aiSend(){
     const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents})
+      body:JSON.stringify({
+        system_instruction:{parts:[{text:systemPrompt}]},
+        contents
+      })
     });
     const data=await res.json();
     if(data.error){
@@ -4403,14 +4317,7 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
   }catch(e){console.error('Failed to load videos from IndexedDB:',e);}
   
   renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
-  // AIコーチプレビュー復元
-  const coachSaved=JSON.parse(localStorage.getItem('ym4_coach_'+TODAY_KEY)||'null');
-  if(coachSaved){
-    const dot=document.getElementById('aiCoachDot');
-    const preview=document.getElementById('aiCoachPreview');
-    if(dot)dot.style.background='var(--accent)';
-    if(preview)preview.textContent=coachSaved.summary||'フィードバック済み';
-  }
+
   
   // Auto fullscreen on load
   const elem=document.documentElement;
