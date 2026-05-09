@@ -289,6 +289,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <div style="font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:6px">MEMO</div>
     <textarea id="checkMemo" placeholder="Memo..." style="width:100%;min-height:100px;padding:12px;border:0.5px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-size:14px;font-family:inherit;resize:none;box-sizing:border-box;line-height:1.6" oninput="state.checkMemo=this.value;saveState()"></textarea>
   </div>
+</div>
 
 <div class="section" id="tab-health">
   <div id="hero-health"></div>
@@ -355,7 +356,6 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
           </div>
         </div>
       </div>
-      </div>
       <div id="weightGraphContainer" style="margin-bottom:4px"></div>
       <div id="bodyCompGraphContainer"></div>
     </div>
@@ -364,6 +364,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
       <div class="sec-label">Body Memo</div>
       <textarea class="diary-area" id="healthMemo" placeholder="体調メモ..." style="min-height:80px"></textarea>
     </div>
+  </div>
   <div id="healthStrength" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div class="health-section-label" style="margin:0">Today's Workout</div>
@@ -701,6 +702,15 @@ let allData=JSON.parse(localStorage.getItem('ym4_all')||'{}');
 
 // checkItemsはstate.checkItemsから取得（日別管理）
 const DEFAULT_CHECK_ITEMS=[{id:'c1',label:'Breakfast — 朝食'},{id:'c2',label:'Teeth / Skincare — 身だしなみ'},{id:'c3',label:'Study — Studyした'},{id:'c4',label:'Exercise — Exerciseした'},{id:'c5',label:'No Doomscrolling — SNS制限'},{id:'c6',label:'Sleep 7h+ — 7Time以上睡眠'},{id:'c7',label:'Evening Review — 夜の振り返り'}];
+const DB_NAME='yuimei_videos';
+const STORE_NAME='videos';
+let db=null;
+let videos=[];
+let videoQueue=[];
+let videoQueuePos=0;
+let currentVideoIdx=0;
+let videoClosedByBackButton=false;
+let videoScrollObserver=null;
 const DEFAULT_GOAL_MINS=+localStorage.getItem('ym4_goal')||360;
 const DEFAULT_SUBJECTS=[{id:'s1',name:'英語',books:[{id:'b1',name:'ターゲット1900'},{id:'b2',name:'ネクステージ'}]},{id:'s2',name:'数学',books:[{id:'b1',name:'青チャート'}]},{id:'s3',name:'国語',books:[{id:'b1',name:'現代文読解'}]}];
 
@@ -2235,844 +2245,6 @@ function updateBMI(){
   }
 }
 
-function renderWeightGraph(){
-  const el=document.getElementById('weightGraphContainer');
-  if(!el)return;
-  // allDataから体重データを収集
-  const entries=Object.keys(allData).sort().map(k=>({date:k,w:allData[k]?.bodyWeight})).filter(e=>e.w&&e.w>0);
-  // 今日のstateも反映
-  const todayW=state.bodyWeight||(+(document.getElementById('bodyWeightInput')?.value)||0);
-  if(todayW>0){
-    const existing=entries.find(e=>e.date===TODAY_KEY);
-    if(existing)existing.w=todayW;
-    else entries.push({date:TODAY_KEY,w:todayW});
-    entries.sort((a,b)=>a.date.localeCompare(b.date));
-  }
-  if(entries.length<2){
-    el.innerHTML='<div style="font-size:11px;color:var(--muted);text-align:center;padding:12px 0">データが2日分以上あるとグラフが表示されます</div>';
-    return;
-  }
-  const W=300,H=120,PL=32,PR=8,PT=10,PB=28;
-  const cW=W-PL-PR,cH=H-PT-PB;
-  const weights=entries.map(e=>e.w);
-  const minW=Math.min(...weights)-1,maxW=Math.max(...weights)+1;
-  const xStep=cW/(entries.length-1);
-  const yScale=v=>(1-(v-minW)/(maxW-minW))*cH+PT;
-  const xScale=i=>PL+i*xStep;
-  // ライン
-  let path='';
-  entries.forEach((e,i)=>{const x=xScale(i),y=yScale(e.w);path+=i===0?`M${x},${y}`:`L${x},${y}`;});
-  // ラベル間隔
-  const n=entries.length;
-  const li=n>60?14:n>30?7:n>14?4:n>7?2:1;
-  // ドットとラベル
-  let dots='',labels='';
-  entries.forEach((e,i)=>{
-    const x=xScale(i),y=yScale(e.w);
-    if(i%li===0||i===n-1){
-      dots+=`<circle cx="${x}" cy="${y}" r="3" fill="var(--accent)"/>`;
-      const d=e.date.slice(5);
-      labels+=`<text x="${x}" y="${H-2}" font-size="8" fill="var(--muted)" text-anchor="middle">${d}</text>`;
-    }
-  });
-  // 最新値ラベル
-  const last=entries[entries.length-1];
-  const lx=xScale(entries.length-1),ly=yScale(last.w);
-  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">
-    <line x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+cH}" stroke="var(--muted)" stroke-width="0.5"/>
-    <line x1="${PL}" y1="${PT+cH}" x2="${W-PR}" y2="${PT+cH}" stroke="var(--muted)" stroke-width="0.5"/>
-    <text x="${PL-2}" y="${PT+4}" font-size="8" fill="var(--muted)" text-anchor="end">${maxW.toFixed(1)}</text>
-    <text x="${PL-2}" y="${PT+cH}" font-size="8" fill="var(--muted)" text-anchor="end">${minW.toFixed(1)}</text>
-    <polyline points="${entries.map((e,i)=>`${xScale(i)},${yScale(e.w)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.8"/>
-    ${dots}${labels}
-    <text x="${lx+4}" y="${ly-4}" font-size="9" fill="var(--accent)" font-weight="bold">${last.w}kg</text>
-  </svg>`;
-}
-
-const FEEDS=[{tag:'GLOBAL POLITICS',title:'国連安保理の拒否権とは？',body:'常任理事国（米英仏露中）は1カ国の反対で決議を阻止できる。冷戦期から現在まで国際秩序を大きく左右する。'},{tag:'FINANCE',title:'Rule of 72 — 複利の法則',body:'「72 ÷ yr利率 ≒ 資産が2倍になるyr数」。yr利6%なら12yrで2倍。Timeを味方にする投資の基本法則。'},{tag:'ENGLISH WORD',title:'Resilience — reps復力',body:'"She showed remarkable resilience after the setback." 逆境から立ち直る力。受験にも人生にも必要な概念。'},{tag:'ECONOMICS',title:'円安とは何か？',body:'1ドル=100円→150円になると円の価値が下がる。輸出企業有利・輸入品（食料・エネルギー）が高騰する。'},{tag:'GLOBAL POLITICS',title:'NATOの存在意義',body:'1949yr、ソ連への対抗として結成。「1カ国への攻撃は全加盟国への攻撃」という集団的自衛権が核心。'},{tag:'FINANCE',title:'ETFとは何か',body:'上場投資信託。株のように売買できるm散投資商品。S&P500連動型は低コストで長期投資に人気。'},{tag:'ENGLISH WORD',title:'Pragmatic — 実際的な',body:'"A pragmatic approach to problem-solving." 現実主義的・実用的。政治・ビジネスで頻出の重要語。'},{tag:'GLOBAL POLITICS',title:'G7とG20の違い',body:'G7は主要先進7カ国、G20は新興国も含む20カ国。経済・安保の議論の場だが拘束力はない。'},{tag:'FINANCE',title:'インフレと金利の関係',body:'物価上昇→中央銀行が金利を上げてお金の流通を抑制。これが世界経済を動かす基本メカニズム。'},{tag:'ENGLISH WORD',title:'Nuance — 微妙なニュアンス',body:'"The nuance was lost in translation." 細かな意味の違い。英語力が上がるほど重要になる語彙。'},{tag:'GLOBAL POLITICS',title:'パレスチナ問題の基本',body:'1948yrイスラエル建国以来の領土紛争。ガザ地区に約200万人が暮らす中東情勢の核心的課題。'},{tag:'FINANCE',title:'株式と債券の違い',body:'株式は会社の所有権でリターン高・リスク大。債券は貸付で安定的・リターン低め。ポートフォリオの基本。'}];
-function loadFeed(){const c=document.getElementById('feedCards');if(!c)return;c.innerHTML='';const idxs=[];while(idxs.length<3){const i=Math.floor(Math.random()*FEEDS.length);if(!idxs.includes(i))idxs.push(i);}idxs.forEach(i=>{const f=FEEDS[i];const d=document.createElement('div');d.className='feed-card';d.innerHTML=`<div class="feed-tag">${f.tag}</div><div class="feed-title">${f.title}</div><div class="feed-body">${f.body}</div>`;c.appendChild(d);});}loadFeed();
-
-let recordPeriod=7;
-let calendarMonthDate=new Date();
-
-// ===== INDEXEDDB FOR VIDEOS =====
-let db=null;
-const DB_NAME='yuimei_videos';
-const STORE_NAME='videos';
-
-function initDB(){
-  return new Promise((resolve,reject)=>{
-    const req=indexedDB.open(DB_NAME,1);
-    req.onerror=()=>reject(req.error);
-    req.onsuccess=()=>{db=req.result;resolve();};
-    req.onupgradeneeded=(e)=>{
-      const store=e.target.result.createObjectStore(STORE_NAME,{keyPath:'id'});
-    };
-  });
-}
-
-async function saveVideoToIndexedDB(id,name,blob){
-  if(!db)await initDB();
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(STORE_NAME,'readwrite');
-    const store=tx.objectStore(STORE_NAME);
-    store.put({id,name,blob:blob,timestamp:Date.now()});
-    tx.oncomplete=resolve;
-    tx.onerror=()=>reject(tx.error);
-  });
-}
-
-async function loadVideosFromIndexedDB(){
-  if(!db)await initDB();
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(STORE_NAME,'readonly');
-    const store=tx.objectStore(STORE_NAME);
-    const req=store.getAll();
-    req.onsuccess=()=>{
-      const vids=req.result.map(v=>({
-        id:v.id,name:v.name,
-        url:URL.createObjectURL(v.blob)
-      }));
-      resolve(vids);
-    };
-    req.onerror=()=>reject(req.error);
-  });
-}
-
-async function deleteVideoFromIndexedDB(id){
-  if(!db)await initDB();
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(STORE_NAME,'readwrite');
-    const store=tx.objectStore(STORE_NAME);
-    store.delete(id);
-    tx.oncomplete=resolve;
-    tx.onerror=()=>reject(tx.error);
-  });
-}
-let quotes=JSON.parse(localStorage.getItem('ym4_quotes')||'null')||[{id:'q1',text:'毎dの小さな努力が大きな成果につながる'},{id:'q2',text:'今この瞬間を大切にしよう'},{id:'q3',text:'失敗は成功への道'}];
-let videos=JSON.parse(localStorage.getItem('ym4_videos')||'[]');
-
-function saveQuotes(){localStorage.setItem('ym4_quotes',JSON.stringify(quotes));}
-
-function delVideo(i){
-  if(!confirm('Delete?'))return;
-  const v=videos[i];
-  if(v)deleteVideoFromIndexedDB(v.id).catch(e=>console.error('IndexedDB delete failed',e));
-  videos.splice(i,1);
-  renderVideoManagementList();
-}
-
-function switchMotivationView(view){
-  const home=document.getElementById('motivationHome');
-  if(home)home.style.display=view==='home'?'grid':'none';
-  document.getElementById('quotesView').style.display=view==='quotes'?'block':'none';
-  document.getElementById('optionView').style.display=view==='option'?'block':'none';
-  
-  if(view==='videos'){
-    if(videos.length>0){
-      playVideoFullscreen();
-    }else{
-      alert('Videosがありません。OptionからAddしてください');
-      // Show home view instead
-      if(home)home.style.display='grid';
-      return;
-    }
-  }
-  if(view==='option') renderVideoManagementList();
-  if(view==='home') renderMotivQuotePreview();
-}
-
-function renderMotivQuotePreview(){
-  const el=document.getElementById('motivQuotePreview');
-  if(!el)return;
-  if(quotes.length===0){el.textContent='Quoteなし';return;}
-  const q=quotes[Math.floor(Math.random()*quotes.length)];
-  el.textContent='"'+q.text+'"';
-}
-
-function renderQuotesList(){
-  const el=document.getElementById('quotesList');
-  el.innerHTML='';
-  quotes.forEach((q,i)=>{
-    const div=document.createElement('div');
-    div.className='card';
-    div.innerHTML=`
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-        <div style="flex:1">
-          <div style="font-size:14px;color:var(--accent);line-height:1.6;font-style:italic">"${q.text}"</div>
-        </div>
-        <button class="del-btn" onclick="delQuote(${i})">×</button>
-      </div>
-    `;
-    el.appendChild(div);
-  });
-}
-
-function delQuote(i){
-  if(!confirm('Delete?'))return;
-  quotes.splice(i,1);
-  saveQuotes();
-  renderQuotesList();
-}
-
-
-function uploadVideo(){
-  const files=document.getElementById('videoUpload').files;
-  if(files.length===0)return;
-  
-  Array.from(files).forEach(file=>{
-    const id='v'+Date.now()+Math.random();
-    const url=URL.createObjectURL(file);
-    videos.push({id,name:file.name,url});
-    saveVideoToIndexedDB(id,file.name,file).catch(e=>console.error('IndexedDB save failed',e));
-  });
-  
-  localStorage.setItem('ym4_video_count',String(videos.length));
-  renderVideoManagementList();
-}
-
-async function openVideoPreview(idx){
-  if(!videos[idx])return;
-  const v=videos[idx];
-  const overlay=document.getElementById('videoPreviewOverlay');
-  const player=document.getElementById('videoPreviewPlayer');
-
-  // IndexedDBからblobを直接取得してsrcにセット
-  try{
-    if(!db)await initDB();
-    const tx=db.transaction(STORE_NAME,'readonly');
-    const req=tx.objectStore(STORE_NAME).get(v.id);
-    req.onsuccess=()=>{
-      if(req.result?.blob){
-        const url=URL.createObjectURL(req.result.blob);
-        player.src=url;
-        player.load();
-        player.play().catch(()=>{});
-      }
-    };
-  }catch(e){
-    // fallback: 既存URLを使う
-    if(v.url){player.src=v.url;player.load();player.play().catch(()=>{});}
-  }
-
-  overlay.style.display='block';
-  document.body.style.overflow='hidden';
-  document.body.style.position='fixed';
-  document.body.style.width='100%';
-}
-
-function closeVideoPreview(){
-  const overlay=document.getElementById('videoPreviewOverlay');
-  const player=document.getElementById('videoPreviewPlayer');
-  overlay.style.display='none';
-  player.pause();
-  if(player.src.startsWith('blob:'))URL.revokeObjectURL(player.src);
-  player.removeAttribute('src');
-  player.load();
-  document.body.style.overflow='auto';
-  document.body.style.position='';
-  document.body.style.width='';
-}
-
-let videoSelectMode=false;
-let videoSelected=new Set();
-
-function toggleVideoSelectMode(){
-  videoSelectMode=!videoSelectMode;
-  videoSelected.clear();
-  document.getElementById('selectModeBtn').textContent=videoSelectMode?'キャンセル':'選択';
-  document.getElementById('selectModeBtn').style.color=videoSelectMode?'var(--accent)':'var(--muted)';
-  const tb=document.getElementById('selectToolbar');
-  tb.style.display=videoSelectMode?'flex':'none';
-  renderVideoManagementList();
-}
-
-function selectAllVideos(){
-  videos.forEach((_,i)=>videoSelected.add(i));
-  updateSelectCount();
-  renderVideoManagementList();
-}
-
-function updateSelectCount(){
-  const el=document.getElementById('selectCount');
-  if(el)el.textContent=`${videoSelected.size}件選択中`;
-}
-
-function deleteSelectedVideos(){
-  if(videoSelected.size===0)return;
-  if(!confirm(`${videoSelected.size}件の動画を削除しますか？`))return;
-  const toDelete=[...videoSelected].sort((a,b)=>b-a);
-  toDelete.forEach(i=>{
-    const v=videos[i];
-    if(v)deleteVideoFromIndexedDB(v.id).catch(()=>{});
-    videos.splice(i,1);
-  });
-  videoSelected.clear();
-  videoSelectMode=false;
-  document.getElementById('selectModeBtn').textContent='選択';
-  document.getElementById('selectModeBtn').style.color='var(--muted)';
-  document.getElementById('selectToolbar').style.display='none';
-  renderVideoManagementList();
-}
-
-function deleteAllVideos(){
-  if(videos.length===0)return;
-  if(!confirm(`全${videos.length}件の動画を削除しますか？`))return;
-  videos.forEach(v=>deleteVideoFromIndexedDB(v.id).catch(()=>{}));
-  videos=[];
-  renderVideoManagementList();
-}
-
-function renderVideoManagementList(){
-  const el=document.getElementById('videoManagementList');
-  const countEl=document.getElementById('videoCount');
-  if(countEl)countEl.textContent=`(${videos.length})`;
-  el.innerHTML='';
-  if(videos.length===0){
-    el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Videosなし<br><span style="font-size:11px">+ Add VideoからAddしてください</span></div>';
-    return;
-  }
-  const grid=document.createElement('div');
-  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px';
-  videos.forEach((v,i)=>{
-    const card=document.createElement('div');
-    card.style.cssText='position:relative;border-radius:8px;overflow:hidden;background:#111;aspect-ratio:9/16;cursor:pointer';
-    // video要素でサムネ表示
-    const vid=document.createElement('video');
-    vid.muted=true;
-    vid.preload='metadata';
-    vid.style.cssText='width:100%;height:100%;object-fit:cover;display:block';
-    vid.addEventListener('loadedmetadata',()=>{vid.currentTime=0.5;});
-    // URLが無効ならIndexedDBから再取得
-    const loadThumb=(url)=>{vid.src=url;};
-    const loadFromDB=async()=>{
-      try{
-        if(!db)await initDB();
-        const tx=db.transaction(STORE_NAME,'readonly');
-        const req=tx.objectStore(STORE_NAME).get(v.id);
-        req.onsuccess=()=>{
-          if(req.result?.blob){
-            const url=URL.createObjectURL(req.result.blob);
-            videos[i].url=url;
-            loadThumb(url);
-          }
-        };
-      }catch(e){}
-    };
-    if(v.url){
-      loadThumb(v.url);
-      vid.onerror=()=>loadFromDB(); // URL無効時に再取得
-    }else{
-      loadFromDB();
-    }
-    // 再生ボタンオーバーレイ
-    const play=document.createElement('div');
-    play.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.3)';
-    play.innerHTML=`<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center"><div style="width:0;height:0;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:3px"></div></div><div style="color:#fff;font-size:10px;margin-top:6px;max-width:90%;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</div>`;
-    // 削除ボタン
-    const del=document.createElement('button');
-    del.textContent='×';
-    del.style.cssText='position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:24px;height:24px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2';
-    del.ontouchend=(e)=>{e.stopPropagation();e.preventDefault();delVideo(i);};
-    del.onclick=(e)=>{e.stopPropagation();delVideo(i);};
-    card.addEventListener('touchstart',e=>{touchStartY=e.changedTouches[0].clientY;},{passive:true});
-    // 選択オーバーレイ
-    if(videoSelectMode){
-      const sel=document.createElement('div');
-      const checked=videoSelected.has(i);
-      sel.style.cssText=`position:absolute;inset:0;z-index:3;background:${checked?'rgba(255,200,0,.3)':'transparent'};display:flex;align-items:flex-start;justify-content:flex-start;padding:6px`;
-      sel.innerHTML=`<div style="width:20px;height:20px;border-radius:50%;border:2px solid #fff;background:${checked?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:12px">${checked?'✓':''}</div>`;
-      card.appendChild(sel);
-      card.addEventListener('click',()=>{
-        if(videoSelected.has(i))videoSelected.delete(i);
-        else videoSelected.add(i);
-        updateSelectCount();
-        renderVideoManagementList();
-      });
-    }else{
-      card.addEventListener('click',e=>{
-        if(e.target===del)return;
-        openVideoPreview(i);
-      });
-      card.addEventListener('touchend',e=>{
-        if(e.target===del)return;
-        if(Math.abs(e.changedTouches[0].clientY-touchStartY)>10)return;
-        e.preventDefault();
-        openVideoPreview(i);
-      });
-    }
-    card.appendChild(vid);
-    card.appendChild(play);
-    card.appendChild(del);
-    grid.appendChild(card);
-  });
-  el.appendChild(grid);
-}
-
-
-let currentVideoIdx=0;
-let videoQueue=[]; // ランダム順序のキュー
-let videoQueuePos=0;
-let videoClosedByBackButton=false;
-let videoSwipeStartY=0;
-let videoSwipeCurrentY=0;
-let videoSwipeActive=false;
-let videoTransitioning=false;
-
-function buildVideoQueue(startIdx){
-  const indices=videos.map((_,i)=>i);
-  for(let i=indices.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [indices[i],indices[j]]=[indices[j],indices[i]];
-  }
-  if(startIdx!==undefined){
-    const pos=indices.indexOf(startIdx);
-    if(pos>0){indices.splice(pos,1);indices.unshift(startIdx);}
-  }
-  videoQueue=indices;
-  videoQueuePos=0;
-}
-
-function buildScrollItems(){
-  // 各動画を100vh高さのアイテムとしてscrollコンテナに配置
-  const scroll=document.getElementById('videoScroll');
-  const fs=document.getElementById('videoFullscreen');
-  const h=fs.clientHeight||window.innerHeight;
-  scroll.innerHTML='';
-  videoQueue.forEach((vidIdx,i)=>{
-    const item=document.createElement('div');
-    item.className='vid-item';
-    item.dataset.idx=String(i);
-    item.style.cssText=`width:100%;height:${h}px;flex-shrink:0;scroll-snap-align:start;scroll-snap-stop:always;background:#000;position:relative;overflow:hidden`;
-    const video=document.createElement('video');
-    video.muted=true;video.loop=true;video.playsInline=true;
-    video.setAttribute('playsinline','');
-    video.style.cssText='width:100%;height:100%;object-fit:contain;background:#000;display:block';
-    video.dataset.vidIdx=String(vidIdx);
-    item.appendChild(video);
-    scroll.appendChild(item);
-  });
-}
-
-function loadVideoForItem(item){
-  const video=item.querySelector('video');
-  const vidIdx=+video.dataset.vidIdx;
-  if(!videos[vidIdx])return;
-  if(!video.src){
-    video.src=videos[vidIdx].url;
-  }
-}
-
-function unloadVideoForItem(item){
-  const video=item.querySelector('video');
-  if(video){video.pause();}
-}
-
-function playVideoFullscreen(idx){
-  if(!videos.length)return;
-  if(idx===undefined)idx=Math.floor(Math.random()*videos.length);
-  if(!videos[idx])return;
-  
-  buildVideoQueue(idx);
-  
-  const fullscreen=document.getElementById('videoFullscreen');
-  fullscreen.style.display='block';
-  document.body.style.overflow='hidden';
-  swipeEnabled=false;
-  
-  const setH=()=>{
-    const h=window.innerHeight;
-    fullscreen.style.height=h+'px';
-    document.querySelectorAll('.vid-item').forEach(it=>{it.style.height=h+'px';});
-  };
-  setH();
-  
-  buildScrollItems();
-  fullscreen.scrollTop=0;
-  
-  // 最初のvideoだけロード&再生
-  const items=document.querySelectorAll('.vid-item');
-  if(items[0]){
-    loadVideoForItem(items[0]);
-    const v0=items[0].querySelector('video');
-    v0.play().catch(()=>{});
-  }
-  // 次のvideoもプリロード
-  if(items[1])loadVideoForItem(items[1]);
-  
-  // スクロール監視
-  setupVideoScrollObserver();
-  
-  requestAnimationFrame(()=>{setH();requestAnimationFrame(setH);});
-  setTimeout(setH,100);
-  setTimeout(setH,500);
-  
-  window.history.pushState({videoOpen:true},'');
-}
-
-let videoScrollObserver=null;
-function setupVideoScrollObserver(){
-  if(videoScrollObserver){videoScrollObserver.disconnect();}
-  const fs=document.getElementById('videoFullscreen');
-  videoScrollObserver=new IntersectionObserver((entries)=>{
-    entries.forEach(entry=>{
-      const item=entry.target;
-      const video=item.querySelector('video');
-      if(entry.intersectionRatio>0.7){
-        // この動画が画面の大半を占めてる→再生
-        loadVideoForItem(item);
-        video.currentTime=0;
-        video.muted=false;
-        video.play().catch(()=>{video.muted=true;video.play().catch(()=>{});});
-        currentVideoIdx=+video.dataset.vidIdx;
-        // 前後もプリロード（ただしmute）
-        const prevSibling=item.previousElementSibling;
-        const nextSibling=item.nextElementSibling;
-        if(prevSibling){loadVideoForItem(prevSibling);prevSibling.querySelector('video').muted=true;}
-        if(nextSibling){loadVideoForItem(nextSibling);nextSibling.querySelector('video').muted=true;}
-        // 再生アイコン消す
-        const playIcon=document.getElementById('videoPlayIcon');
-        if(playIcon)playIcon.style.opacity='0';
-      }else if(entry.intersectionRatio<0.3){
-        // 画面外→停止
-        video.pause();
-        video.muted=true;
-      }
-    });
-  },{root:fs,threshold:[0.3,0.7]});
-  
-  document.querySelectorAll('.vid-item').forEach(it=>videoScrollObserver.observe(it));
-}
-
-function toggleVideoBackBtn(){
-  const btn=document.getElementById('videoBackBtn');
-  if(!btn)return;
-  const visible=btn.style.opacity==='1';
-  btn.style.opacity=visible?'0':'1';
-  btn.style.pointerEvents=visible?'none':'auto';
-  clearTimeout(btn._hideTimer);
-  if(!visible){
-    btn._hideTimer=setTimeout(()=>{btn.style.opacity='0';btn.style.pointerEvents='none';},2500);
-  }
-}
-
-function closeVideoFullscreen(){
-  const fs=document.getElementById('videoFullscreen');
-  fs.style.display='none';
-  // 全videoを停止
-  document.querySelectorAll('#videoFullscreen video').forEach(v=>{v.pause();v.removeAttribute('src');v.load();});
-  if(videoScrollObserver){videoScrollObserver.disconnect();videoScrollObserver=null;}
-  document.body.style.overflow='auto';
-  swipeEnabled=true;
-  
-  const home=document.getElementById('motivationHome');
-  if(home)home.style.display='grid';
-  document.getElementById('quotesView').style.display='none';
-  document.getElementById('optionView').style.display='none';
-  
-  if(!videoClosedByBackButton){window.history.back();}
-  setTimeout(()=>{videoClosedByBackButton=false;},100);
-}
-
-// Vertical swipe inside video fullscreen (next video)
-document.addEventListener('DOMContentLoaded',()=>{
-  // Hero動画をIndexedDBから復元してから表示
-  restoreHeroVideos().finally(()=>{
-    ['study','check','health','diary','record','motivation'].forEach(t=>{
-      const el=document.getElementById('hero-'+t);
-      if(el) el.innerHTML=renderHero(t);
-    });
-  });
-  // 初期wrapの高さセット
-  setTimeout(()=>{},200);
-  // Hide loading screen
-  setTimeout(() => {
-    const loading = document.getElementById('loadingScreen');
-    if (loading) {
-      loading.style.transition = 'opacity 0.8s ease-out';
-      loading.style.opacity = '0';
-      setTimeout(() => {
-        loading.style.display = 'none';
-        document.querySelector('.app').style.opacity = '1';
-        document.querySelector('.app').style.pointerEvents = 'auto';
-      }, 800);
-    }
-  }, 1000);
-  
-  const fs=document.getElementById('videoFullscreen');
-  
-  // タップ判定のみ（スクロールはブラウザネイティブ）
-  let tapStartY=0,tapStartX=0,tapStartT=0;
-  fs.addEventListener('touchstart',e=>{
-    tapStartY=e.changedTouches[0].clientY;
-    tapStartX=e.changedTouches[0].clientX;
-    tapStartT=Date.now();
-  },{passive:true});
-  
-  fs.addEventListener('touchend',e=>{
-    const t=e.changedTouches[0];
-    const dy=Math.abs(t.clientY-tapStartY);
-    const dx=Math.abs(t.clientX-tapStartX);
-    const dt=Date.now()-tapStartT;
-    // タップ＝動いてない＆短時間
-    if(dy<10&&dx<10&&dt<300){
-      // 戻るボタンエリア
-      const backBtn=document.getElementById('videoBackBtn');
-      if(backBtn && backBtn.style.opacity==='1'){
-        const r=backBtn.getBoundingClientRect();
-        if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom){
-          return;
-        }
-      }
-      const w=fs.clientWidth,h=fs.clientHeight;
-      const cxMin=w*0.25,cxMax=w*0.75;
-      const cyMin=h*0.3,cyMax=h*0.7;
-      const inCenter=t.clientX>=cxMin&&t.clientX<=cxMax&&t.clientY>=cyMin&&t.clientY<=cyMax;
-      // 現在表示中のvideoを取得
-      const items=document.querySelectorAll('.vid-item');
-      let curVid=null;
-      items.forEach(it=>{
-        const r=it.getBoundingClientRect();
-        if(r.top<=h/2&&r.bottom>=h/2)curVid=it.querySelector('video');
-      });
-      if(inCenter && curVid){
-        const playIcon=document.getElementById('videoPlayIcon');
-        if(curVid.paused){
-          curVid.muted=false;
-          curVid.play().catch(()=>{});
-          if(playIcon)playIcon.style.opacity='0';
-        }else{
-          curVid.pause();
-          if(playIcon)playIcon.style.opacity='1';
-          // 一時停止時に戻るボタンも表示
-          const btn=document.getElementById('videoBackBtn');
-          if(btn){btn.style.opacity='1';btn.style.pointerEvents='auto';clearTimeout(btn._hideTimer);}
-        }
-      }else if(!inCenter){
-        toggleVideoBackBtn();
-      }
-    }
-  },{passive:true});
-});
-
-// Back button to close video
-window.addEventListener('resize',()=>{
-  const fs=document.getElementById('videoFullscreen');
-  if(fs && fs.style.display==='block'){
-    const h=window.innerHeight;
-    fs.style.height=h+'px';
-    document.querySelectorAll('.vid-item').forEach(it=>it.style.height=h+'px');
-  }
-});
-
-window.addEventListener('popstate',()=>{
-  const fs=document.getElementById('videoFullscreen');
-  if(fs && fs.style.display!=='none' && fs.style.display!==''){
-    videoClosedByBackButton=true;
-    closeVideoFullscreen();
-  }
-});
-function setRecordPeriod(days){
-  recordPeriod=days;
-  document.querySelectorAll('.record-filter-btn').forEach(b=>b.classList.remove('active'));
-  event.target.classList.add('active');
-  renderRecord();
-}
-function renderRecord(){
-  const keys=Object.keys(allData).sort();
-  const now=new Date();
-  
-  let filteredKeys=keys;
-  if(recordPeriod>0){
-    const cutoff=new Date(now.getTime()-recordPeriod*24*60*60*1000).toISOString().slice(0,10);
-    filteredKeys=keys.filter(k=>k>=cutoff);
-  }
-  
-  if(filteredKeys.length===0){
-    document.getElementById('recordList').innerHTML='<div class="empty-record">No records yet.<br>Start logging today!</div>';
-    document.getElementById('recordStats').innerHTML='<div class="card" style="text-align:center;margin-bottom:0"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">平均</div><div style="font-family:\'Bebas Neue\',sans-serif;font-size:24px;color:var(--accent)">—</div></div><div class="card" style="text-align:center;margin-bottom:0"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">最高</div><div style="font-family:\'Bebas Neue\',sans-serif;font-size:24px;color:var(--accent)">—</div></div>';
-    renderCalendar();
-    return;
-  }
-  
-  // Calculate scores
-  const scores=filteredKeys.map(k=>({date:k,score:calcScoreFor(allData[k])}));
-  const avgScore=Math.round(scores.reduce((a,b)=>a+b.score,0)/scores.length);
-  const maxScore=Math.max(...scores.map(s=>s.score));
-  
-  document.getElementById('recordAvg').textContent=avgScore;
-  document.getElementById('recordMax').textContent=maxScore;
-  
-  // Draw graph
-  drawScoreGraph(scores);
-  
-  // List
-  const el=document.getElementById('recordList');
-  el.innerHTML='';
-  filteredKeys.forEach(k=>{
-    const r=allData[k];
-    const sc=calcScoreFor(r);
-    const _subs=r.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
-    const ch=Object.values(r.checks||{}).filter(Boolean).length;
-    const div=document.createElement('div');
-    div.className='record-day';
-    div.innerHTML=`<div class="record-header" onclick="this.nextElementSibling.classList.toggle('open')">
-      <div><div class="record-date-txt" style="cursor:pointer" onclick="showRecordDetail('${k}'); event.stopPropagation()">${k}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${minsToStr(sm)}</div></div>
-      <div class="record-score">${sc}</div>
-    </div>
-    <div class="record-body">
-      <div class="record-item"><span>Study</span><span class="record-val">${minsToStr(sm)}</span></div>
-      <div class="record-item"><span>Checks</span><span class="record-val">${ch}/${checkItems.length}</span></div>
-      <div class="record-item"><span>Exercise</span><span class="record-val">${r.health?.exercise||0}min</span></div>
-      <div class="record-item"><span>Meals</span><span class="record-val">${(r.meals||[]).length} meals</span></div>
-    </div>`;
-    el.appendChild(div);
-  });
-  
-  // Render calendar
-  renderCalendar();
-}
-
-function drawScoreGraph(scores){
-  const svg=document.getElementById('scoreChart');
-  svg.innerHTML='';
-  
-  const w=400,h=300,padding=40;
-  const graphW=w-padding*2,graphH=h-padding*2;
-  
-  // Draw axes
-  const axes=document.createElementNS('http://www.w3.org/2000/svg','g');
-  axes.innerHTML=`
-    <line x1="${padding}" y1="${h-padding}" x2="${w-padding}" y2="${h-padding}" stroke="var(--border)" stroke-width="1"/>
-    <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${h-padding}" stroke="var(--border)" stroke-width="1"/>
-    <text x="10" y="${padding-10}" font-size="10" fill="var(--muted)">100</text>
-    <text x="10" y="${h-padding+15}" font-size="10" fill="var(--muted)">0</text>
-  `;
-  svg.appendChild(axes);
-  
-  // Draw line
-  const points=scores.map((s,i)=>{
-    const x=padding+(i/(scores.length-1||1))*graphW;
-    const y=h-padding-(s.score/100)*graphH;
-    return `${x},${y}`;
-  }).join(' ');
-  
-  const line=document.createElementNS('http://www.w3.org/2000/svg','polyline');
-  line.setAttribute('points',points);
-  line.setAttribute('stroke','var(--accent)');
-  line.setAttribute('stroke-width','2');
-  line.setAttribute('fill','none');
-  svg.appendChild(line);
-  
-  // Draw points
-  scores.forEach((s,i)=>{
-    const x=padding+(i/(scores.length-1||1))*graphW;
-    const y=h-padding-(s.score/100)*graphH;
-    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    circle.setAttribute('cx',x);
-    circle.setAttribute('cy',y);
-    circle.setAttribute('r','3');
-    circle.setAttribute('fill','var(--accent)');
-    svg.appendChild(circle);
-  });
-}
-
-function renderCalendar(){
-  const grid=document.getElementById('calendarGrid');
-  if(!grid)return; // グリッドが見つからない場合は処理しない
-  
-  const year=calendarMonthDate.getFullYear();
-  const month=calendarMonthDate.getMonth();
-  
-  // Month/Year header
-  const monthName=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month];
-  const headerEl=document.getElementById('calMonthYear');
-  if(headerEl)headerEl.textContent=`${monthName} ${year}`;
-  
-  // Get days in month
-  const firstDay=new Date(year,month,1).getDay();
-  const daysInMonth=new Date(year,month+1,0).getDate();
-  
-  grid.innerHTML='';
-  
-  // Day headers
-  ['S','M','T','W','T','F','S'].forEach(d=>{
-    const header=document.createElement('div');
-    header.style.cssText='color:var(--muted);font-weight:bold;padding:4px';
-    header.textContent=d;
-    grid.appendChild(header);
-  });
-  
-  // Empty cells
-  for(let i=0;i<firstDay;i++){
-    const empty=document.createElement('div');
-    grid.appendChild(empty);
-  }
-  
-  // Days
-  for(let day=1;day<=daysInMonth;day++){
-    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const hasData=allData[dateStr];
-    const dayEl=document.createElement('button');
-    dayEl.style.cssText=`
-      padding:6px;border-radius:6px;border:1px solid var(--border);
-      background:${hasData?'var(--accent)':'var(--surface)'};
-      color:${hasData?'var(--black)':'var(--text)'};
-      cursor:pointer;font-weight:bold;font-size:12px
-    `;
-    dayEl.textContent=day;
-    dayEl.onclick=()=>startEditMode(dateStr);
-    grid.appendChild(dayEl);
-  }
-}
-
-function prevCalMonth(){
-  calendarMonthDate.setMonth(calendarMonthDate.getMonth()-1);
-  renderCalendar();
-}
-
-function nextCalMonth(){
-  calendarMonthDate.setMonth(calendarMonthDate.getMonth()+1);
-  renderCalendar();
-}
-
-function calcScoreFor(r){
-  const _subs=r.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
-  
-  // 65% Study
-  const _goal=r.goalMins||DEFAULT_GOAL_MINS;
-  const studyScore=Math.min(65,(sm/_goal)*65);
-  
-  // 10% Exercise (30min = 100%)
-  const exScore=Math.min(10,(r.health?.exercise||0)/30*10);
-  
-  // 10% Nutrition
-  let nutritionScore=0;
-  const goals=r.nutritionGoals||{};
-  const goalKeys=Object.keys(goals).filter(k=>goals[k]>0);
-  if(goalKeys.length>0&&(r.meals||[]).length>0){
-    const totals=calcMealTotals(r.meals||[]);
-    const scores=goalKeys.map(k=>{
-      const goal=goals[k];
-      const actual=totals[k]||0;
-      // 目標に近いほど高スコア（超過は0.8倍でペナルティ）
-      if(actual<=goal) return actual/goal;
-      else return Math.max(0,1-(actual-goal)/goal*0.5);
-    });
-    nutritionScore=Math.min(10,(scores.reduce((a,b)=>a+b,0)/scores.length)*10);
-  }
-  
-  // 10% Checks
-  const n=Math.max(1,(r.checkItems||checkItems).length);
-  const checkScore=(Object.values(r.checks||{}).filter(Boolean).length/n)*10;
-  
-  // 5% Diary
-  const diaryScore=(r.diary?.length||0)>0?5:0;
-  
-  return Math.min(100,Math.round(studyScore+exScore+nutritionScore+checkScore+diaryScore));
-}
-function calcScore(){document.getElementById('topScore').textContent=calcScoreFor(state);}
-
 function renderBodyCompGraph(){
   const el=document.getElementById('bodyCompGraphContainer');
   if(el)el.innerHTML='';
@@ -3876,6 +3048,43 @@ function renderExerciseGraph(type){
   });
 }
 
+function calcScoreFor(r){
+  const _subs=r.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
+  
+  // 65% Study
+  const _goal=r.goalMins||DEFAULT_GOAL_MINS;
+  const studyScore=Math.min(65,(sm/_goal)*65);
+  
+  // 10% Exercise (30min = 100%)
+  const exScore=Math.min(10,(r.health?.exercise||0)/30*10);
+  
+  // 10% Nutrition
+  let nutritionScore=0;
+  const goals=r.nutritionGoals||{};
+  const goalKeys=Object.keys(goals).filter(k=>goals[k]>0);
+  if(goalKeys.length>0&&(r.meals||[]).length>0){
+    const totals=calcMealTotals(r.meals||[]);
+    const scores=goalKeys.map(k=>{
+      const goal=goals[k];
+      const actual=totals[k]||0;
+      // 目標に近いほど高スコア（超過は0.8倍でペナルティ）
+      if(actual<=goal) return actual/goal;
+      else return Math.max(0,1-(actual-goal)/goal*0.5);
+    });
+    nutritionScore=Math.min(10,(scores.reduce((a,b)=>a+b,0)/scores.length)*10);
+  }
+  
+  // 10% Checks
+  const n=Math.max(1,(r.checkItems||checkItems).length);
+  const checkScore=(Object.values(r.checks||{}).filter(Boolean).length/n)*10;
+  
+  // 5% Diary
+  const diaryScore=(r.diary?.length||0)>0?5:0;
+  
+  return Math.min(100,Math.round(studyScore+exScore+nutritionScore+checkScore+diaryScore));
+}
+function calcScore(){document.getElementById('topScore').textContent=calcScoreFor(state);}
+
 function showScoreBreakdown(){
   const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study?.[s.id]?.[b.id]||0),0),0);
   const _goal=state.goalMins||DEFAULT_GOAL_MINS;
@@ -4414,6 +3623,11 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
   
   renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
 
+  // ロード画面を非表示
+  let _lhidden=false;
+  const _hideLoad=()=>{if(_lhidden)return;_lhidden=true;const ls=document.getElementById('loadingScreen');if(ls){ls.style.transition='opacity 0.6s';ls.style.opacity='0';setTimeout(()=>ls.style.display='none',600);}};
+  setTimeout(_hideLoad,800);
+
   
   // Auto fullscreen on load
   const elem=document.documentElement;
@@ -4423,6 +3637,306 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
     elem.webkitRequestFullscreen();
   }
 })();
+
+function renderRecord(){
+  const keys=Object.keys(allData).sort();
+  const now=new Date();
+  
+  let filteredKeys=keys;
+  if(recordPeriod>0){
+    const cutoff=new Date(now.getTime()-recordPeriod*24*60*60*1000).toISOString().slice(0,10);
+    filteredKeys=keys.filter(k=>k>=cutoff);
+  }
+  
+  if(filteredKeys.length===0){
+    document.getElementById('recordList').innerHTML='<div class="empty-record">No records yet.<br>Start logging today!</div>';
+    document.getElementById('recordStats').innerHTML='<div class="card" style="text-align:center;margin-bottom:0"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">平均</div><div style="font-family:\'Bebas Neue\',sans-serif;font-size:24px;color:var(--accent)">—</div></div><div class="card" style="text-align:center;margin-bottom:0"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">最高</div><div style="font-family:\'Bebas Neue\',sans-serif;font-size:24px;color:var(--accent)">—</div></div>';
+    renderCalendar();
+    return;
+  }
+  
+  // Calculate scores
+  const scores=filteredKeys.map(k=>({date:k,score:calcScoreFor(allData[k])}));
+  const avgScore=Math.round(scores.reduce((a,b)=>a+b.score,0)/scores.length);
+  const maxScore=Math.max(...scores.map(s=>s.score));
+  
+  document.getElementById('recordAvg').textContent=avgScore;
+  document.getElementById('recordMax').textContent=maxScore;
+  
+  // Draw graph
+  drawScoreGraph(scores);
+  
+  // List
+  const el=document.getElementById('recordList');
+  el.innerHTML='';
+  filteredKeys.forEach(k=>{
+    const r=allData[k];
+    const sc=calcScoreFor(r);
+    const _subs=r.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
+    const ch=Object.values(r.checks||{}).filter(Boolean).length;
+    const div=document.createElement('div');
+    div.className='record-day';
+    div.innerHTML=`<div class="record-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      <div><div class="record-date-txt" style="cursor:pointer" onclick="showRecordDetail('${k}'); event.stopPropagation()">${k}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${minsToStr(sm)}</div></div>
+      <div class="record-score">${sc}</div>
+    </div>
+    <div class="record-body">
+      <div class="record-item"><span>Study</span><span class="record-val">${minsToStr(sm)}</span></div>
+      <div class="record-item"><span>Checks</span><span class="record-val">${ch}/${checkItems.length}</span></div>
+      <div class="record-item"><span>Exercise</span><span class="record-val">${r.health?.exercise||0}min</span></div>
+      <div class="record-item"><span>Meals</span><span class="record-val">${(r.meals||[]).length} meals</span></div>
+    </div>`;
+    el.appendChild(div);
+  });
+  
+  // Render calendar
+  renderCalendar();
+}
+
+
+function initDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NAME,1);
+    req.onerror=()=>reject(req.error);
+    req.onsuccess=()=>{db=req.result;resolve();};
+    req.onupgradeneeded=(e)=>{
+      const store=e.target.result.createObjectStore(STORE_NAME,{keyPath:'id'});
+    };
+  });
+}
+
+
+function setupVideoScrollObserver(){
+  if(videoScrollObserver){videoScrollObserver.disconnect();}
+  const fs=document.getElementById('videoFullscreen');
+  videoScrollObserver=new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      const item=entry.target;
+      const video=item.querySelector('video');
+      if(entry.intersectionRatio>0.7){
+        // この動画が画面の大半を占めてる→再生
+        loadVideoForItem(item);
+        video.muted=false;
+        video.play().catch(()=>{video.muted=true;video.play().catch(()=>{});});
+        currentVideoIdx=+video.dataset.vidIdx;
+        // 前後もプリロード（ただしmute）
+        const prevSibling=item.previousElementSibling;
+        const nextSibling=item.nextElementSibling;
+        if(prevSibling){loadVideoForItem(prevSibling);prevSibling.querySelector('video').muted=true;}
+        if(nextSibling){loadVideoForItem(nextSibling);nextSibling.querySelector('video').muted=true;}
+        // 再生アイコン消す
+        const playIcon=document.getElementById('videoPlayIcon');
+        if(playIcon)playIcon.style.opacity='0';
+      }else if(entry.intersectionRatio<0.3){
+        // 画面外→停止
+        video.pause();
+        video.muted=true;
+      }
+    });
+  },{root:fs,threshold:[0.3,0.7]});
+  
+  document.querySelectorAll('.vid-item').forEach(it=>videoScrollObserver.observe(it));
+}
+
+
+function loadVideoForItem(item){
+  const video=item.querySelector('video');
+  const vidIdx=+video.dataset.vidIdx;
+  if(!videos[vidIdx])return;
+  if(!video.src){
+    video.src=videos[vidIdx].url;
+  }
+}
+
+
+function unloadVideoForItem(item){
+  const video=item.querySelector('video');
+  if(video){video.pause();}
+}
+
+
+function buildScrollItems(){
+  // 各動画を100vh高さのアイテムとしてscrollコンテナに配置
+  const scroll=document.getElementById('videoScroll');
+  const fs=document.getElementById('videoFullscreen');
+  const h=fs.clientHeight||window.innerHeight;
+  scroll.innerHTML='';
+  videoQueue.forEach((vidIdx,i)=>{
+    const item=document.createElement('div');
+    item.className='vid-item';
+    item.dataset.idx=String(i);
+    item.style.cssText=`width:100%;height:${h}px;flex-shrink:0;scroll-snap-align:start;scroll-snap-stop:always;background:#000;position:relative;overflow:hidden`;
+    const video=document.createElement('video');
+    video.muted=true;video.loop=true;video.playsInline=true;
+    video.setAttribute('playsinline','');
+    video.style.cssText='width:100%;height:100%;object-fit:contain;background:#000;display:block';
+    video.dataset.vidIdx=String(vidIdx);
+    item.appendChild(video);
+    scroll.appendChild(item);
+  });
+}
+
+
+function buildVideoQueue(startIdx){
+  const indices=videos.map((_,i)=>i);
+  for(let i=indices.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [indices[i],indices[j]]=[indices[j],indices[i]];
+  }
+  if(startIdx!==undefined){
+    const pos=indices.indexOf(startIdx);
+    if(pos>0){indices.splice(pos,1);indices.unshift(startIdx);}
+  }
+  videoQueue=indices;
+  videoQueuePos=0;
+}
+
+
+function toggleVideoBackBtn(){
+  const btn=document.getElementById('videoBackBtn');
+  if(!btn)return;
+  const visible=btn.style.opacity==='1';
+  btn.style.opacity=visible?'0':'1';
+  btn.style.pointerEvents=visible?'none':'auto';
+  clearTimeout(btn._hideTimer);
+  if(!visible){
+    btn._hideTimer=setTimeout(()=>{btn.style.opacity='0';btn.style.pointerEvents='none';},2500);
+  }
+}
+
+
+function closeVideoFullscreen(){
+  const fs=document.getElementById('videoFullscreen');
+  fs.style.display='none';
+  // 全videoを停止
+  document.querySelectorAll('#videoFullscreen video').forEach(v=>{v.pause();v.removeAttribute('src');v.load();});
+  if(videoScrollObserver){videoScrollObserver.disconnect();videoScrollObserver=null;}
+  document.body.style.overflow='auto';
+  swipeEnabled=true;
+  
+  const home=document.getElementById('motivationHome');
+  if(home)home.style.display='grid';
+  document.getElementById('quotesView').style.display='none';
+  document.getElementById('optionView').style.display='none';
+  
+  if(!videoClosedByBackButton){window.history.back();}
+  setTimeout(()=>{videoClosedByBackButton=false;},100);
+}
+
+
+function playVideoFullscreen(idx){
+  if(!videos.length)return;
+  if(idx===undefined)idx=Math.floor(Math.random()*videos.length);
+  if(!videos[idx])return;
+  
+  buildVideoQueue(idx);
+  
+  const fullscreen=document.getElementById('videoFullscreen');
+  fullscreen.style.display='block';
+  document.body.style.overflow='hidden';
+  swipeEnabled=false;
+  
+  const setH=()=>{
+    const h=window.innerHeight;
+    fullscreen.style.height=h+'px';
+    document.querySelectorAll('.vid-item').forEach(it=>{it.style.height=h+'px';});
+  };
+  setH();
+  
+  buildScrollItems();
+  fullscreen.scrollTop=0;
+  
+  // 最初のvideoだけロード&再生
+  const items=document.querySelectorAll('.vid-item');
+  if(items[0]){
+    loadVideoForItem(items[0]);
+    const v0=items[0].querySelector('video');
+    v0.play().catch(()=>{});
+  }
+  // 次のvideoもプリロード
+  if(items[1])loadVideoForItem(items[1]);
+  
+  // スクロール監視
+  setupVideoScrollObserver();
+  
+  requestAnimationFrame(()=>{setH();requestAnimationFrame(setH);});
+  setTimeout(setH,100);
+  setTimeout(setH,500);
+  
+  window.history.pushState({videoOpen:true},'');
+}
+async function loadVideosFromIndexedDB(){
+  if(!db)await initDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE_NAME,'readonly');
+    const req=tx.objectStore(STORE_NAME).getAll();
+    req.onsuccess=()=>{
+      const vids=req.result.map(v=>({id:v.id,name:v.name,url:URL.createObjectURL(v.blob)}));
+      resolve(vids);
+    };
+    req.onerror=()=>reject(req.error);
+  });
+}
+
+async function saveVideoToIndexedDB(id,name,blob){
+  if(!db)await initDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE_NAME,'readwrite');
+    tx.objectStore(STORE_NAME).put({id,name,blob,timestamp:Date.now()});
+    tx.oncomplete=resolve;
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+
+async function deleteVideoFromIndexedDB(id){
+  if(!db)await initDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE_NAME,'readwrite');
+    tx.objectStore(STORE_NAME).delete(id);
+    tx.oncomplete=resolve;
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+
+async function openVideoPreview(idx){
+  if(!videos[idx])return;
+  const v=videos[idx];
+  const overlay=document.getElementById('videoPreviewOverlay');
+  const player=document.getElementById('videoPreviewPlayer');
+  try{
+    if(!db)await initDB();
+    const tx=db.transaction(STORE_NAME,'readonly');
+    const req=tx.objectStore(STORE_NAME).get(v.id);
+    req.onsuccess=()=>{
+      if(req.result?.blob){
+        const url=URL.createObjectURL(req.result.blob);
+        player.onerror=null;
+        player.src=url;player.load();player.play().catch(()=>{});
+      }
+    };
+  }catch(e){
+    if(v.url){player.src=v.url;player.load();player.play().catch(()=>{});}
+  }
+  overlay.style.display='block';
+  document.body.style.overflow='hidden';
+  document.body.style.position='fixed';
+  document.body.style.width='100%';
+}
+
+function closeVideoPreview(){
+  const overlay=document.getElementById('videoPreviewOverlay');
+  const player=document.getElementById('videoPreviewPlayer');
+  overlay.style.display='none';
+  player.onerror=null;
+  player.pause();
+  if(player.src.startsWith('blob:'))URL.revokeObjectURL(player.src);
+  player.removeAttribute('src');player.load();
+  document.body.style.overflow='auto';
+  document.body.style.position='';
+  document.body.style.width='';
+}
+
+
 </script>
 </body>
 </html>
