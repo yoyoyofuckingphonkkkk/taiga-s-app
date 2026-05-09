@@ -2764,6 +2764,13 @@ ${pastSummary}`;
 
 // Enterで送信（Shift+Enterで改行）
 document.addEventListener('DOMContentLoaded',()=>{
+  // Hero動画をIndexedDBから復元してから表示
+  restoreHeroVideos().finally(()=>{
+    ['study','check','health','diary','record','motivation'].forEach(t=>{
+      const el=document.getElementById('hero-'+t);
+      if(el) el.innerHTML=renderHero(t);
+    });
+  });
   const ai=document.getElementById('aiInput');
   if(ai){
     ai.addEventListener('keydown',e=>{
