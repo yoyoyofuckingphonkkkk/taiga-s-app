@@ -460,7 +460,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     
     <!-- Option - top right -->
     <div style="grid-column:2;grid-row:1;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:80px" onclick="switchMotivationView('option')">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.1em;color:var(--text)">OPTION</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.1em;color:var(--text)">SAVED</div>
     </div>
     
     <!-- Quotes - bottom right -->
@@ -512,7 +512,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 <!-- AI Coach overlay -->
-<div id="aiCoachOverlay" style="display:none;position:fixed;inset:0;background:#000;z-index:1100;flex-direction:column">
+<div id="aiCoachOverlay" style="display:none;position:fixed;inset:0;width:100%;height:100%;background:#000;z-index:1100;flex-direction:column">
   <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border);padding-top:max(14px,env(safe-area-inset-top));flex-shrink:0">
     <button onclick="closeAICoach()" style="background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px 10px">←</button>
     <div style="flex:1;text-align:center;font-family:var(--serif);font-style:italic;font-size:18px;letter-spacing:.1em">AI Coach</div>
@@ -1943,11 +1943,11 @@ async function restoreMealPhotos(){
 
 // ===== AI COACH =====
 function openAICoach(){
-  document.getElementById('aiCoachOverlay').style.display='flex';
+  const overlay=document.getElementById('aiCoachOverlay');
+  overlay.style.display='flex';
   document.body.style.overflow='hidden';
   document.getElementById('aiCoachDate').textContent=TODAY_KEY;
   
-  // 既存のフィードバックを表示
   const saved=JSON.parse(localStorage.getItem('ym4_coach_'+TODAY_KEY)||'null');
   if(saved){
     renderCoachFeedback(saved);
@@ -3457,8 +3457,9 @@ let aiHistory=JSON.parse(localStorage.getItem('ym4_ai_history')||'[]');
 function openAIChat(){
   document.getElementById('aiChatOverlay').style.display='flex';
   document.body.style.overflow='hidden';
+  document.body.style.position='fixed';
+  document.body.style.width='100%';
   document.getElementById('aiApiKey').value=localStorage.getItem('ym4_ai_key')||'';
-  // APIキーがなければ設定パネル開く
   if(!localStorage.getItem('ym4_ai_key')){
     document.getElementById('aiSettingsPanel').style.display='block';
   }
@@ -3472,6 +3473,8 @@ function openAIChat(){
 function closeAIChat(){
   document.getElementById('aiChatOverlay').style.display='none';
   document.body.style.overflow='auto';
+  document.body.style.position='';
+  document.body.style.width='';
 }
 
 function aiSettingsToggle(){
@@ -3587,6 +3590,9 @@ document.addEventListener('DOMContentLoaded',()=>{
       setTimeout(()=>{
         const m=document.getElementById('aiMessages');
         if(m)m.scrollTop=m.scrollHeight;
+        // body固定を維持
+        document.body.style.position='fixed';
+        document.body.style.width='100%';
       },300);
     });
   }
