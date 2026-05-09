@@ -3614,25 +3614,28 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
 
 // Initialize DB and load saved videos
 (async()=>{
+  const _hideLoad=()=>{const ls=document.getElementById('loadingScreen');if(ls){ls.style.transition='opacity 0.5s';ls.style.opacity='0';setTimeout(()=>ls.style.display='none',500);}};
+  // 5秒で強制非表示
+  const _forceHide=setTimeout(_hideLoad,5000);
+
   try{
     await initDB();
     const savedVideos=await loadVideosFromIndexedDB();
     videos=savedVideos.filter(v=>!v.id.startsWith('hero_'));
     await restoreMealPhotos();
   }catch(e){console.error('Failed to load videos from IndexedDB:',e);}
-  
-  renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
 
-  // ロード画面を非表示
-  let _lhidden=false;
-  const _hideLoad=()=>{if(_lhidden)return;_lhidden=true;const ls=document.getElementById('loadingScreen');if(ls){ls.style.transition='opacity 0.6s';ls.style.opacity='0';setTimeout(()=>ls.style.display='none',600);}};
-  setTimeout(_hideLoad,800);
+  try{
+    renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
+  }catch(e){console.error('Render error:',e);}
 
-  
+  clearTimeout(_forceHide);
+  _hideLoad();
+
   // Auto fullscreen on load
   const elem=document.documentElement;
   if(elem.requestFullscreen){
-    elem.requestFullscreen().catch(err=>console.log('フルスクリーン申請:',err));
+    elem.requestFullscreen().catch(()=>{});
   }else if(elem.webkitRequestFullscreen){
     elem.webkitRequestFullscreen();
   }
@@ -3937,6 +3940,346 @@ function closeVideoPreview(){
 }
 
 
+
+function delQuote(i){
+  if(!confirm('Delete?'))return;
+  quotes.splice(i,1);
+  saveQuotes();
+  renderQuotesList();
+}
+
+
+function delVideo(i){
+  if(!confirm('Delete?'))return;
+  const v=videos[i];
+  if(v)deleteVideoFromIndexedDB(v.id).catch(e=>console.error('IndexedDB delete failed',e));
+  videos.splice(i,1);
+  renderVideoManagementList();
+}
+
+
+function deleteAllVideos(){
+  if(videos.length===0)return;
+  if(!confirm(`全${videos.length}件の動画を削除しますか？`))return;
+  videos.forEach(v=>deleteVideoFromIndexedDB(v.id).catch(()=>{}));
+  videos=[];
+  renderVideoManagementList();
+}
+
+
+function deleteSelectedVideos(){
+  if(videoSelected.size===0)return;
+  if(!confirm(`${videoSelected.size}件の動画を削除しますか？`))return;
+  const toDelete=[...videoSelected].sort((a,b)=>b-a);
+  toDelete.forEach(i=>{
+    const v=videos[i];
+    if(v)deleteVideoFromIndexedDB(v.id).catch(()=>{});
+    videos.splice(i,1);
+  });
+  videoSelected.clear();
+  videoSelectMode=false;
+  document.getElementById('selectModeBtn').textContent='選択';
+  document.getElementById('selectModeBtn').style.color='var(--muted)';
+  document.getElementById('selectToolbar').style.display='none';
+  renderVideoManagementList();
+}
+
+
+function drawScoreGraph(scores){
+  const svg=document.getElementById('scoreChart');
+  svg.innerHTML='';
+  
+  const w=400,h=300,padding=40;
+  const graphW=w-padding*2,graphH=h-padding*2;
+  
+  // Draw axes
+  const axes=document.createElementNS('http://www.w3.org/2000/svg','g');
+  axes.innerHTML=`
+    <line x1="${padding}" y1="${h-padding}" x2="${w-padding}" y2="${h-padding}" stroke="var(--border)" stroke-width="1"/>
+    <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${h-padding}" stroke="var(--border)" stroke-width="1"/>
+    <text x="10" y="${padding-10}" font-size="10" fill="var(--muted)">100</text>
+    <text x="10" y="${h-padding+15}" font-size="10" fill="var(--muted)">0</text>
+  `;
+  svg.appendChild(axes);
+  
+  // Draw line
+  const points=scores.map((s,i)=>{
+    const x=padding+(i/(scores.length-1||1))*graphW;
+    const y=h-padding-(s.score/100)*graphH;
+    return `${x},${y}`;
+  }).join(' ');
+  
+  const line=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+  line.setAttribute('points',points);
+  line.setAttribute('stroke','var(--accent)');
+  line.setAttribute('stroke-width','2');
+  line.setAttribute('fill','none');
+  svg.appendChild(line);
+  
+  // Draw points
+  scores.forEach((s,i)=>{
+    const x=padding+(i/(scores.length-1||1))*graphW;
+    const y=h-padding-(s.score/100)*graphH;
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',x);
+    circle.setAttribute('cy',y);
+    circle.setAttribute('r','3');
+    circle.setAttribute('fill','var(--accent)');
+    svg.appendChild(circle);
+  });
+}
+
+
+function loadFeed(){const c=document.getElementById('feedCards');if(!c)return;c.innerHTML='';const idxs=[];while(idxs.length<3){const i=Math.floor(Math.random()*FEEDS.length);if(!idxs.includes(i))idxs.push(i);}idxs.forEach(i=>{const f=FEEDS[i];const d=document.createElement('div');d.className='feed-card';d.innerHTML=`<div class="feed-tag">${f.tag}</div><div class="feed-title">${f.title}</div><div class="feed-body">${f.body}</div>`;c.appendChild(d);});}
+
+
+function nextCalMonth(){
+  calendarMonthDate.setMonth(calendarMonthDate.getMonth()+1);
+  renderCalendar();
+}
+
+
+function prevCalMonth(){
+  calendarMonthDate.setMonth(calendarMonthDate.getMonth()-1);
+  renderCalendar();
+}
+
+
+function renderCalendar(){
+  const grid=document.getElementById('calendarGrid');
+  if(!grid)return; // グリッドが見つからない場合は処理しない
+  
+  const year=calendarMonthDate.getFullYear();
+  const month=calendarMonthDate.getMonth();
+  
+  // Month/Year header
+  const monthName=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month];
+  const headerEl=document.getElementById('calMonthYear');
+  if(headerEl)headerEl.textContent=`${monthName} ${year}`;
+  
+  // Get days in month
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  
+  grid.innerHTML='';
+  
+  // Day headers
+  ['S','M','T','W','T','F','S'].forEach(d=>{
+    const header=document.createElement('div');
+    header.style.cssText='color:var(--muted);font-weight:bold;padding:4px';
+    header.textContent=d;
+    grid.appendChild(header);
+  });
+  
+  // Empty cells
+  for(let i=0;i<firstDay;i++){
+    const empty=document.createElement('div');
+    grid.appendChild(empty);
+  }
+  
+  // Days
+  for(let day=1;day<=daysInMonth;day++){
+    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const hasData=allData[dateStr];
+    const dayEl=document.createElement('button');
+    dayEl.style.cssText=`
+      padding:6px;border-radius:6px;border:1px solid var(--border);
+      background:${hasData?'var(--accent)':'var(--surface)'};
+      color:${hasData?'var(--black)':'var(--text)'};
+      cursor:pointer;font-weight:bold;font-size:12px
+    `;
+    dayEl.textContent=day;
+    dayEl.onclick=()=>startEditMode(dateStr);
+    grid.appendChild(dayEl);
+  }
+}
+
+
+function renderMotivQuotePreview(){
+  const el=document.getElementById('motivQuotePreview');
+  if(!el)return;
+  if(quotes.length===0){el.textContent='Quoteなし';return;}
+  const q=quotes[Math.floor(Math.random()*quotes.length)];
+  el.textContent='"'+q.text+'"';
+}
+
+
+function renderQuotesList(){
+  const el=document.getElementById('quotesList');
+  el.innerHTML='';
+  quotes.forEach((q,i)=>{
+    const div=document.createElement('div');
+    div.className='card';
+    div.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:14px;color:var(--accent);line-height:1.6;font-style:italic">"${q.text}"</div>
+        </div>
+        <button class="del-btn" onclick="delQuote(${i})">×</button>
+      </div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+
+function renderVideoManagementList(){
+  const el=document.getElementById('videoManagementList');
+  const countEl=document.getElementById('videoCount');
+  if(countEl)countEl.textContent=`(${videos.length})`;
+  el.innerHTML='';
+  if(videos.length===0){
+    el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Videosなし<br><span style="font-size:11px">+ Add VideoからAddしてください</span></div>';
+    return;
+  }
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px';
+  videos.forEach((v,i)=>{
+    const card=document.createElement('div');
+    card.style.cssText='position:relative;border-radius:8px;overflow:hidden;background:#111;aspect-ratio:9/16;cursor:pointer';
+    // video要素でサムネ表示
+    const vid=document.createElement('video');
+    vid.muted=true;
+    vid.preload='metadata';
+    vid.style.cssText='width:100%;height:100%;object-fit:cover;display:block';
+    vid.addEventListener('loadedmetadata',()=>{vid.currentTime=0.5;});
+    // URLが無効ならIndexedDBから再取得
+    const loadThumb=(url)=>{vid.src=url;};
+    const loadFromDB=async()=>{
+      try{
+        if(!db)await initDB();
+        const tx=db.transaction(STORE_NAME,'readonly');
+        const req=tx.objectStore(STORE_NAME).get(v.id);
+        req.onsuccess=()=>{
+          if(req.result?.blob){
+            const url=URL.createObjectURL(req.result.blob);
+            videos[i].url=url;
+            loadThumb(url);
+          }
+        };
+      }catch(e){}
+    };
+    if(v.url){
+      loadThumb(v.url);
+      vid.onerror=()=>loadFromDB(); // URL無効時に再取得
+    }else{
+      loadFromDB();
+    }
+    // 再生ボタンオーバーレイ
+    const play=document.createElement('div');
+    play.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.3)';
+    play.innerHTML=`<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center"><div style="width:0;height:0;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:3px"></div></div><div style="color:#fff;font-size:10px;margin-top:6px;max-width:90%;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</div>`;
+    // 削除ボタン
+    const del=document.createElement('button');
+    del.textContent='×';
+    del.style.cssText='position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:24px;height:24px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2';
+    del.ontouchend=(e)=>{e.stopPropagation();e.preventDefault();delVideo(i);};
+    del.onclick=(e)=>{e.stopPropagation();delVideo(i);};
+    card.addEventListener('touchstart',e=>{touchStartY=e.changedTouches[0].clientY;},{passive:true});
+    // 選択オーバーレイ
+    if(videoSelectMode){
+      const sel=document.createElement('div');
+      const checked=videoSelected.has(i);
+      sel.style.cssText=`position:absolute;inset:0;z-index:3;background:${checked?'rgba(255,200,0,.3)':'transparent'};display:flex;align-items:flex-start;justify-content:flex-start;padding:6px`;
+      sel.innerHTML=`<div style="width:20px;height:20px;border-radius:50%;border:2px solid #fff;background:${checked?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:12px">${checked?'✓':''}</div>`;
+      card.appendChild(sel);
+      card.addEventListener('click',()=>{
+        if(videoSelected.has(i))videoSelected.delete(i);
+        else videoSelected.add(i);
+        updateSelectCount();
+        renderVideoManagementList();
+      });
+    }else{
+      card.addEventListener('click',e=>{
+        if(e.target===del)return;
+        openVideoPreview(i);
+      });
+      card.addEventListener('touchend',e=>{
+        if(e.target===del)return;
+        if(Math.abs(e.changedTouches[0].clientY-touchStartY)>10)return;
+        e.preventDefault();
+        openVideoPreview(i);
+      });
+    }
+    card.appendChild(vid);
+    card.appendChild(play);
+    card.appendChild(del);
+    grid.appendChild(card);
+  });
+  el.appendChild(grid);
+}
+
+
+function saveQuotes(){localStorage.setItem('ym4_quotes',JSON.stringify(quotes));}
+
+
+function selectAllVideos(){
+  videos.forEach((_,i)=>videoSelected.add(i));
+  updateSelectCount();
+  renderVideoManagementList();
+}
+
+
+function setRecordPeriod(days){
+  recordPeriod=days;
+  document.querySelectorAll('.record-filter-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderRecord();
+}
+
+
+function switchMotivationView(view){
+  const home=document.getElementById('motivationHome');
+  if(home)home.style.display=view==='home'?'grid':'none';
+  document.getElementById('quotesView').style.display=view==='quotes'?'block':'none';
+  document.getElementById('optionView').style.display=view==='option'?'block':'none';
+  
+  if(view==='videos'){
+    if(videos.length>0){
+      playVideoFullscreen();
+    }else{
+      alert('Videosがありません。OptionからAddしてください');
+      // Show home view instead
+      if(home)home.style.display='grid';
+      return;
+    }
+  }
+  if(view==='option') renderVideoManagementList();
+  if(view==='home') renderMotivQuotePreview();
+}
+
+
+function toggleVideoSelectMode(){
+  videoSelectMode=!videoSelectMode;
+  videoSelected.clear();
+  document.getElementById('selectModeBtn').textContent=videoSelectMode?'キャンセル':'選択';
+  document.getElementById('selectModeBtn').style.color=videoSelectMode?'var(--accent)':'var(--muted)';
+  const tb=document.getElementById('selectToolbar');
+  tb.style.display=videoSelectMode?'flex':'none';
+  renderVideoManagementList();
+}
+
+
+function updateSelectCount(){
+  const el=document.getElementById('selectCount');
+  if(el)el.textContent=`${videoSelected.size}件選択中`;
+}
+
+
+function uploadVideo(){
+  const files=document.getElementById('videoUpload').files;
+  if(files.length===0)return;
+  
+  Array.from(files).forEach(file=>{
+    const id='v'+Date.now()+Math.random();
+    const url=URL.createObjectURL(file);
+    videos.push({id,name:file.name,url});
+    saveVideoToIndexedDB(id,file.name,file).catch(e=>console.error('IndexedDB save failed',e));
+  });
+  
+  localStorage.setItem('ym4_video_count',String(videos.length));
+  renderVideoManagementList();
+}
 </script>
 </body>
 </html>
