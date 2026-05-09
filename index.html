@@ -278,17 +278,9 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 
 <div class="section" id="tab-check">
   <div id="hero-check"></div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <button id="checkClearBtn" onclick="clearAllChecks()" style="display:none;background:none;border:0.5px solid #f44;border-radius:8px;color:#f44;font-size:12px;padding:5px 10px;cursor:pointer">All Delete</button>
-    <div style="flex:1"></div>
-    <button id="checkEditBtn" onclick="toggleCheckEditMode()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 10px;cursor:pointer">Edit</button>
-  </div>
   <div class="card" id="checklist"></div>
   <button class="add-btn" style="margin-top:0" onclick="openModal('check')">+ Add Item</button>
-  <div style="margin-top:16px">
-    <div style="font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:6px">MEMO</div>
-    <textarea id="checkMemo" placeholder="Memo..." style="width:100%;min-height:100px;padding:12px;border:0.5px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-size:14px;font-family:inherit;resize:none;box-sizing:border-box;line-height:1.6" oninput="state.checkMemo=this.value;saveState()"></textarea>
-  </div>
+</div>
 
 <div class="section" id="tab-health">
   <div id="hero-health"></div>
@@ -716,7 +708,7 @@ function getInitialState(){
   const prevItems=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.checkItems||DEFAULT_CHECK_ITEMS)):JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS));
   const prevGoal=prevKey?(allData[prevKey]?.goalMins||DEFAULT_GOAL_MINS):DEFAULT_GOAL_MINS;
   const prevSubjects=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.subjects||DEFAULT_SUBJECTS)):JSON.parse(JSON.stringify(DEFAULT_SUBJECTS));
-  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null,checkMemo:''};
+  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null};
 }
 
 let state=getInitialState();
@@ -1332,129 +1324,46 @@ function stopTimer(save){clearInterval(timerInterval);timerInterval=null;timerAc
 function minimizeTimer(){timerRunning=false;document.getElementById('timerPlayPause').textContent='▶';document.getElementById('timerOverlay').classList.remove('active');const b=timerBi>=0?subjects[timerSi]?.books[timerBi]?.name:'';document.getElementById('timerMiniText').textContent=(b||'Timer')+' — paused';document.getElementById('timerMini').classList.add('visible');}
 function showTimer(){document.getElementById('timerOverlay').classList.add('active');document.getElementById('timerMini').classList.remove('visible');}
 
-let checkEditMode=false;
-
-function toggleCheckEditMode(){
-  checkEditMode=!checkEditMode;
-  const btn=document.getElementById('checkEditBtn');
-  const clearBtn=document.getElementById('checkClearBtn');
-  btn.textContent=checkEditMode?'Done':'Edit';
-  btn.style.color=checkEditMode?'var(--accent)':'var(--muted)';
-  btn.style.borderColor=checkEditMode?'var(--accent)':'var(--border)';
-  clearBtn.style.display=checkEditMode?'block':'none';
-  renderChecks();
-}
-
-function clearAllChecks(){
-  const modal=document.createElement('div');
-  modal.className='modal-bg';
-  modal.innerHTML=`<div class="modal" style="text-align:center">
-    <div class="modal-title">All Delete</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">全ての項目を削除しますか？</div>
-    <div style="display:flex;gap:8px">
-      <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
-      <button class="modal-ok" style="flex:1;background:#f44" onclick="
-        checkItems.splice(0,checkItems.length);
-        state.checks={};
-        saveChecks();renderChecks();calcScore();saveState();
-        this.closest('.modal-bg').remove();
-      ">Delete</button>
-    </div>
-  </div>`;
-  document.body.appendChild(modal);modal.classList.add('open');
-}
-
-function editCheckLabel(i){
-  const modal=document.createElement('div');
-  modal.className='modal-bg';
-  modal.innerHTML=`<div class="modal">
-    <div class="modal-title">Rename Item</div>
-    <input class="modal-input" id="checkLabelInput" value="${checkItems[i].label}" placeholder="項目名">
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
-      <button class="modal-ok" style="flex:1" onclick="
-        const v=document.getElementById('checkLabelInput').value.trim();
-        if(v){checkItems[${i}].label=v;saveChecks();renderChecks();saveState();}
-        this.closest('.modal-bg').remove();
-      ">Save</button>
-    </div>
-  </div>`;
-  document.body.appendChild(modal);modal.classList.add('open');
-  setTimeout(()=>document.getElementById('checkLabelInput')?.focus(),100);
-}
-
 function renderChecks(){
   const el=document.getElementById('checklist');el.innerHTML='';
-  let dragSrc=null;
   checkItems.forEach((c,i)=>{
     const done=!!state.checks[c.id];
     const div=document.createElement('div');
     div.className='check-item'+(done?' done':'');
-    div.style.cssText='display:flex;align-items:center';
-
-    if(checkEditMode){
-      const handle=document.createElement('span');
-      handle.textContent='☰';
-      handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none';
-      handle.addEventListener('touchstart',e=>{dragSrc=i;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
-      div.appendChild(handle);
-    }
-
+    
     const checkBox=document.createElement('div');
     checkBox.className='check-box'+(done?' done':'');
-    if(!checkEditMode)checkBox.onclick=()=>toggleCheck(c.id,checkBox);
-    div.appendChild(checkBox);
-
+    checkBox.onclick=()=>toggleCheck(c.id,checkBox);
+    
     const label=document.createElement('span');
-    label.className='check-label';label.textContent=c.label;label.style.flex='1';
-    if(checkEditMode){label.style.cursor='pointer';label.onclick=()=>editCheckLabel(i);}
-    else label.onclick=()=>toggleCheck(c.id,checkBox);
-    div.appendChild(label);
-
+    label.className='check-label';
+    label.textContent=c.label;
+    label.onclick=()=>toggleCheck(c.id,checkBox);
+    
     const delBtn=document.createElement('button');
-    delBtn.className='check-del';delBtn.textContent='×';delBtn.type='button';
+    delBtn.className='check-del';
+    delBtn.textContent='×';
+    delBtn.type='button';
     delBtn.onclick=(e)=>{
-      e.preventDefault();e.stopPropagation();
-      const modal=document.createElement('div');
-      modal.className='modal-bg';
-      modal.innerHTML=`<div class="modal" style="text-align:center">
-        <div class="modal-title">Delete</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:16px">"${c.label}"を削除しますか？</div>
-        <div style="display:flex;gap:8px">
-          <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
-          <button class="modal-ok" style="flex:1;background:#f44" onclick="
-            checkItems.splice(${i},1);saveChecks();renderChecks();calcScore();saveState();
-            this.closest('.modal-bg').remove();
-          ">Delete</button>
-        </div>
-      </div>`;
-      document.body.appendChild(modal);modal.classList.add('open');
+      e.preventDefault();
+      e.stopPropagation();
+      if(confirm('Delete?')){
+        checkItems.splice(i,1);
+        saveChecks();
+        renderChecks();
+        calcScore();
+        saveState();
+      }
     };
+    
+    div.appendChild(checkBox);
+    div.appendChild(label);
     div.appendChild(delBtn);
-
-    if(checkEditMode){
-      div.addEventListener('touchmove',e=>{
-        e.preventDefault();
-        const touch=e.touches[0];
-        const target=document.elementFromPoint(touch.clientX,touch.clientY);
-        const targetItem=target?.closest('.check-item');
-        if(targetItem&&targetItem!==div){
-          const items=[...el.children];
-          const toIdx=items.indexOf(targetItem);
-          if(toIdx>=0&&toIdx!==dragSrc){
-            const moved=checkItems.splice(dragSrc,1)[0];
-            checkItems.splice(toIdx,0,moved);
-            dragSrc=toIdx;
-            saveChecks();renderChecks();saveState();
-          }
-        }
-      },{passive:false});
-      div.addEventListener('touchend',()=>{div.style.opacity='1';dragSrc=null;});
-    }
     el.appendChild(div);
   });
 }
 function toggleCheck(id,box){state.checks[id]=!state.checks[id];const done=state.checks[id];box.closest('.check-item').className='check-item'+(done?' done':'');box.className='check-box'+(done?' done':'');saveState();calcScore();}
+
 // ===== EXERCISE =====
 function switchHealthView(view){
   document.getElementById('healthOverview').style.display='none';
@@ -1685,8 +1594,6 @@ document.getElementById('diaryText').value=state.diary||'';
 document.getElementById('diaryText').addEventListener('input',e=>{state.diary=e.target.value;saveState()});
 document.getElementById('healthMemo').value=state.healthMemo||'';
 document.getElementById('healthMemo').addEventListener('input',e=>{state.healthMemo=e.target.value;saveState()});
-const _checkMemoEl=document.getElementById('checkMemo');
-if(_checkMemoEl){_checkMemoEl.value=state.checkMemo||'';}
 document.getElementById('healthOverview').style.display='block';
 document.getElementById('bodyWeightInput').value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'';
 if(state.bodyFat){const el=document.getElementById('bodyFatInput');if(el)el.value=state.bodyFat;}
@@ -2721,7 +2628,6 @@ function setupVideoScrollObserver(){
       if(entry.intersectionRatio>0.7){
         // この動画が画面の大半を占めてる→再生
         loadVideoForItem(item);
-        video.currentTime=0;
         video.muted=false;
         video.play().catch(()=>{video.muted=true;video.play().catch(()=>{});});
         currentVideoIdx=+video.dataset.vidIdx;
@@ -3329,7 +3235,6 @@ function startEditMode(date){
   const bwEl=document.getElementById('bodyWeightInput');
   if(diaryEl) diaryEl.value=state.diary||'';
   if(healthMemoEl) healthMemoEl.value=state.healthMemo||'';
-  const _cmEl=document.getElementById('checkMemo');if(_cmEl)_cmEl.value=state.checkMemo||'';
   if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'';
   const _bfEl=document.getElementById('bodyFatInput');if(_bfEl)_bfEl.value=state.bodyFat||'';
   const _mmEl=document.getElementById('muscleMassInput');if(_mmEl)_mmEl.value=state.muscleMass||'';
@@ -3375,7 +3280,6 @@ function cancelEdit(){
   const bwEl=document.getElementById('bodyWeightInput');
   if(diaryEl) diaryEl.value=state.diary||'';
   if(healthMemoEl) healthMemoEl.value=state.healthMemo||'';
-  const _cmEl=document.getElementById('checkMemo');if(_cmEl)_cmEl.value=state.checkMemo||'';
   if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'';
   const _bfEl=document.getElementById('bodyFatInput');if(_bfEl)_bfEl.value=state.bodyFat||'';
   const _mmEl=document.getElementById('muscleMassInput');if(_mmEl)_mmEl.value=state.muscleMass||'';
