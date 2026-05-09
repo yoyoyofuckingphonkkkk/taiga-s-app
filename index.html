@@ -268,7 +268,11 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 <div class="tab-content-wrap" id="tabContentWrap" style="min-height:100vh">
 <div class="section active" id="tab-study">
   <div id="hero-study"></div>
-  <button onclick="showGraphModal()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em;margin-bottom:12px">GRAPH</button>
+  <div style="display:flex;gap:6px;margin-bottom:12px">
+    <button onclick="showGraphModal()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GRAPH</button>
+    <button onclick="openGoalsView()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GOALS</button>
+  </div>
+  <div id="goalsPreview"></div>
   <div id="subjectList"></div>
 </div>
 
@@ -290,21 +294,68 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
   </div>
   
   <!-- Overview tab -->
-  <div id="healthOverview">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-      <span style="font-size:12px;color:var(--muted);flex:1">体重（カロリー計算用）</span>
-      <input type="number" id="bodyWeightInput" min="30" max="200" style="width:70px;padding:6px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;text-align:center" oninput="state.bodyWeight=+this.value;localStorage.setItem('ym4_bodyweight',this.value);saveState();renderWeightGraph()">
-      <span style="font-size:12px;color:var(--muted)">kg</span>
+  <div id="healthOverview" style="display:none">
+    <!-- Body Composition -->
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="health-section-label" style="margin:0">Body</div>
+        <button onclick="toggleBodyDetails()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:11px;padding:4px 10px;cursor:pointer" id="bodyDetailsBtn">詳細</button>
+      </div>
+      <!-- メイン入力（常時表示） -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="background:var(--surface2);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:10px;color:var(--muted)">体重</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" id="bodyWeightInput" min="30" max="200" step="0.1" style="flex:1;padding:4px;border:none;background:transparent;color:var(--text);font-size:20px;font-family:'Bebas Neue',sans-serif;width:0" oninput="saveBodyComp()">
+            <span style="font-size:11px;color:var(--muted)">kg</span>
+          </div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:10px;color:var(--muted)">体脂肪率 <span style="color:var(--accent);font-size:9px">AUTO</span></div>
+          <div style="font-size:20px;font-family:'Bebas Neue',sans-serif;color:var(--text)" id="bodyFatDisplay">—</div>
+          <div style="font-size:9px;color:var(--muted)">% (BMI推定)</div>
+          <input type="hidden" id="bodyFatInput">
+        </div>
+      </div>
+      <!-- 詳細入力（折りたたみ） -->
+      <div id="bodyDetailsSection" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div style="background:var(--surface2);border-radius:10px;padding:10px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:4px">BMI</div>
+            <div style="font-size:20px;font-family:'Bebas Neue',sans-serif;color:var(--text)" id="bmiDisplay">—</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:10px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:4px">身長</div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" id="heightInput" min="100" max="250" step="0.1" placeholder="170" style="flex:1;padding:4px;border:none;background:transparent;color:var(--text);font-size:20px;font-family:'Bebas Neue',sans-serif;width:0" oninput="saveBodyComp()">
+              <span style="font-size:11px;color:var(--muted)">cm</span>
+            </div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:10px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:4px">年齢</div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" id="ageInput" min="10" max="100" placeholder="17" style="flex:1;padding:4px;border:none;background:transparent;color:var(--text);font-size:20px;font-family:'Bebas Neue',sans-serif;width:0" oninput="saveBodyComp()">
+              <span style="font-size:11px;color:var(--muted)">歳</span>
+            </div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:10px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px">性別</div>
+            <div style="display:flex;gap:8px">
+              <button id="genderMale" onclick="setGender('male')" style="flex:1;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer">男性</button>
+              <button id="genderFemale" onclick="setGender('female')" style="flex:1;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer">女性</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+      <div id="weightGraphContainer" style="margin-bottom:4px"></div>
+      <div id="bodyCompGraphContainer"></div>
     </div>
-    <div id="weightGraphContainer" style="margin-bottom:12px"></div>
     <div class="health-grid" id="healthGrid"></div>
     <div style="margin-top:14px">
       <div class="sec-label">Body Memo</div>
       <textarea class="diary-area" id="healthMemo" placeholder="体調メモ..." style="min-height:80px"></textarea>
     </div>
-  </div>
-  
-  <!-- Workout tab -->
   <div id="healthStrength" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div class="health-section-label" style="margin:0">Today's Workout</div>
@@ -399,7 +450,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 <div class="section" id="tab-motivation">
   <div id="hero-motivation"></div>
   
-  <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:12px">
+  <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;gap:12px">
     
     <!-- Tap to Play - big left -->
     <div style="grid-column:1;grid-row:1/3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px;cursor:pointer" onclick="switchMotivationView('videos')">
@@ -416,6 +467,15 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <div style="grid-column:2;grid-row:2;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;cursor:pointer;min-height:120px;overflow:hidden" onclick="switchMotivationView('quotes')">
       <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:8px">QUOTES</div>
       <div id="motivQuotePreview" style="font-size:13px;color:var(--accent);font-style:italic;line-height:1.5"></div>
+    </div>
+
+    <!-- AI Coach - full width bottom -->
+    <div style="grid-column:1/3;grid-row:3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;cursor:pointer" onclick="openAICoach()">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.1em">AI COACH</div>
+        <div id="aiCoachDot" style="width:8px;height:8px;border-radius:50%;background:var(--muted)"></div>
+      </div>
+      <div id="aiCoachPreview" style="font-size:12px;color:var(--muted);line-height:1.5">今日のフィードバックを受け取る</div>
     </div>
     
   </div>
@@ -447,6 +507,67 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
         <button onclick="deleteSelectedVideos()" style="background:#f44;border:none;border-radius:8px;color:#fff;font-size:12px;padding:5px 10px;cursor:pointer">削除</button>
       </div>
       <div id="videoManagementList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- AI Coach overlay -->
+<div id="aiCoachOverlay" style="display:none;position:fixed;inset:0;background:#000;z-index:1100;flex-direction:column">
+  <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border);padding-top:max(14px,env(safe-area-inset-top));flex-shrink:0">
+    <button onclick="closeAICoach()" style="background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px 10px">←</button>
+    <div style="flex:1;text-align:center;font-family:var(--serif);font-style:italic;font-size:18px;letter-spacing:.1em">AI Coach</div>
+    <div id="aiCoachDate" style="font-size:11px;color:var(--muted);padding-right:10px"></div>
+  </div>
+  <div id="aiCoachContent" style="flex:1;overflow-y:auto;padding:20px 16px;overscroll-behavior:contain"></div>
+  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));border-top:0.5px solid var(--border);flex-shrink:0">
+    <button id="aiCoachBtn" onclick="requestAICoach()" style="width:100%;padding:14px;background:var(--accent);border:none;color:#000;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.1em;border-radius:10px;cursor:pointer">今日のフィードバックを受け取る</button>
+  </div>
+</div>
+
+<!-- Goals overlay -->
+<div id="goalsOverlay" style="display:none;position:fixed;inset:0;background:#000;z-index:1100;flex-direction:column">
+  <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border);padding-top:max(14px,env(safe-area-inset-top));flex-shrink:0">
+    <button onclick="closeGoalsView()" style="background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px 10px">←</button>
+    <div style="flex:1;text-align:center;font-family:var(--serif);font-style:italic;font-size:18px;letter-spacing:.1em">Goals</div>
+    <button onclick="openAddGoal()" style="background:none;border:0.5px solid var(--accent);border-radius:8px;color:var(--accent);font-size:12px;cursor:pointer;padding:5px 10px">+ Add</button>
+  </div>
+  <div id="goalsList" style="flex:1;overflow-y:auto;padding:14px 16px"></div>
+</div>
+
+<!-- Add Goal modal -->
+<div id="addGoalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1150;align-items:center;justify-content:center">
+  <div style="background:var(--surface);width:90%;max-width:400px;border-radius:14px;padding:18px">
+    <div style="font-family:var(--serif);font-style:italic;font-size:17px;text-align:center;margin-bottom:14px">New Goal</div>
+    
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px">タイトル</div>
+    <input type="text" id="goalTitle" placeholder="例：英検準1級" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box;margin-bottom:10px">
+    
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px">対象</div>
+    <select id="goalScope" onchange="updateGoalScopeOptions()" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box;margin-bottom:10px">
+      <option value="total">全体（全科目合計）</option>
+      <option value="subject">科目</option>
+      <option value="book">参考書</option>
+    </select>
+    
+    <div id="goalTargetWrap" style="display:none;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">対象を選択</div>
+      <select id="goalTargetSelect" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box"></select>
+    </div>
+    
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="flex:1">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">目標時間（h）</div>
+        <input type="number" id="goalHours" min="1" placeholder="50" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="flex:1">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">期限</div>
+        <input type="date" id="goalDeadline" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+    </div>
+    
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="closeAddGoal()" class="modal-cancel" style="flex:1">Cancel</button>
+      <button onclick="saveGoal()" class="modal-ok" style="flex:1">Save</button>
     </div>
   </div>
 </div>
@@ -557,7 +678,11 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 <script>
-const TODAY_KEY=new Date().toISOString().slice(0,10);
+// 4時前は前日扱い
+const _now=new Date();
+const _adjustedDate=new Date(_now);
+if(_now.getHours()<4)_adjustedDate.setDate(_adjustedDate.getDate()-1);
+const TODAY_KEY=_adjustedDate.toISOString().slice(0,10);
 
 // 月曜日バックアップリマインダー
 (()=>{
@@ -604,7 +729,7 @@ function getInitialState(){
   const prevItems=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.checkItems||DEFAULT_CHECK_ITEMS)):JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS));
   const prevGoal=prevKey?(allData[prevKey]?.goalMins||DEFAULT_GOAL_MINS):DEFAULT_GOAL_MINS;
   const prevSubjects=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.subjects||DEFAULT_SUBJECTS)):JSON.parse(JSON.stringify(DEFAULT_SUBJECTS));
-  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null};
+  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null};
 }
 
 let state=getInitialState();
@@ -1121,6 +1246,7 @@ function renderStudy(){
   addBtn.className='add-btn';addBtn.textContent='+ Add Subject';
   addBtn.onclick=()=>openModal('subject');
   el.appendChild(addBtn);updateRing();
+  if(typeof renderGoalsPreview==='function')renderGoalsPreview();
 }
 
 function editSubjectName(si){
@@ -1489,8 +1615,18 @@ document.getElementById('diaryText').value=state.diary||'';
 document.getElementById('diaryText').addEventListener('input',e=>{state.diary=e.target.value;saveState()});
 document.getElementById('healthMemo').value=state.healthMemo||'';
 document.getElementById('healthMemo').addEventListener('input',e=>{state.healthMemo=e.target.value;saveState()});
-document.getElementById('bodyWeightInput').value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
+document.getElementById('healthOverview').style.display='block';
+document.getElementById('bodyWeightInput').value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'';
+if(state.bodyFat){const el=document.getElementById('bodyFatInput');if(el)el.value=state.bodyFat;}
+if(state.muscleMass){const el=document.getElementById('muscleMassInput');if(el)el.value=state.muscleMass;}
+if(state.skeletalMuscle){const el=document.getElementById('skeletalMuscleInput');if(el)el.value=state.skeletalMuscle;}
+const _h=localStorage.getItem('ym4_height');if(_h){const el=document.getElementById('heightInput');if(el)el.value=_h;}
+const _age=localStorage.getItem('ym4_age');if(_age){const el=document.getElementById('ageInput');if(el)el.value=_age;}
+const _gender=localStorage.getItem('ym4_gender')||'male';
+if(document.getElementById('genderMale'))setGender(_gender);
+updateBMI();
 renderWeightGraph();
+renderBodyCompGraph();
 const NUTRITION_GOAL_FIELDS=[
   {key:'calories',label:'Calories',unit:'kcal'},
   {key:'protein',label:'Protein',unit:'g'},
@@ -1802,6 +1938,342 @@ async function restoreMealPhotos(){
       const dayData=allData[TODAY_KEY]?.meals?.find(m=>m.id===meal.id);
       if(dayData?.photoUrl)meal.photoUrl=dayData.photoUrl;
     }
+  }
+}
+
+// ===== AI COACH =====
+function openAICoach(){
+  document.getElementById('aiCoachOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+  document.getElementById('aiCoachDate').textContent=TODAY_KEY;
+  
+  // 既存のフィードバックを表示
+  const saved=JSON.parse(localStorage.getItem('ym4_coach_'+TODAY_KEY)||'null');
+  if(saved){
+    renderCoachFeedback(saved);
+    document.getElementById('aiCoachBtn').textContent='再取得する';
+  }else{
+    document.getElementById('aiCoachContent').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:60px 20px;line-height:1.8">下のボタンを押すと、<br>今日の記録をもとにAIが<br>フィードバックをくれます。</div>';
+    document.getElementById('aiCoachBtn').textContent='今日のフィードバックを受け取る';
+  }
+}
+
+function closeAICoach(){
+  document.getElementById('aiCoachOverlay').style.display='none';
+  document.body.style.overflow='auto';
+  // プレビュー更新
+  const saved=JSON.parse(localStorage.getItem('ym4_coach_'+TODAY_KEY)||'null');
+  const dot=document.getElementById('aiCoachDot');
+  const preview=document.getElementById('aiCoachPreview');
+  if(saved){
+    if(dot)dot.style.background='var(--accent)';
+    if(preview)preview.textContent=saved.summary||'フィードバック済み';
+  }
+}
+
+async function requestAICoach(){
+  const key=localStorage.getItem('ym4_ai_key');
+  if(!key){alert('AIチャットからAPIキーを設定してください');return;}
+  
+  const btn=document.getElementById('aiCoachBtn');
+  btn.textContent='分析中...';btn.disabled=true;
+  
+  // 今日のデータ集計
+  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study?.[s.id]?.[b.id]||0),0),0);
+  const checks=Object.values(state.checks||{});
+  const checkDone=checks.filter(Boolean).length;
+  const checkTotal=checkItems.length;
+  const meals=state.meals||[];
+  const hasMeals=meals.length>0;
+  const totalCal=meals.filter(m=>m.nutrition).reduce((a,m)=>a+(m.nutrition.calories||0),0);
+  const score=calcScoreFor(state);
+  
+  const studyDetails=subjects.map(s=>{
+    const tot=s.books.reduce((a,b)=>a+(state.study?.[s.id]?.[b.id]||0),0);
+    if(tot===0)return null;
+    return `${s.name}: ${Math.floor(tot/60)}h${tot%60}m`;
+  }).filter(Boolean).join('、');
+  
+  const prompt=`あなたは厳しくも温かいパーソナルコーチです。以下は今日の記録です。日本語で、簡潔に3つのセクションに分けてフィードバックしてください。
+
+【今日の記録】
+- LIFE SCORE: ${score}点
+- 勉強時間: ${Math.floor(sm/60)}時間${sm%60}分${studyDetails?`（${studyDetails}）`:''}
+- 目標達成率: ${Math.round(sm/(state.goalMins||360)*100)}%
+- チェック: ${checkDone}/${checkTotal}完了
+- 運動: ${state.health?.exercise||0}分
+${hasMeals?`- 食事: ${meals.length}食、合計${Math.round(totalCal)}kcal`:'- 食事: 記録なし'}
+${state.diary?`- 日記: あり（${state.diary.length}文字）`:'- 日記: なし'}
+
+以下のJSON形式のみで返答してください（前後に文章不要）:
+{
+  "summary": "一言で今日を表す（20文字以内）",
+  "good": "良かった点（2〜3文、具体的に）",
+  "improve": "改善点・明日への提案（2〜3文、具体的に）",
+  "message": "明日への一言メッセージ（力強く、短く）"
+}`;
+
+  try{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}]})
+    });
+    const data=await res.json();
+    if(data.error)throw new Error(data.error.message);
+    const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const json=JSON.parse(text.replace(/```json|```/g,'').trim());
+    localStorage.setItem('ym4_coach_'+TODAY_KEY,JSON.stringify(json));
+    renderCoachFeedback(json);
+    btn.textContent='再取得する';
+    // プレビュー更新
+    const dot=document.getElementById('aiCoachDot');
+    const preview=document.getElementById('aiCoachPreview');
+    if(dot)dot.style.background='var(--accent)';
+    if(preview)preview.textContent=json.summary||'フィードバック済み';
+  }catch(e){
+    alert('エラー: '+e.message);
+    btn.textContent='今日のフィードバックを受け取る';
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+function renderCoachFeedback(f){
+  document.getElementById('aiCoachContent').innerHTML=`
+    <div style="font-family:var(--serif);font-style:italic;font-size:22px;text-align:center;color:var(--accent);margin-bottom:24px;line-height:1.3">"${f.summary}"</div>
+    <div style="margin-bottom:18px">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">GOOD</div>
+      <div style="background:var(--surface);border-radius:12px;padding:14px;font-size:13px;line-height:1.8;color:var(--text);border-left:2px solid var(--green)">${f.good}</div>
+    </div>
+    <div style="margin-bottom:18px">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">IMPROVE</div>
+      <div style="background:var(--surface);border-radius:12px;padding:14px;font-size:13px;line-height:1.8;color:var(--text);border-left:2px solid var(--accent)">${f.improve}</div>
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">TOMORROW</div>
+      <div style="background:var(--surface);border-radius:12px;padding:14px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.05em;color:var(--text);text-align:center">${f.message}</div>
+    </div>
+  `;
+}
+
+// ===== STUDY GOALS =====
+let studyGoals=JSON.parse(localStorage.getItem('ym4_study_goals')||'[]');
+
+function saveStudyGoals(){localStorage.setItem('ym4_study_goals',JSON.stringify(studyGoals));}
+
+function openGoalsView(){
+  document.getElementById('goalsOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+  renderGoalsList();
+}
+function closeGoalsView(){
+  document.getElementById('goalsOverlay').style.display='none';
+  document.body.style.overflow='auto';
+  renderGoalsPreview();
+}
+
+function openAddGoal(){
+  document.getElementById('addGoalOverlay').style.display='flex';
+  document.getElementById('goalTitle').value='';
+  document.getElementById('goalScope').value='total';
+  document.getElementById('goalHours').value='';
+  const d=new Date();d.setDate(d.getDate()+30);
+  document.getElementById('goalDeadline').value=d.toISOString().slice(0,10);
+  document.getElementById('goalTargetWrap').style.display='none';
+  updateGoalScopeOptions();
+}
+function closeAddGoal(){document.getElementById('addGoalOverlay').style.display='none';}
+
+function updateGoalScopeOptions(){
+  const scope=document.getElementById('goalScope').value;
+  const wrap=document.getElementById('goalTargetWrap');
+  const sel=document.getElementById('goalTargetSelect');
+  if(scope==='total'){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  if(scope==='subject'){
+    sel.innerHTML=subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  }else if(scope==='book'){
+    sel.innerHTML=subjects.flatMap(s=>s.books.map(b=>`<option value="${s.id}|${b.id}">${s.name} / ${b.name}</option>`)).join('');
+  }
+}
+
+function saveGoal(){
+  const title=document.getElementById('goalTitle').value.trim();
+  const scope=document.getElementById('goalScope').value;
+  const hours=parseFloat(document.getElementById('goalHours').value);
+  const deadline=document.getElementById('goalDeadline').value;
+  if(!title||!hours||!deadline){alert('全項目を入力してください');return;}
+  const goal={id:'g'+Date.now(),title,scope,targetMins:hours*60,deadline,createdAt:new Date().toISOString().slice(0,10)};
+  if(scope==='subject'){goal.subjectId=document.getElementById('goalTargetSelect').value;}
+  else if(scope==='book'){
+    const [sid,bid]=document.getElementById('goalTargetSelect').value.split('|');
+    goal.subjectId=sid;goal.bookId=bid;
+  }
+  studyGoals.push(goal);
+  saveStudyGoals();
+  closeAddGoal();
+  renderGoalsList();
+}
+
+function delGoal(id){
+  if(!confirm('Delete?'))return;
+  studyGoals=studyGoals.filter(g=>g.id!==id);
+  saveStudyGoals();renderGoalsList();renderGoalsPreview();
+}
+
+function calcGoalProgress(g){
+  let totalMins=0;
+  const startKey=g.createdAt;
+  for(const dateKey of Object.keys(allData)){
+    if(dateKey<startKey)continue;
+    if(dateKey===TODAY_KEY)continue;
+    const day=allData[dateKey];
+    if(!day?.study)continue;
+    if(g.scope==='total'){
+      Object.values(day.study).forEach(books=>Object.values(books).forEach(m=>totalMins+=m||0));
+    }else if(g.scope==='subject'){
+      Object.values(day.study[g.subjectId]||{}).forEach(m=>totalMins+=m||0);
+    }else if(g.scope==='book'){
+      totalMins+=day.study[g.subjectId]?.[g.bookId]||0;
+    }
+  }
+  // 今日のstateから加算（最新値）
+  if(TODAY_KEY>=startKey){
+    if(g.scope==='total'){
+      Object.values(state.study||{}).forEach(books=>Object.values(books).forEach(m=>totalMins+=m||0));
+    }else if(g.scope==='subject'){
+      Object.values(state.study?.[g.subjectId]||{}).forEach(m=>totalMins+=m||0);
+    }else if(g.scope==='book'){
+      totalMins+=state.study?.[g.subjectId]?.[g.bookId]||0;
+    }
+  }
+  const pct=Math.min(100,Math.round(totalMins/g.targetMins*100));
+  const today=new Date();today.setHours(0,0,0,0);
+  const dl=new Date(g.deadline);dl.setHours(0,0,0,0);
+  const daysLeft=Math.ceil((dl-today)/(1000*60*60*24));
+  return {totalMins,pct,daysLeft};
+}
+
+function getGoalLabel(g){
+  if(g.scope==='total')return 'All Subjects';
+  if(g.scope==='subject'){const s=subjects.find(s=>s.id===g.subjectId);return s?.name||'(削除済)';}
+  if(g.scope==='book'){
+    const s=subjects.find(s=>s.id===g.subjectId);
+    const b=s?.books?.find(b=>b.id===g.bookId);
+    return s?`${s.name} / ${b?.name||'(削除済)'}`:'(削除済)';
+  }
+  return '';
+}
+
+function renderGoalCard(g,compact){
+  const p=calcGoalProgress(g);
+  const overdue=p.daysLeft<0;
+  const urgent=!overdue&&p.daysLeft<=3;
+  const completed=p.pct>=100;
+  const barColor=completed?'var(--green)':overdue?'var(--red)':urgent?'#ffa500':'var(--accent)';
+  const dlText=overdue?`${Math.abs(p.daysLeft)}日超過`:p.daysLeft===0?'今日まで':`残り${p.daysLeft}日`;
+  return `<div style="background:var(--surface);border-radius:12px;padding:14px;margin-bottom:10px;position:relative;border:0.5px solid ${completed?'var(--green)':'var(--border)'}">
+    ${!compact?`<button onclick="delGoal('${g.id}')" style="position:absolute;top:8px;right:10px;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0">×</button>`:''}
+    <div style="font-family:var(--serif);font-style:italic;font-size:15px;margin-bottom:2px;padding-right:24px">${g.title}</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;letter-spacing:.05em">${getGoalLabel(g)}</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+      <div><span style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--text)">${Math.floor(p.totalMins/60)}</span><span style="font-size:11px;color:var(--muted)">h ${p.totalMins%60}m / ${g.targetMins/60}h</span></div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${barColor}">${p.pct}%</div>
+    </div>
+    <div style="height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-bottom:8px">
+      <div style="height:100%;width:${p.pct}%;background:${barColor};transition:width .3s"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)">
+      <span>${dlText}</span><span>${g.deadline}</span>
+    </div>
+  </div>`;
+}
+
+function renderGoalsList(){
+  const el=document.getElementById('goalsList');
+  if(!el)return;
+  if(studyGoals.length===0){
+    el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:60px 20px;line-height:1.6">まだ目標が設定されていません。<br>右上の「+ Add」から追加してください。</div>';
+    return;
+  }
+  el.innerHTML=studyGoals.map(g=>renderGoalCard(g,false)).join('');
+}
+
+function renderGoalsPreview(){
+  const el=document.getElementById('goalsPreview');
+  if(!el)return;
+  if(studyGoals.length===0){el.innerHTML='';return;}
+  const sorted=[...studyGoals].sort((a,b)=>{
+    const pa=calcGoalProgress(a),pb=calcGoalProgress(b);
+    const ca=pa.pct>=100?1:0,cb=pb.pct>=100?1:0;
+    if(ca!==cb)return ca-cb;
+    return new Date(a.deadline)-new Date(b.deadline);
+  }).slice(0,2);
+  el.innerHTML=`<div style="margin-bottom:14px">${sorted.map(g=>renderGoalCard(g,true)).join('')}</div>`;
+}
+
+function toggleBodyDetails(){
+  const sec=document.getElementById('bodyDetailsSection');
+  const btn=document.getElementById('bodyDetailsBtn');
+  const isOpen=sec.style.display!=='none';
+  sec.style.display=isOpen?'none':'block';
+  btn.textContent=isOpen?'詳細':'閉じる';
+  if(!isOpen){
+    // 身長をlocalStorageから復元
+    const h=localStorage.getItem('ym4_height');
+    if(h)document.getElementById('heightInput').value=h;
+  }
+}
+
+function setGender(g){
+  localStorage.setItem('ym4_gender',g);
+  document.getElementById('genderMale').style.background=g==='male'?'var(--accent)':'transparent';
+  document.getElementById('genderMale').style.color=g==='male'?'#000':'var(--muted)';
+  document.getElementById('genderFemale').style.background=g==='female'?'var(--accent)':'transparent';
+  document.getElementById('genderFemale').style.color=g==='female'?'#000':'var(--muted)';
+  saveBodyComp();
+}
+
+function saveBodyComp(){
+  const w=parseFloat(document.getElementById('bodyWeightInput')?.value)||null;
+  const h=parseFloat(document.getElementById('heightInput')?.value)||null;
+  const age=parseFloat(document.getElementById('ageInput')?.value)||null;
+  if(w)state.bodyWeight=w;
+  if(h)localStorage.setItem('ym4_height',h);
+  if(age)localStorage.setItem('ym4_age',age);
+  if(w)localStorage.setItem('ym4_bodyweight',w);
+  updateBMI();
+  saveState();
+  renderWeightGraph();
+  renderBodyCompGraph();
+}
+
+function updateBMI(){
+  const w=parseFloat(document.getElementById('bodyWeightInput')?.value)||state.bodyWeight;
+  const h=parseFloat(document.getElementById('heightInput')?.value)||parseFloat(localStorage.getItem('ym4_height')||'0');
+  const age=parseFloat(document.getElementById('ageInput')?.value)||parseFloat(localStorage.getItem('ym4_age')||'0');
+  const gender=localStorage.getItem('ym4_gender')||'male';
+  const bmiEl=document.getElementById('bmiDisplay');
+  const fatEl=document.getElementById('bodyFatDisplay');
+  if(!bmiEl)return;
+  if(w&&h){
+    const bmi=w/((h/100)**2);
+    const bmiColor=bmi<18.5?'#6af':bmi<25?'var(--green)':bmi<30?'#ffa500':'var(--red)';
+    bmiEl.textContent=bmi.toFixed(1);
+    bmiEl.style.color=bmiColor;
+    // Deurenberg式で体脂肪率自動計算
+    if(age&&fatEl){
+      const sex=gender==='male'?1:0;
+      const fat=1.2*bmi+0.23*age-10.8*sex-5.4;
+      const fatClamped=Math.max(3,Math.min(55,fat));
+      fatEl.textContent=fatClamped.toFixed(1);
+      state.bodyFat=fatClamped;
+      const fatHidden=document.getElementById('bodyFatInput');
+      if(fatHidden)fatHidden.value=fatClamped;
+    }
+  }else{
+    bmiEl.textContent='—';bmiEl.style.color='var(--text)';
+    if(fatEl){fatEl.textContent='—';}
   }
 }
 
@@ -2642,6 +3114,80 @@ function calcScoreFor(r){
 }
 function calcScore(){document.getElementById('topScore').textContent=calcScoreFor(state);}
 
+function renderBodyCompGraph(){
+  const el=document.getElementById('bodyCompGraphContainer');
+  if(el)el.innerHTML='';
+}
+
+function renderWeightGraph(){
+  const el=document.getElementById('weightGraphContainer');
+  if(!el)return;
+
+  const wEntries=Object.keys(allData).sort().map(k=>({date:k,w:allData[k]?.bodyWeight,f:allData[k]?.bodyFat})).filter(e=>e.w&&e.w>0);
+  const todayW=state.bodyWeight||(+(document.getElementById('bodyWeightInput')?.value)||0);
+  const todayF=state.bodyFat||0;
+  if(todayW>0){
+    const ex=wEntries.find(e=>e.date===TODAY_KEY);
+    if(ex){ex.w=todayW;ex.f=todayF;}
+    else wEntries.push({date:TODAY_KEY,w:todayW,f:todayF});
+    wEntries.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  if(wEntries.length<2){
+    el.innerHTML='<div style="font-size:11px;color:var(--muted);text-align:center;padding:12px 0">データが2日分以上あるとグラフが表示されます</div>';
+    return;
+  }
+
+  const W=300,H=130,PL=36,PR=36,PT=10,PB=22;
+  const cW=W-PL-PR,cH=H-PT-PB;
+  const weights=wEntries.map(e=>e.w);
+  const fats=wEntries.map(e=>e.f).filter(v=>v>0);
+  const minW=Math.min(...weights)-1,maxW=Math.max(...weights)+1;
+  const minF=fats.length?Math.min(...fats)-1:0,maxF=fats.length?Math.max(...fats)+1:1;
+  const xS=i=>PL+i*(cW/(wEntries.length-1));
+  const yW=v=>PT+(1-(v-minW)/(maxW-minW))*cH;
+  const yF=v=>PT+(1-(v-minF)/(maxF-minF))*cH;
+
+  let wPath='',fPath='';
+  wEntries.forEach((e,i)=>{
+    const x=xS(i).toFixed(1),yw=yW(e.w).toFixed(1);
+    wPath+=i===0?`M${x},${yw}`:`L${x},${yw}`;
+  });
+  if(fats.length>=2){
+    let first=true;
+    wEntries.forEach((e,i)=>{
+      if(!e.f)return;
+      const x=xS(i).toFixed(1),yf=yF(e.f).toFixed(1);
+      fPath+=first?`M${x},${yf}`:`L${x},${yf}`;
+      first=false;
+    });
+  }
+
+  const interval=wEntries.length>30?7:wEntries.length>14?3:1;
+  const labels=wEntries.map((e,i)=>i%interval===0||i===wEntries.length-1?
+    `<text x="${xS(i).toFixed(1)}" y="${H-4}" text-anchor="middle" fill="var(--muted)" font-size="8">${e.date.slice(5)}</text>`:''
+  ).join('');
+  const lastW=wEntries[wEntries.length-1];
+  const fatWithVal=wEntries.filter(e=>e.f>0);
+  const lastF=fatWithVal.length?fatWithVal[fatWithVal.length-1]:null;
+
+  el.innerHTML=`
+    <div style="display:flex;gap:12px;font-size:10px;margin-bottom:6px">
+      <span style="color:var(--accent)">● 体重 (kg)</span>
+      ${fats.length>=2?'<span style="color:#f88">● 体脂肪率 (%)</span>':''}
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px">
+      <path d="${wPath}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>
+      ${wEntries.map((e,i)=>`<circle cx="${xS(i).toFixed(1)}" cy="${yW(e.w).toFixed(1)}" r="2" fill="var(--accent)"/>`).join('')}
+      <text x="${xS(wEntries.length-1).toFixed(1)}" y="${(yW(lastW.w)-5).toFixed(1)}" text-anchor="middle" fill="var(--accent)" font-size="9" font-family="'Bebas Neue',sans-serif">${lastW.w}</text>
+      <text x="${PL-4}" y="${(PT+cH/2).toFixed(1)}" text-anchor="end" fill="var(--accent)" font-size="8">${((minW+maxW)/2).toFixed(0)}</text>
+      ${fats.length>=2?`
+      <path d="${fPath}" fill="none" stroke="#f88" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="4,2"/>
+      ${wEntries.filter(e=>e.f>0).map(e=>{const i=wEntries.indexOf(e);return `<circle cx="${xS(i).toFixed(1)}" cy="${yF(e.f).toFixed(1)}" r="2" fill="#f88"/>`;}).join('')}
+      ${lastF?`<text x="${(W-PR+4).toFixed(1)}" y="${(yF(lastF.f)-5).toFixed(1)}" text-anchor="start" fill="#f88" font-size="9" font-family="'Bebas Neue',sans-serif">${lastF.f.toFixed(1)}%</text>`:''}
+      `:''}
+      ${labels}
+    </svg>`;
+}
 function calcMealTotals(meals){
   return meals.filter(m=>m.nutrition).reduce((a,m)=>({
     calories:a.calories+(m.nutrition.calories||0),
@@ -2824,7 +3370,11 @@ function startEditMode(date){
   const bwEl=document.getElementById('bodyWeightInput');
   if(diaryEl) diaryEl.value=state.diary||'';
   if(healthMemoEl) healthMemoEl.value=state.healthMemo||'';
-  if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
+  if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'';
+  const _bfEl=document.getElementById('bodyFatInput');if(_bfEl)_bfEl.value=state.bodyFat||'';
+  const _mmEl=document.getElementById('muscleMassInput');if(_mmEl)_mmEl.value=state.muscleMass||'';
+  const _skEl=document.getElementById('skeletalMuscleInput');if(_skEl)_skEl.value=state.skeletalMuscle||'';
+  updateBMI();renderBodyCompGraph();
   
   // Switch to study tab
   const studyBtn=Array.from(document.querySelectorAll('.tab-btn')).find(b=>b.textContent==='STUDY');
@@ -2865,7 +3415,11 @@ function cancelEdit(){
   const bwEl=document.getElementById('bodyWeightInput');
   if(diaryEl) diaryEl.value=state.diary||'';
   if(healthMemoEl) healthMemoEl.value=state.healthMemo||'';
-  if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'70';
+  if(bwEl) bwEl.value=state.bodyWeight||localStorage.getItem('ym4_bodyweight')||'';
+  const _bfEl=document.getElementById('bodyFatInput');if(_bfEl)_bfEl.value=state.bodyFat||'';
+  const _mmEl=document.getElementById('muscleMassInput');if(_mmEl)_mmEl.value=state.muscleMass||'';
+  const _skEl=document.getElementById('skeletalMuscleInput');if(_skEl)_skEl.value=state.skeletalMuscle||'';
+  updateBMI();renderBodyCompGraph();
   
   // Go back to record tab
   const recordBtn=Array.from(document.querySelectorAll('.tab-btn')).find(b=>b.textContent==='RECORD');
@@ -3843,6 +4397,14 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
   }catch(e){console.error('Failed to load videos from IndexedDB:',e);}
   
   renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
+  // AIコーチプレビュー復元
+  const coachSaved=JSON.parse(localStorage.getItem('ym4_coach_'+TODAY_KEY)||'null');
+  if(coachSaved){
+    const dot=document.getElementById('aiCoachDot');
+    const preview=document.getElementById('aiCoachPreview');
+    if(dot)dot.style.background='var(--accent)';
+    if(preview)preview.textContent=coachSaved.summary||'フィードバック済み';
+  }
   
   // Auto fullscreen on load
   const elem=document.documentElement;
