@@ -2799,6 +2799,62 @@ document.addEventListener('DOMContentLoaded',()=>{
       },300);
     });
   }
+
+  const fs=document.getElementById('videoFullscreen');
+  
+  // タップ判定のみ（スクロールはブラウザネイティブ）
+  let tapStartY=0,tapStartX=0,tapStartT=0;
+  fs.addEventListener('touchstart',e=>{
+    tapStartY=e.changedTouches[0].clientY;
+    tapStartX=e.changedTouches[0].clientX;
+    tapStartT=Date.now();
+  },{passive:true});
+  
+  fs.addEventListener('touchend',e=>{
+    const t=e.changedTouches[0];
+    const dy=Math.abs(t.clientY-tapStartY);
+    const dx=Math.abs(t.clientX-tapStartX);
+    const dt=Date.now()-tapStartT;
+    // タップ＝動いてない＆短時間
+    if(dy<10&&dx<10&&dt<300){
+      // 戻るボタンエリア
+      const backBtn=document.getElementById('videoBackBtn');
+      if(backBtn && backBtn.style.opacity==='1'){
+        const r=backBtn.getBoundingClientRect();
+        if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom){
+          return;
+        }
+      }
+      const w=fs.clientWidth,h=fs.clientHeight;
+      const cxMin=w*0.25,cxMax=w*0.75;
+      const cyMin=h*0.3,cyMax=h*0.7;
+      const inCenter=t.clientX>=cxMin&&t.clientX<=cxMax&&t.clientY>=cyMin&&t.clientY<=cyMax;
+      // 現在表示中のvideoを取得
+      const items=document.querySelectorAll('.vid-item');
+      let curVid=null;
+      items.forEach(it=>{
+        const r=it.getBoundingClientRect();
+        if(r.top<=h/2&&r.bottom>=h/2)curVid=it.querySelector('video');
+      });
+      if(inCenter && curVid){
+        const playIcon=document.getElementById('videoPlayIcon');
+        if(curVid.paused){
+          curVid.muted=false;
+          curVid.play().catch(()=>{});
+          if(playIcon)playIcon.style.opacity='0';
+        }else{
+          curVid.pause();
+          if(playIcon)playIcon.style.opacity='1';
+          // 一時停止時に戻るボタンも表示
+          const btn=document.getElementById('videoBackBtn');
+          if(btn){btn.style.opacity='1';btn.style.pointerEvents='auto';clearTimeout(btn._hideTimer);}
+        }
+      }else if(!inCenter){
+        toggleVideoBackBtn();
+      }
+    }
+  },{passive:true});
+
 });
 
 function downloadBackup(){
