@@ -284,7 +284,9 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <button id="checkEditBtn" onclick="toggleCheckEditMode()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 10px;cursor:pointer">Edit</button>
   </div>
   <div class="card" id="checklist"></div>
-  <button class="add-btn" style="margin-top:0" onclick="openModal('check')">+ Add Item</button>
+  <button id="createGroupBtn" style="display:none;width:100%;padding:10px;margin-top:8px;background:none;border:0.5px solid var(--accent);border-radius:10px;color:var(--accent);font-size:13px;cursor:pointer" onclick="createGroupFromSelected()">選択してグループを作成</button>
+  <button class="add-btn" style="margin-top:8px" onclick="openModal('check')">+ Add Item</button>
+  <button class="add-btn" style="margin-top:8px;border-color:var(--muted);color:var(--muted)" onclick="openTomorrowChecklist()">Tomorrow's Checklist →</button>
   <div style="margin-top:16px">
     <div style="font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:6px">MEMO</div>
     <textarea id="checkMemo" placeholder="Memo..." style="width:100%;min-height:100px;padding:12px;border:0.5px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-size:14px;font-family:inherit;resize:none;box-sizing:border-box;line-height:1.6" oninput="state.checkMemo=this.value;saveState()"></textarea>
@@ -512,6 +514,18 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 
+<!-- Tomorrow Checklist overlay -->
+<div id="tomorrowChecklistOverlay" style="display:none;position:fixed;inset:0;background:#000;z-index:1100;flex-direction:column">
+  <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border);padding-top:max(14px,env(safe-area-inset-top));flex-shrink:0">
+    <button onclick="closeTomorrowChecklist()" style="background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px 10px">←</button>
+    <div style="flex:1;text-align:center;font-family:var(--serif);font-style:italic;font-size:18px">Tomorrow</div>
+    <button onclick="addTomorrowItem()" style="background:none;border:0.5px solid var(--accent);border-radius:8px;color:var(--accent);font-size:12px;cursor:pointer;padding:5px 10px">+ Add</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px">
+    <div id="tomorrowChecklistItems" class="card"></div>
+  </div>
+</div>
+
 <!-- Goals overlay -->
 <div id="goalsOverlay" style="display:none;position:fixed;inset:0;background:#000;z-index:1100;flex-direction:column">
   <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border);padding-top:max(14px,env(safe-area-inset-top));flex-shrink:0">
@@ -736,7 +750,8 @@ function getInitialState(){
   const prevItems=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.checkItems||DEFAULT_CHECK_ITEMS)):JSON.parse(JSON.stringify(DEFAULT_CHECK_ITEMS));
   const prevGoal=prevKey?(allData[prevKey]?.goalMins||DEFAULT_GOAL_MINS):DEFAULT_GOAL_MINS;
   const prevSubjects=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.subjects||DEFAULT_SUBJECTS)):JSON.parse(JSON.stringify(DEFAULT_SUBJECTS));
-  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null,checkMemo:''};
+  const prevGroups=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.checkGroups||[])):[];
+  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null,checkMemo:'',checkGroups:[]};
 }
 
 let state=getInitialState();
@@ -1353,9 +1368,11 @@ function minimizeTimer(){timerRunning=false;document.getElementById('timerPlayPa
 function showTimer(){document.getElementById('timerOverlay').classList.add('active');document.getElementById('timerMini').classList.remove('visible');}
 
 let checkEditMode=false;
+let checkSelected=new Set(); // edit中の選択アイテムID
 
 function toggleCheckEditMode(){
   checkEditMode=!checkEditMode;
+  checkSelected=new Set();
   const btn=document.getElementById('checkEditBtn');
   const clearBtn=document.getElementById('checkClearBtn');
   btn.textContent=checkEditMode?'Done':'Edit';
@@ -1375,7 +1392,7 @@ function clearAllChecks(){
       <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
       <button class="modal-ok" style="flex:1;background:#f44" onclick="
         checkItems.splice(0,checkItems.length);
-        state.checks={};
+        state.checks={};state.checkGroups=[];
         saveChecks();renderChecks();calcScore();saveState();
         this.closest('.modal-bg').remove();
       ">Delete</button>
@@ -1403,77 +1420,203 @@ function editCheckLabel(i){
   setTimeout(()=>document.getElementById('checkLabelInput')?.focus(),100);
 }
 
+function editGroupName(gid){
+  const g=(state.checkGroups||[]).find(g=>g.id===gid);
+  if(!g)return;
+  const modal=document.createElement('div');
+  modal.className='modal-bg';
+  modal.innerHTML=`<div class="modal">
+    <div class="modal-title">Rename Group</div>
+    <input class="modal-input" id="groupNameInput" value="${g.name}">
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+      <button class="modal-ok" style="flex:1" onclick="
+        const v=document.getElementById('groupNameInput').value.trim();
+        if(v){const grp=(state.checkGroups||[]).find(g=>g.id==='${gid}');if(grp)grp.name=v;saveState();renderChecks();}
+        this.closest('.modal-bg').remove();
+      ">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);modal.classList.add('open');
+  setTimeout(()=>document.getElementById('groupNameInput')?.focus(),100);
+}
+
+function deleteGroup(gid){
+  state.checkGroups=(state.checkGroups||[]).filter(g=>g.id!==gid);
+  saveState();renderChecks();
+}
+
+function createGroupFromSelected(){
+  if(checkSelected.size<1)return;
+  const modal=document.createElement('div');
+  modal.className='modal-bg';
+  modal.innerHTML=`<div class="modal">
+    <div class="modal-title">Group Name</div>
+    <input class="modal-input" id="newGroupInput" placeholder="例: 勉強">
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+      <button class="modal-ok" style="flex:1" onclick="
+        const v=document.getElementById('newGroupInput').value.trim();
+        if(v){
+          if(!state.checkGroups)state.checkGroups=[];
+          state.checkGroups.push({id:'g'+Date.now(),name:v,itemIds:[...checkSelected]});
+          checkSelected=new Set();
+          saveState();renderChecks();
+        }
+        this.closest('.modal-bg').remove();
+      ">Create</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);modal.classList.add('open');
+  setTimeout(()=>document.getElementById('newGroupInput')?.focus(),100);
+}
+
 function renderChecks(){
   const el=document.getElementById('checklist');el.innerHTML='';
+  const groups=state.checkGroups||[];
   let dragSrc=null;
-  checkItems.forEach((c,i)=>{
-    const done=!!state.checks[c.id];
-    const div=document.createElement('div');
-    div.className='check-item'+(done?' done':'');
-    div.style.cssText='display:flex;align-items:center';
 
+  // グループ化されてるitemIdの集合
+  const groupedIds=new Set(groups.flatMap(g=>g.itemIds));
+
+  // グループを先に描画
+  groups.forEach(g=>{
+    const items=checkItems.filter(c=>g.itemIds.includes(c.id));
+    if(items.length===0)return;
+
+    const groupDiv=document.createElement('div');
+    groupDiv.style.cssText='margin-bottom:8px';
+
+    // グループヘッダー
+    const header=document.createElement('div');
+    header.style.cssText='display:flex;align-items:center;padding:6px 0;gap:8px';
+    const nameEl=document.createElement('span');
+    nameEl.textContent=g.name;
+    nameEl.style.cssText='font-size:10px;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;flex:1';
     if(checkEditMode){
-      const handle=document.createElement('span');
-      handle.textContent='☰';
-      handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none';
-      handle.addEventListener('touchstart',e=>{dragSrc=i;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
-      div.appendChild(handle);
+      nameEl.style.cursor='pointer';
+      nameEl.onclick=()=>editGroupName(g.id);
     }
-
-    const checkBox=document.createElement('div');
-    checkBox.className='check-box'+(done?' done':'');
-    if(!checkEditMode)checkBox.onclick=()=>toggleCheck(c.id,checkBox);
-    div.appendChild(checkBox);
-
-    const label=document.createElement('span');
-    label.className='check-label';label.textContent=c.label;label.style.flex='1';
-    if(checkEditMode){label.style.cursor='pointer';label.onclick=()=>editCheckLabel(i);}
-    else label.onclick=()=>toggleCheck(c.id,checkBox);
-    div.appendChild(label);
-
-    const delBtn=document.createElement('button');
-    delBtn.className='check-del';delBtn.textContent='×';delBtn.type='button';
-    delBtn.onclick=(e)=>{
-      e.preventDefault();e.stopPropagation();
-      const modal=document.createElement('div');
-      modal.className='modal-bg';
-      modal.innerHTML=`<div class="modal" style="text-align:center">
-        <div class="modal-title">Delete</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:16px">"${c.label}"を削除しますか？</div>
-        <div style="display:flex;gap:8px">
-          <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
-          <button class="modal-ok" style="flex:1;background:#f44" onclick="
-            checkItems.splice(${i},1);saveChecks();renderChecks();calcScore();saveState();
-            this.closest('.modal-bg').remove();
-          ">Delete</button>
-        </div>
-      </div>`;
-      document.body.appendChild(modal);modal.classList.add('open');
-    };
-    div.appendChild(delBtn);
-
+    header.appendChild(nameEl);
     if(checkEditMode){
-      div.addEventListener('touchmove',e=>{
-        e.preventDefault();
-        const touch=e.touches[0];
-        const target=document.elementFromPoint(touch.clientX,touch.clientY);
-        const targetItem=target?.closest('.check-item');
-        if(targetItem&&targetItem!==div){
-          const items=[...el.children];
-          const toIdx=items.indexOf(targetItem);
-          if(toIdx>=0&&toIdx!==dragSrc){
-            const moved=checkItems.splice(dragSrc,1)[0];
-            checkItems.splice(toIdx,0,moved);
-            dragSrc=toIdx;
-            saveChecks();renderChecks();saveState();
-          }
-        }
-      },{passive:false});
-      div.addEventListener('touchend',()=>{div.style.opacity='1';dragSrc=null;});
+      const delG=document.createElement('button');
+      delG.textContent='解除';
+      delG.style.cssText='background:none;border:0.5px solid var(--muted);border-radius:6px;color:var(--muted);font-size:10px;padding:2px 8px;cursor:pointer';
+      delG.onclick=()=>deleteGroup(g.id);
+      header.appendChild(delG);
     }
-    el.appendChild(div);
+    groupDiv.appendChild(header);
+
+    // グループ内アイテム
+    items.forEach(c=>{
+      const row=renderCheckItem(c,checkItems.indexOf(c),dragSrc,groupedIds);
+      groupDiv.appendChild(row);
+    });
+    el.appendChild(groupDiv);
   });
+
+  // グループ化されてない項目
+  const ungrouped=checkItems.filter(c=>!groupedIds.has(c.id));
+  if(ungrouped.length>0){
+    if(groups.length>0){
+      const sep=document.createElement('div');
+      sep.style.cssText='font-size:10px;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;padding:6px 0';
+      sep.textContent='Other';
+      el.appendChild(sep);
+    }
+    ungrouped.forEach(c=>{
+      const row=renderCheckItem(c,checkItems.indexOf(c),dragSrc,groupedIds);
+      el.appendChild(row);
+    });
+  }
+
+  // 選択中アイテムがある時グループ作成ボタン表示
+  const createBtn=document.getElementById('createGroupBtn');
+  if(createBtn)createBtn.style.display=checkEditMode&&checkSelected.size>0?'block':'none';
 }
+
+function renderCheckItem(c,i,dragSrc,groupedIds){
+  const done=!!state.checks[c.id];
+  const div=document.createElement('div');
+  div.className='check-item'+(done?' done':'');
+  div.style.cssText='display:flex;align-items:center';
+
+  if(checkEditMode){
+    // チェックボックス代わりの選択ボタン
+    const sel=document.createElement('div');
+    const isSelected=checkSelected.has(c.id);
+    sel.style.cssText=`width:18px;height:18px;border-radius:50%;border:1.5px solid ${isSelected?'var(--accent)':'var(--border)'};background:${isSelected?'var(--accent)':'transparent'};margin-right:8px;flex-shrink:0;cursor:pointer;transition:all .15s`;
+    sel.onclick=()=>{
+      if(checkSelected.has(c.id))checkSelected.delete(c.id);
+      else checkSelected.add(c.id);
+      renderChecks();
+    };
+    div.appendChild(sel);
+
+    // ドラッグハンドル
+    const handle=document.createElement('span');
+    handle.textContent='☰';
+    handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none';
+    handle.addEventListener('touchstart',e=>{dragSrc=i;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
+    div.appendChild(handle);
+  }
+
+  const checkBox=document.createElement('div');
+  checkBox.className='check-box'+(done?' done':'');
+  if(!checkEditMode)checkBox.onclick=()=>toggleCheck(c.id,checkBox);
+  div.appendChild(checkBox);
+
+  const label=document.createElement('span');
+  label.className='check-label';label.textContent=c.label;label.style.flex='1';
+  if(checkEditMode){label.style.cursor='pointer';label.onclick=()=>editCheckLabel(i);}
+  else label.onclick=()=>toggleCheck(c.id,checkBox);
+  div.appendChild(label);
+
+  const delBtn=document.createElement('button');
+  delBtn.className='check-del';delBtn.textContent='×';delBtn.type='button';
+  delBtn.onclick=(e)=>{
+    e.preventDefault();e.stopPropagation();
+    const modal=document.createElement('div');
+    modal.className='modal-bg';
+    modal.innerHTML=`<div class="modal" style="text-align:center">
+      <div class="modal-title">Delete</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px">"${c.label}"を削除しますか？</div>
+      <div style="display:flex;gap:8px">
+        <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+        <button class="modal-ok" style="flex:1;background:#f44" onclick="
+          checkItems.splice(${i},1);
+          state.checkGroups=(state.checkGroups||[]).map(g=>({...g,itemIds:g.itemIds.filter(id=>id!=='${c.id}')}));
+          saveChecks();renderChecks();calcScore();saveState();
+          this.closest('.modal-bg').remove();
+        ">Delete</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);modal.classList.add('open');
+  };
+  div.appendChild(delBtn);
+
+  if(checkEditMode){
+    div.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      const touch=e.touches[0];
+      const target=document.elementFromPoint(touch.clientX,touch.clientY);
+      const targetItem=target?.closest('.check-item');
+      if(targetItem&&targetItem!==div){
+        const allItems=[...document.getElementById('checklist').querySelectorAll('.check-item')];
+        const toIdx=allItems.indexOf(targetItem);
+        if(toIdx>=0&&toIdx!==dragSrc){
+          const moved=checkItems.splice(dragSrc,1)[0];
+          checkItems.splice(toIdx,0,moved);
+          dragSrc=toIdx;
+          saveChecks();renderChecks();saveState();
+        }
+      }
+    },{passive:false});
+    div.addEventListener('touchend',()=>{div.style.opacity='1';dragSrc=null;});
+  }
+  return div;
+}
+
 function toggleCheck(id,box){state.checks[id]=!state.checks[id];const done=state.checks[id];box.closest('.check-item').className='check-item'+(done?' done':'');box.className='check-box'+(done?' done':'');saveState();calcScore();}
 // ===== EXERCISE =====
 function switchHealthView(view){
@@ -2033,6 +2176,118 @@ async function restoreMealPhotos(){
   }
 }
 
+
+// ===== TOMORROW CHECKLIST =====
+function getTomorrowKey(){
+  const d=new Date();
+  if(d.getHours()<4)d.setDate(d.getDate()+1); // 4時前は今日が前日扱いなので+1で明日
+  else d.setDate(d.getDate()+1);
+  return d.toISOString().slice(0,10);
+}
+
+function getTomorrowItems(){
+  const key=getTomorrowKey();
+  const saved=allData[key];
+  // 明日のデータがあればそのcheckItems、なければ今日のをコピー
+  return saved?.checkItems ? JSON.parse(JSON.stringify(saved.checkItems)) : JSON.parse(JSON.stringify(checkItems));
+}
+
+function saveTomorrowItems(items){
+  const key=getTomorrowKey();
+  if(!allData[key]){
+    // 明日のstateを初期化（今日ベース）
+    allData[key]=JSON.parse(JSON.stringify({
+      ...state,
+      study:{},checks:{},diary:'',diaryDate:key,
+      healthMemo:'',checkMemo:'',checkGroups:[],meals:[],bodyWeight:null,bodyFat:null
+    }));
+  }
+  allData[key].checkItems=items;
+  localStorage.setItem('ym4_'+key, JSON.stringify(allData[key]));
+  localStorage.setItem('ym4_all', JSON.stringify(allData));
+}
+
+function openTomorrowChecklist(){
+  const overlay=document.getElementById('tomorrowChecklistOverlay');
+  overlay.style.display='flex';
+  overlay.scrollTop=0;
+  document.body.style.overflow='hidden';
+  document.body.style.position='fixed';
+  document.body.style.width='100%';
+  renderTomorrowItems();
+}
+
+function closeTomorrowChecklist(){
+  document.getElementById('tomorrowChecklistOverlay').style.display='none';
+  document.body.style.overflow='auto';
+  document.body.style.position='';
+  document.body.style.width='';
+}
+
+function renderTomorrowItems(){
+  const items=getTomorrowItems();
+  const el=document.getElementById('tomorrowChecklistItems');
+  el.innerHTML='';
+  if(items.length===0){
+    el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:24px">項目がありません</div>';
+    return;
+  }
+  items.forEach((c,i)=>{
+    const div=document.createElement('div');
+    div.className='check-item';
+    div.style.cssText='display:flex;align-items:center';
+
+    const label=document.createElement('span');
+    label.className='check-label';label.textContent=c.label;label.style.flex='1';
+    label.style.cursor='pointer';
+    label.onclick=()=>{
+      const modal=document.createElement('div');
+      modal.className='modal-bg';
+      modal.innerHTML=`<div class="modal">
+        <div class="modal-title">Rename</div>
+        <input class="modal-input" id="tmrLabelInput" value="${c.label}">
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+          <button class="modal-ok" style="flex:1" onclick="
+            const v=document.getElementById('tmrLabelInput').value.trim();
+            if(v){const its=getTomorrowItems();its[${i}].label=v;saveTomorrowItems(its);renderTomorrowItems();}
+            this.closest('.modal-bg').remove();
+          ">Save</button>
+        </div>
+      </div>`;
+      document.body.appendChild(modal);modal.classList.add('open');
+      setTimeout(()=>document.getElementById('tmrLabelInput')?.focus(),100);
+    };
+
+    const delBtn=document.createElement('button');
+    delBtn.className='check-del';delBtn.textContent='×';
+    delBtn.onclick=()=>{
+      const its=getTomorrowItems();its.splice(i,1);saveTomorrowItems(its);renderTomorrowItems();
+    };
+
+    div.appendChild(label);div.appendChild(delBtn);
+    el.appendChild(div);
+  });
+}
+
+function addTomorrowItem(){
+  const modal=document.createElement('div');
+  modal.className='modal-bg';
+  modal.innerHTML=`<div class="modal">
+    <div class="modal-title">Add Item</div>
+    <input class="modal-input" id="tmrNewInput" placeholder="例: 読書 30m">
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+      <button class="modal-ok" style="flex:1" onclick="
+        const v=document.getElementById('tmrNewInput').value.trim();
+        if(v){const its=getTomorrowItems();its.push({id:'c'+Date.now(),label:v});saveTomorrowItems(its);renderTomorrowItems();}
+        this.closest('.modal-bg').remove();
+      ">Add</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);modal.classList.add('open');
+  setTimeout(()=>document.getElementById('tmrNewInput')?.focus(),100);
+}
 
 // ===== STUDY GOALS =====
 let studyGoals=JSON.parse(localStorage.getItem('ym4_study_goals')||'[]');
