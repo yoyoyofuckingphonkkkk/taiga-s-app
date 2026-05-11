@@ -198,6 +198,45 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 .hero-btn{background:rgba(0,0,0,0.6);border:0.5px solid rgba(255,255,255,0.3);color:#fff;border-radius:4px;padding:10px 16px;font-size:12px;cursor:pointer;font-family:var(--sans);letter-spacing:.05em;-webkit-tap-highlight-color:transparent;touch-action:manipulation;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;}
 .hero-btn:active{background:rgba(255,255,255,0.2)}
 </style>
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCNIKlZSVUg7TMetD1C3wBAOju9JAmCyvg",
+      authDomain: "ascend-app-7e2cb.firebaseapp.com",
+      projectId: "ascend-app-7e2cb",
+      storageBucket: "ascend-app-7e2cb.firebasestorage.app",
+      messagingSenderId: "832261399751",
+      appId: "1:832261399751:web:a995f2a7c36336ae100ae2"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
+
+    // グローバルに公開
+    window._fbAuth = auth;
+    window._fbDb = db;
+    window._fbProvider = provider;
+    window._fbSignIn = ()=>signInWithPopup(auth, provider);
+    window._fbSignOut = ()=>signOut(auth);
+    window._fbSetDoc = (path, data)=>setDoc(doc(db, ...path.split('/')), data, {merge:true});
+    window._fbGetDoc = async(path)=>{const s=await getDoc(doc(db,...path.split('/')));return s.exists()?s.data():null;};
+    window._fbOnSnapshot = (path, cb)=>onSnapshot(doc(db,...path.split('/')), s=>cb(s.exists()?s.data():null));
+
+    onAuthStateChanged(auth, user=>{
+      window._currentUser = user;
+      if(typeof window._onAuthChange === 'function') window._onAuthChange(user);
+    });
+  </script>
+  <!-- Google API (Drive) -->
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client"></script>
 </head>
 <body>
 <div id="loadingScreen" style="position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;opacity:0;transition:opacity 0.4s ease">
@@ -461,7 +500,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 <div class="section" id="tab-motivation">
   <div id="hero-motivation"></div>
   
-  <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:12px">
+  <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;gap:12px">
     
     <!-- Tap to Play - big left -->
     <div style="grid-column:1;grid-row:1/3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px;cursor:pointer" onclick="switchMotivationView('videos')">
@@ -478,6 +517,15 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <div style="grid-column:2;grid-row:2;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;cursor:pointer;min-height:120px;overflow:hidden" onclick="switchMotivationView('quotes')">
       <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:8px">QUOTES</div>
       <div id="motivQuotePreview" style="font-size:13px;color:var(--accent);font-style:italic;line-height:1.5"></div>
+    </div>
+
+    <!-- Drive Videos -->
+    <div style="grid-column:1/3;grid-row:3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;cursor:pointer;display:flex;align-items:center;gap:12px" onclick="openDriveVideos()">
+      <div style="font-size:28px">☁️</div>
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.1em">DRIVE VIDEOS</div>
+        <div style="font-size:11px;color:var(--muted)">Googleドライブの動画を再生</div>
+      </div>
     </div>
 
   </div>
@@ -2289,6 +2337,206 @@ function addTomorrowItem(){
   setTimeout(()=>document.getElementById('tmrNewInput')?.focus(),100);
 }
 
+// ===== ACCOUNT & SYNC =====
+async function signInAccount(){
+  try{
+    await window._fbSignIn();
+    document.getElementById('settingsModal')?.remove();
+    showSettings();
+  }catch(e){alert('サインイン失敗: '+e.message);}
+}
+
+async function signOutAccount(){
+  await window._fbSignOut();
+  document.getElementById('settingsModal')?.remove();
+  showSettings();
+}
+
+window._onAuthChange=(user)=>{
+  // サインイン状態が変わったらDriveも初期化
+  if(user){
+    initGoogleDrive(user);
+  }
+};
+
+async function syncToCloud(){
+  const user=window._currentUser;
+  if(!user){alert('先にサインインしてください');return;}
+  try{
+    const btn=event.target;btn.textContent='同期中...';btn.disabled=true;
+    const backup={};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k.startsWith('ym4_'))backup[k]=localStorage.getItem(k);
+    }
+    await window._fbSetDoc(`users/${user.uid}/data/backup`, {
+      payload: JSON.stringify(backup),
+      updatedAt: Date.now()
+    });
+    btn.textContent='✅ 同期完了';
+    setTimeout(()=>{btn.textContent='☁️ クラウドに同期';btn.disabled=false;},2000);
+  }catch(e){alert('同期失敗: '+e.message);}
+}
+
+async function syncFromCloud(){
+  const user=window._currentUser;
+  if(!user){alert('先にサインインしてください');return;}
+  if(!confirm('クラウドのデータで上書きしますか？'))return;
+  try{
+    const data=await window._fbGetDoc(`users/${user.uid}/data/backup`);
+    if(!data){alert('クラウドにデータがありません');return;}
+    const backup=JSON.parse(data.payload);
+    Object.keys(backup).forEach(k=>localStorage.setItem(k,backup[k]));
+    location.reload();
+  }catch(e){alert('復元失敗: '+e.message);}
+}
+
+// ===== GOOGLE DRIVE =====
+const DRIVE_CLIENT_ID='832261399751-a9t1b37pn7af1tuss1siaenvmmr3oao2.apps.googleusercontent.com';
+let driveAccessToken=null;
+let driveInited=false;
+
+function initGoogleDrive(user){
+  if(driveInited)return;
+  driveInited=true;
+  // Google Identity Services でアクセストークン取得
+  if(!window.google)return;
+  const tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:DRIVE_CLIENT_ID,
+    scope:'https://www.googleapis.com/auth/drive.file',
+    callback:(resp)=>{
+      if(resp.access_token){
+        driveAccessToken=resp.access_token;
+        console.log('Drive ready');
+      }
+    },
+    hint:user.email
+  });
+  window._driveTokenClient=tokenClient;
+}
+
+async function ensureDriveToken(){
+  if(driveAccessToken)return true;
+  if(!window._driveTokenClient){
+    alert('先にGoogleサインインしてください');return false;
+  }
+  return new Promise(res=>{
+    const orig=window._driveTokenClient.callback;
+    window._driveTokenClient.callback=(resp)=>{
+      orig(resp);
+      res(!!resp.access_token);
+    };
+    window._driveTokenClient.requestAccessToken({prompt:''});
+  });
+}
+
+async function uploadVideoToDrive(file){
+  if(!await ensureDriveToken())return null;
+  const meta={name:file.name,mimeType:file.type};
+  const form=new FormData();
+  form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
+  form.append('file',file);
+  const res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webContentLink',{
+    method:'POST',
+    headers:{Authorization:'Bearer '+driveAccessToken},
+    body:form
+  });
+  if(!res.ok){driveAccessToken=null;throw new Error('Drive upload failed');}
+  const data=await res.json();
+  // 共有リンク設定（自分だけアクセス可）
+  await fetch(`https://www.googleapis.com/drive/v3/files/${data.id}/permissions`,{
+    method:'POST',
+    headers:{Authorization:'Bearer '+driveAccessToken,'Content-Type':'application/json'},
+    body:JSON.stringify({role:'reader',type:'anyone'})
+  });
+  return data;
+}
+
+async function listDriveVideos(){
+  if(!await ensureDriveToken())return[];
+  const res=await fetch("https://www.googleapis.com/drive/v3/files?q=mimeType contains 'video/'&fields=files(id,name,webContentLink,thumbnailLink)&orderBy=createdTime desc",{
+    headers:{Authorization:'Bearer '+driveAccessToken}
+  });
+  const data=await res.json();
+  return data.files||[];
+}
+
+async function deleteDriveVideo(fileId){
+  if(!await ensureDriveToken())return;
+  await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`,{
+    method:'DELETE',
+    headers:{Authorization:'Bearer '+driveAccessToken}
+  });
+}
+
+// Drive動画一覧を開く
+async function openDriveVideos(){
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:#000;z-index:1200;display:flex;flex-direction:column';
+  overlay.innerHTML=`
+    <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border);padding-top:max(14px,env(safe-area-inset-top))">
+      <button onclick="this.closest('[style]').remove();document.body.style.overflow='auto'" style="background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px 10px">←</button>
+      <div style="flex:1;text-align:center;font-family:var(--serif);font-style:italic;font-size:18px">Drive Videos</div>
+      <button onclick="uploadDriveVideo()" style="background:none;border:0.5px solid var(--accent);border-radius:8px;color:var(--accent);font-size:12px;cursor:pointer;padding:5px 10px">+ Upload</button>
+    </div>
+    <div id="driveVideoList" style="flex:1;overflow-y:auto;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="color:var(--muted);font-size:12px;text-align:center;grid-column:1/3;padding:40px">読み込み中...</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.body.style.overflow='hidden';
+
+  try{
+    const files=await listDriveVideos();
+    const list=overlay.querySelector('#driveVideoList');
+    if(files.length===0){
+      list.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;grid-column:1/3;padding:40px">動画がありません</div>';
+      return;
+    }
+    list.innerHTML=files.map(f=>`
+      <div style="background:var(--surface);border-radius:10px;overflow:hidden;cursor:pointer" onclick="playDriveVideo('${f.id}','${f.name}')">
+        ${f.thumbnailLink?`<img src="${f.thumbnailLink}" style="width:100%;aspect-ratio:16/9;object-fit:cover">`:`<div style="width:100%;aspect-ratio:16/9;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px">▶</div>`}
+        <div style="padding:8px">
+          <div style="font-size:11px;color:var(--text);overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${f.name}</div>
+          <button onclick="event.stopPropagation();deleteDriveVideo('${f.id}').then(()=>openDriveVideos())" style="background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;padding:0;margin-top:4px">削除</button>
+        </div>
+      </div>
+    `).join('');
+  }catch(e){
+    overlay.querySelector('#driveVideoList').innerHTML=`<div style="color:var(--red);font-size:12px;text-align:center;grid-column:1/3;padding:40px">${e.message}</div>`;
+  }
+}
+
+async function playDriveVideo(fileId, name){
+  const streamUrl=`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+  const overlay=document.getElementById('videoPreviewOverlay');
+  const player=document.getElementById('videoPreviewPlayer');
+  // tokenをヘッダーに使えないのでwebContentLinkを使う
+  player.src=`https://drive.google.com/uc?export=download&id=${fileId}`;
+  player.load();player.play().catch(()=>{});
+  overlay.style.display='block';
+  document.body.style.overflow='hidden';
+  document.body.style.position='fixed';
+  document.body.style.width='100%';
+}
+
+async function uploadDriveVideo(){
+  const input=document.createElement('input');
+  input.type='file';input.accept='video/*';
+  input.onchange=async(e)=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    try{
+      const data=await uploadVideoToDrive(file);
+      if(data)openDriveVideos();
+    }catch(err){alert('アップロード失敗: '+err.message);}
+  };
+  input.click();
+}
+
+// Motivationタブにdriveボタンを追加するため既存switchMotivationViewを拡張
+const _origSwitchMotiv=window.switchMotivationView;
+
 // ===== STUDY GOALS =====
 let studyGoals=JSON.parse(localStorage.getItem('ym4_study_goals')||'[]');
 
@@ -3156,10 +3404,24 @@ function showSettings(){
   const modal=document.createElement('div');
   modal.className='modal-bg';
   modal.id='settingsModal';
-  const bw=localStorage.getItem('ym4_bodyweight')||'70';
+  const user=window._currentUser;
   modal.innerHTML=`
     <div class="modal">
       <div class="modal-title">Settings</div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">アカウント</div>
+        <div id="accountInfo" style="margin-bottom:8px">
+          ${user ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <img src="${user.photoURL}" style="width:32px;height:32px;border-radius:50%">
+            <div style="font-size:13px">${user.displayName}<br><span style="font-size:11px;color:var(--muted)">${user.email}</span></div>
+          </div>
+          <button onclick="syncToCloud()" class="modal-ok" style="width:100%;margin-bottom:8px">☁️ クラウドに同期</button>
+          <button onclick="syncFromCloud()" class="modal-ok" style="width:100%;background:var(--surface);color:var(--text);margin-bottom:8px">⬇️ クラウドから復元</button>
+          <button onclick="signOutAccount()" class="modal-ok" style="width:100%;background:var(--surface);color:var(--red)">サインアウト</button>`
+          : `<button onclick="signInAccount()" class="modal-ok" style="width:100%">Googleでサインイン</button>`}
+        </div>
+      </div>
 
       <div style="margin-bottom:16px">
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">バックアップ</div>
