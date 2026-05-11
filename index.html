@@ -201,8 +201,8 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
   <!-- Firebase -->
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyCNIKlZSVUg7TMetD1C3wBAOju9JAmCyvg",
@@ -219,15 +219,21 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     const provider = new GoogleAuthProvider();
     provider.addScope('https://www.googleapis.com/auth/drive.file');
 
-    // グローバルに公開
     window._fbAuth = auth;
     window._fbDb = db;
     window._fbProvider = provider;
-    window._fbSignIn = ()=>signInWithPopup(auth, provider);
+    window._fbSignIn = ()=>signInWithRedirect(auth, provider);
     window._fbSignOut = ()=>signOut(auth);
     window._fbSetDoc = (path, data)=>setDoc(doc(db, ...path.split('/')), data, {merge:true});
     window._fbGetDoc = async(path)=>{const s=await getDoc(doc(db,...path.split('/')));return s.exists()?s.data():null;};
-    window._fbOnSnapshot = (path, cb)=>onSnapshot(doc(db,...path.split('/')), s=>cb(s.exists()?s.data():null));
+
+    // リダイレクト後の結果を処理
+    getRedirectResult(auth).then(result=>{
+      if(result?.user){
+        window._currentUser = result.user;
+        if(typeof window._onAuthChange === 'function') window._onAuthChange(result.user);
+      }
+    }).catch(e=>console.error('redirect result error:',e));
 
     onAuthStateChanged(auth, user=>{
       window._currentUser = user;
@@ -2341,8 +2347,7 @@ function addTomorrowItem(){
 async function signInAccount(){
   try{
     await window._fbSignIn();
-    document.getElementById('settingsModal')?.remove();
-    showSettings();
+    // リダイレクトするのでここには戻らない
   }catch(e){alert('サインイン失敗: '+e.message);}
 }
 
