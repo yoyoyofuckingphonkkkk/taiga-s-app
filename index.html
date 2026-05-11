@@ -227,17 +227,25 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     window._fbSetDoc = (path, data)=>setDoc(doc(db, ...path.split('/')), data, {merge:true});
     window._fbGetDoc = async(path)=>{const s=await getDoc(doc(db,...path.split('/')));return s.exists()?s.data():null;};
 
-    // リダイレクト後の結果を処理
+    // リダイレクト後の結果を処理（アプリ起動をブロックしない）
     getRedirectResult(auth).then(result=>{
       if(result?.user){
         window._currentUser = result.user;
         if(typeof window._onAuthChange === 'function') window._onAuthChange(result.user);
+        console.log('Signed in via redirect:', result.user.email);
+      }else{
+        console.log('No redirect result');
       }
-    }).catch(e=>console.error('redirect result error:',e));
+    }).catch(e=>console.warn('redirect result:',e.code, e.message));
 
     onAuthStateChanged(auth, user=>{
       window._currentUser = user;
       if(typeof window._onAuthChange === 'function') window._onAuthChange(user);
+      // Settingsが開いてたら更新
+      if(document.getElementById('settingsModal')){
+        document.getElementById('settingsModal').remove();
+        showSettings();
+      }
     });
   </script>
   <!-- Google API (Drive) -->
