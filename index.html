@@ -500,13 +500,8 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
   <!-- Option view -->
   <div id="optionView" style="display:none;margin-top:16px">
     <button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;margin-bottom:8px" onclick="switchMotivationView('home')">←</button>
-    <!-- クラウド/ローカル切り替え -->
-    <div style="display:flex;gap:6px;margin-bottom:10px">
-      <button id="storageLocalBtn" onclick="switchStorageMode('local')" style="flex:1;padding:8px;border-radius:8px;border:0.5px solid var(--accent);background:var(--accent);color:#000;font-size:12px;cursor:pointer;font-family:inherit">📱 Local</button>
-      <button id="storageCloudBtn" onclick="switchStorageMode('cloud')" style="flex:1;padding:8px;border-radius:8px;border:0.5px solid var(--border);background:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit">☁️ Cloud</button>
-    </div>
 
-    <!-- クラウドアップロード進捗 -->
+    <!-- アップロード進捗 -->
     <div id="cloudUploadProgress" style="display:none;margin-bottom:10px;padding:10px;background:var(--surface);border-radius:8px;border:0.5px solid var(--border)">
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px" id="cloudUploadLabel">Uploading...</div>
       <div style="height:4px;background:var(--surface2);border-radius:2px;overflow:hidden">
@@ -514,25 +509,18 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
       </div>
     </div>
 
-    <!-- IndexedDB→Cloud移行ボタン（ローカル動画がある時だけ表示） -->
-    <div id="migrateToCloudBanner" style="display:none;margin-bottom:10px;padding:10px;background:var(--surface);border-radius:8px;border:0.5px solid var(--accent2)">
-      <div style="font-size:12px;color:var(--text);margin-bottom:8px">ローカルの動画をクラウドに移行できます</div>
-      <button onclick="migrateLocalToCloud()" style="width:100%;padding:8px;background:var(--accent2);border:none;border-radius:6px;color:#fff;font-size:12px;cursor:pointer">☁️ クラウドに移行する</button>
-    </div>
-
-    <button class="add-btn" onclick="handleVideoAdd()">+ Add Video</button>
-    <input type="file" id="videoUpload" accept="video/mp4,video/*" multiple style="display:none" onchange="uploadVideo();this.value=''">
+    <button class="add-btn" onclick="document.getElementById('videoUploadCloud').click()">+ Add Video</button>
     <input type="file" id="videoUploadCloud" accept="video/mp4,video/*" multiple style="display:none" onchange="uploadVideoToCloud(this);this.value=''">
+
     <div style="margin-top:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div class="sec-label" style="margin:0">Videos <span id="videoCount" style="color:var(--muted);font-size:12px;font-weight:normal"></span></div>
+        <div class="sec-label" style="margin:0">☁️ Cloud Videos <span id="videoCount" style="color:var(--muted);font-size:12px;font-weight:normal"></span></div>
         <div style="display:flex;gap:6px">
           <button id="selectModeBtn" onclick="toggleVideoSelectMode()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 10px;cursor:pointer">選択</button>
           <button onclick="deleteAllVideos()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:#f44;font-size:12px;padding:5px 10px;cursor:pointer">全削除</button>
         </div>
       </div>
-      <!-- 選択モード時のツールバー -->
-      <div id="selectToolbar" style="display:none;margin-bottom:8px;display:none;gap:8px;align-items:center">
+      <div id="selectToolbar" style="display:none;margin-bottom:8px;gap:8px;align-items:center">
         <span id="selectCount" style="font-size:12px;color:var(--muted);flex:1">0件選択中</span>
         <button onclick="selectAllVideos()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 10px;cursor:pointer">全選択</button>
         <button onclick="deleteSelectedVideos()" style="background:#f44;border:none;border-radius:8px;color:#fff;font-size:12px;padding:5px 10px;cursor:pointer">削除</button>
@@ -3992,12 +3980,8 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
 
   try{
     await initDB();
-    const savedVideos=await loadVideosFromIndexedDB();
-    videos=savedVideos.filter(v=>!v.id.startsWith('hero_'));
     await restoreMealPhotos();
-    if(storageMode==='cloud'){loadCloudVideos();}
-    updateMigrateBanner();
-  }catch(e){console.error('Failed to load videos from IndexedDB:',e);}
+  }catch(e){console.error('DB init error:',e);}
 
   try{
     renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
@@ -4327,29 +4311,19 @@ function delQuote(i){
 function delVideo(i){
   if(!confirm('Delete?'))return;
   const v=videos[i];
-  if(storageMode==='cloud'&&v?.cloudPublicId){
+  if(v?.cloudPublicId){
     deleteCloudVideo(v.cloudPublicId).then(()=>loadCloudVideos());
-    videos.splice(i,1);
-    renderVideoManagementList();
-  }else{
-    if(v)deleteVideoFromIndexedDB(v.id).catch(e=>console.error('IndexedDB delete failed',e));
-    videos.splice(i,1);
-    renderVideoManagementList();
   }
+  videos.splice(i,1);
+  renderVideoManagementList();
 }
 
 
 function deleteAllVideos(){
   if(videos.length===0)return;
   if(!confirm(`全${videos.length}件の動画を削除しますか？`))return;
-  if(storageMode==='cloud'){
-    Promise.all(videos.filter(v=>v.cloudPublicId).map(v=>deleteCloudVideo(v.cloudPublicId)))
-      .then(()=>{videos=[];renderVideoManagementList();});
-  }else{
-    videos.forEach(v=>deleteVideoFromIndexedDB(v.id).catch(()=>{}));
-    videos=[];
-    renderVideoManagementList();
-  }
+  Promise.all(videos.filter(v=>v.cloudPublicId).map(v=>deleteCloudVideo(v.cloudPublicId)))
+    .then(()=>{videos=[];renderVideoManagementList();});
 }
 
 
@@ -4621,16 +4595,35 @@ function switchMotivationView(view){
   document.getElementById('optionView').style.display=view==='option'?'block':'none';
   
   if(view==='videos'){
-    if(videos.length>0){
-      playVideoFullscreen();
-    }else{
-      alert('Videosがありません。OptionからAddしてください');
-      // Show home view instead
-      if(home)home.style.display='grid';
-      return;
-    }
+    // Cloudinaryから読み込んでから再生
+    const tryPlay=async()=>{
+      if(videos.length===0){
+        const listEl=document.createElement('div');
+        if(home)home.style.display='grid';
+        try{
+          const res=await fetch(`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/list/ascend.json`);
+          if(res.ok){
+            const data=await res.json();
+            videos=(data.resources||[]).map(r=>({
+              id:r.public_id,
+              name:r.public_id.split('/').pop(),
+              url:`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/upload/${r.public_id}.${r.format||'mp4'}`,
+              cloudPublicId:r.public_id
+            }));
+          }
+        }catch(e){}
+      }
+      if(videos.length>0){
+        playVideoFullscreen();
+      }else{
+        alert('Videosがありません。SAVEDから追加してください');
+        if(home)home.style.display='grid';
+      }
+    };
+    tryPlay();
+    return;
   }
-  if(view==='option'){renderVideoManagementList();updateMigrateBanner();switchStorageMode(storageMode);}
+  if(view==='option'){loadCloudVideos();}
   if(view==='home') renderMotivQuotePreview();
 }
 
@@ -4652,44 +4645,9 @@ function updateSelectCount(){
 }
 
 
-// ===== CLOUDINARY STORAGE MODE =====
-let storageMode=localStorage.getItem('ym4_storage_mode')||'local';
-let cloudVideos=[];
+// ===== CLOUDINARY ONLY =====
 
-function switchStorageMode(mode){
-  storageMode=mode;
-  localStorage.setItem('ym4_storage_mode',mode);
-  const lb=document.getElementById('storageLocalBtn');
-  const cb=document.getElementById('storageCloudBtn');
-  if(lb&&cb){
-    lb.style.background=mode==='local'?'var(--accent)':'none';
-    lb.style.color=mode==='local'?'#000':'var(--muted)';
-    lb.style.borderColor=mode==='local'?'var(--accent)':'var(--border)';
-    cb.style.background=mode==='cloud'?'var(--accent)':'none';
-    cb.style.color=mode==='cloud'?'#000':'var(--muted)';
-    cb.style.borderColor=mode==='cloud'?'var(--accent)':'var(--border)';
-  }
-  if(mode==='cloud'){loadCloudVideos();}
-  else{
-    loadVideosFromIndexedDB().then(saved=>{
-      videos=saved.filter(v=>!v.id.startsWith('hero_'));
-      renderVideoManagementList();
-      updateMigrateBanner();
-    });
-  }
-}
-
-function handleVideoAdd(){
-  if(storageMode==='cloud'){document.getElementById('videoUploadCloud').click();}
-  else{document.getElementById('videoUpload').click();}
-}
-
-function updateMigrateBanner(){
-  const b=document.getElementById('migrateToCloudBanner');
-  if(b)b.style.display=videos.length>0?'block':'none';
-}
-
-// Cloudinary署名生成（SHA-1）
+// SHA-1署名
 async function cloudinarySign(params){
   const sorted=Object.keys(params).sort().map(k=>`${k}=${params[k]}`).join('&');
   const str=sorted+CLOUDINARY_API_SECRET;
@@ -4697,30 +4655,29 @@ async function cloudinarySign(params){
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-// タグ方式でクラウド動画一覧取得（CORSなし）
+// タグ方式で一覧取得
 async function loadCloudVideos(){
   const listEl=document.getElementById('videoManagementList');
   const countEl=document.getElementById('videoCount');
   if(listEl)listEl.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">☁️ 読み込み中...</div>';
   try{
     const res=await fetch(`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/list/ascend.json`);
-    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    if(!res.ok)throw new Error(`HTTP ${res.status} — まず動画をアップロードしてください`);
     const data=await res.json();
-    cloudVideos=(data.resources||[]).map(r=>({
+    videos=(data.resources||[]).map(r=>({
       id:r.public_id,
       name:r.public_id.split('/').pop(),
       url:`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/upload/${r.public_id}.${r.format||'mp4'}`,
       cloudPublicId:r.public_id
     }));
-    videos=cloudVideos;
     if(countEl)countEl.textContent=`(${videos.length})`;
     renderVideoManagementList();
   }catch(e){
-    if(listEl)listEl.innerHTML=`<div style="color:#f44;font-size:12px;text-align:center;padding:20px">読み込みエラー: ${e.message}<br><span style="font-size:10px">CloudinaryのSettings→SecurityでResource listをオフにしてください</span></div>`;
+    if(listEl)listEl.innerHTML=`<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">${e.message}</div>`;
   }
 }
 
-// Cloudinaryにアップロード（タグ付き・Signed）
+// アップロード（タグ付き）
 async function uploadVideoToCloud(input){
   const files=Array.from(input.files);
   if(!files.length)return;
@@ -4739,7 +4696,7 @@ async function uploadVideoToCloud(input){
       const fd=new FormData();
       fd.append('file',file);
       fd.append('api_key',CLOUDINARY_API_KEY);
-      fd.append('timestamp',ts);
+      fd.append('timestamp',String(ts));
       fd.append('folder',CLOUDINARY_FOLDER);
       fd.append('public_id',publicId);
       fd.append('tags','ascend');
@@ -4759,56 +4716,7 @@ async function uploadVideoToCloud(input){
   await loadCloudVideos();
 }
 
-// ローカル→Cloudinaryに移行
-async function migrateLocalToCloud(){
-  if(!videos.length){alert('ローカル動画がありません');return;}
-  if(!confirm(`${videos.length}件の動画をCloudinaryにアップロードしますか？`))return;
-  const progressEl=document.getElementById('cloudUploadProgress');
-  const barEl=document.getElementById('cloudUploadBar');
-  const labelEl=document.getElementById('cloudUploadLabel');
-  progressEl.style.display='block';
-  let success=0;
-  const localVids=[...videos];
-  for(let i=0;i<localVids.length;i++){
-    const v=localVids[i];
-    labelEl.textContent=`移行中 ${i+1}/${localVids.length}: ${v.name}`;
-    try{
-      if(!db)await initDB();
-      const blob=await new Promise((res,rej)=>{
-        const tx=db.transaction(STORE_NAME,'readonly');
-        const req=tx.objectStore(STORE_NAME).get(v.id);
-        req.onsuccess=()=>req.result?res(req.result.blob):rej(new Error('not found'));
-        req.onerror=()=>rej(req.error);
-      });
-      const ts=Math.floor(Date.now()/1000);
-      const publicId=`${CLOUDINARY_FOLDER}/${ts}_${v.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
-      const sig=await cloudinarySign({folder:CLOUDINARY_FOLDER,public_id:publicId,tags:'ascend',timestamp:ts});
-      const fd=new FormData();
-      fd.append('file',blob);
-      fd.append('api_key',CLOUDINARY_API_KEY);
-      fd.append('timestamp',ts);
-      fd.append('folder',CLOUDINARY_FOLDER);
-      fd.append('public_id',publicId);
-      fd.append('tags','ascend');
-      fd.append('signature',sig);
-      await new Promise((resolve,reject)=>{
-        const xhr=new XMLHttpRequest();
-        xhr.open('POST',CLOUDINARY_UPLOAD_URL);
-        xhr.upload.onprogress=e=>{if(e.lengthComputable)barEl.style.width=(e.loaded/e.total*100)+'%';};
-        xhr.onload=()=>{const r=JSON.parse(xhr.responseText);r.error?reject(new Error(r.error.message)):resolve(r);};
-        xhr.onerror=()=>reject(new Error('Upload failed'));
-        xhr.send(fd);
-      });
-      success++;
-    }catch(e){console.error('migrate failed',v.name,e);}
-  }
-  progressEl.style.display='none';
-  barEl.style.width='0%';
-  alert(`${success}/${localVids.length}件の移行が完了しました！`);
-  switchStorageMode('cloud');
-}
-
-// Cloudinaryから削除（Signed）
+// 削除
 async function deleteCloudVideo(publicId){
   try{
     const ts=Math.floor(Date.now()/1000);
@@ -4816,7 +4724,7 @@ async function deleteCloudVideo(publicId){
     const fd=new FormData();
     fd.append('public_id',publicId);
     fd.append('api_key',CLOUDINARY_API_KEY);
-    fd.append('timestamp',ts);
+    fd.append('timestamp',String(ts));
     fd.append('signature',sig);
     await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/destroy`,{method:'POST',body:fd});
   }catch(e){console.error('cloud delete failed',e);}
