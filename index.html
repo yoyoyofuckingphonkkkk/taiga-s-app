@@ -4733,11 +4733,10 @@ function unloadVideoForItem(item){
 }
 
 
-function buildScrollItems(){
-  // 各動画を100vh高さのアイテムとしてscrollコンテナに配置
+function buildScrollItems(h){
   const scroll=document.getElementById('videoScroll');
   const fs=document.getElementById('videoFullscreen');
-  const h=fs.clientHeight||window.innerHeight;
+  if(!h)h=window.visualViewport?window.visualViewport.height:window.innerHeight;
   scroll.innerHTML='';
   videoQueue.forEach((vidIdx,i)=>{
     const item=document.createElement('div');
@@ -4816,8 +4815,8 @@ function playVideoFullscreen(idx){
   buildVideoQueue(idx);
   
   const fullscreen=document.getElementById('videoFullscreen');
-  fullscreen.style.display='block';
-  // bodyのスクロール位置を記録してfixedで固定
+
+  // bodyをfixedで固定
   const scrollY=window.scrollY;
   document.body.style.overflow='hidden';
   document.body.style.position='fixed';
@@ -4825,29 +4824,30 @@ function playVideoFullscreen(idx){
   document.body.style.width='100%';
   document.body.dataset.scrollY=scrollY;
   swipeEnabled=false;
+
+  // 高さをvisualViewportで確実に取得
+  const getH=()=>(window.visualViewport?window.visualViewport.height:window.innerHeight);
+  const h=getH();
+  fullscreen.style.cssText=`display:block;position:fixed;top:0;left:0;width:100vw;height:${h}px;background:#000;z-index:2000;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain`;
+
+  buildScrollItems(h);
   
-  const setH=()=>{
-    const h=window.visualViewport?window.visualViewport.height:window.innerHeight;
-    fullscreen.style.height=h+'px';
-    document.querySelectorAll('.vid-item').forEach(it=>{it.style.height=h+'px';});
-  };
-  setH();
-  
-  buildScrollItems();
+  // scrollTopを2フレームで確実に0にする
   fullscreen.scrollTop=0;
-  requestAnimationFrame(()=>{fullscreen.scrollTop=0;});
+  requestAnimationFrame(()=>{
+    fullscreen.scrollTop=0;
+    requestAnimationFrame(()=>{fullscreen.scrollTop=0;});
+  });
   
-  // 最初のvideoだけロード&再生
   const items=document.querySelectorAll('.vid-item');
   if(items[0]){
     loadVideoForItem(items[0]);
     const v0=items[0].querySelector('video');
-    v0.play().catch(()=>{});
+    v0.currentTime=0;
+    v0.play().catch(()=>{v0.muted=true;v0.play().catch(()=>{});});
   }
-  // 次のvideoもプリロード
   if(items[1])loadVideoForItem(items[1]);
   
-  // スクロール監視
   setupVideoScrollObserver();
   
   requestAnimationFrame(()=>{setH();requestAnimationFrame(setH);});
