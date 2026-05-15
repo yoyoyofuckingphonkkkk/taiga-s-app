@@ -829,11 +829,11 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 <script>
-// 4時前は前日扱い
+// 4時前は前日扱い（日本時間で正しく計算）
 const _now=new Date();
-const _adjustedDate=new Date(_now);
-if(_now.getHours()<4)_adjustedDate.setDate(_adjustedDate.getDate()-1);
-const TODAY_KEY=_adjustedDate.toISOString().slice(0,10);
+const _jst=new Date(_now.getTime()+9*60*60*1000);
+if(_jst.getUTCHours()<4)_jst.setUTCDate(_jst.getUTCDate()-1);
+const TODAY_KEY=_jst.toISOString().slice(0,10);
 
 // 月曜日バックアップリマインダー
 (()=>{
@@ -1360,8 +1360,11 @@ function saveChecks(){saveState();}
 function saveCardio(){localStorage.setItem('ym4_cardio',JSON.stringify(cardioList));}
 function saveStrength(){localStorage.setItem('ym4_strength',JSON.stringify(strengthList));}
 
-const _d=new Date();
-document.getElementById('hdate').textContent=_d.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+const _realNow=new Date();
+const _isBeforeFour=(_realNow.getTime()+9*60*60*1000)%(24*60*60*1000)<4*60*60*1000;
+const _displayDate=_jst.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric',weekday:'long',timeZone:'UTC'});
+const _realDate=_realNow.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'Asia/Tokyo'});
+document.getElementById('hdate').textContent=_isBeforeFour?`${_displayDate} (${_realDate})`:_displayDate;
 
 
 function minsToStr(m){const h=Math.floor(m/60),mn=m%60;return h+'h '+String(mn).padStart(2,'0')+'m'}
