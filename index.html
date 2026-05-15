@@ -647,10 +647,17 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <div style="height:0.5px;background:var(--border);margin-bottom:14px;flex-shrink:0"></div>
 
     <!-- 写真 -->
-    <div id="mealPhotoPreview" style="width:100%;height:140px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;overflow:hidden;cursor:pointer;background:var(--surface2);flex-shrink:0" onclick="document.getElementById('mealPhotoInput').click()">
-      <span style="color:var(--muted);font-size:13px">📷 Tap to add photo</span>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-shrink:0">
+      <div id="mealPhotoPreview" style="flex:1;height:140px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--surface2)" onclick="document.getElementById('mealPhotoInputLib').click()">
+        <span style="color:var(--muted);font-size:13px">📷 Tap to select</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;justify-content:center">
+        <button onclick="document.getElementById('mealPhotoInputCam').click()" style="padding:10px 14px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:18px;cursor:pointer">📷</button>
+        <button onclick="document.getElementById('mealPhotoInputLib').click()" style="padding:10px 14px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:18px;cursor:pointer">🖼️</button>
+      </div>
     </div>
-    <input type="file" id="mealPhotoInput" accept="image/*" style="display:none" onchange="previewMealPhoto(this)">
+    <input type="file" id="mealPhotoInputCam" accept="image/*" capture="environment" style="display:none" onchange="previewMealPhoto(this)">
+    <input type="file" id="mealPhotoInputLib" accept="image/*" style="display:none" onchange="previewMealPhoto(this)">
 
     <!-- Meal name -->
     <input type="text" id="mealName" placeholder="Meal name (e.g. Grilled Chicken)" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:10px;flex-shrink:0">
@@ -2403,7 +2410,7 @@ function openAddMeal(){
   document.getElementById('mealName').value='';
   document.getElementById('mealDetails').value='';
   document.getElementById('mealNutritionResult').style.display='none';
-  document.getElementById('mealPhotoPreview').innerHTML='<span style="color:var(--muted);font-size:13px">📷 Tap to add photo</span>';
+  document.getElementById('mealPhotoPreview').innerHTML='<span style="color:var(--muted);font-size:13px">📷 Tap to select</span>';
   mealPhotoBase64=null;
   mealNutritionData=null;
   document.body.style.overflow='hidden';
