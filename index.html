@@ -856,7 +856,7 @@ function renderHero(tabName){
     : hasImg
       ? `<img class="hero-img" src="${h.img}" alt="" style="object-fit:cover;object-position:${h.posX||50}% ${h.posY||50}%;transform:scale(${h.zoom||1});transform-origin:${h.posX||50}% ${h.posY||50}%">`
       : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#111 0%,#222 100%)"></div>`;
-  return `<div class="hero-section" id="hero-wrap-${tabName}" ontouchend="heroToggleEdit('${tabName}',event)" onclick="heroToggleEdit('${tabName}',event)">
+  return `<div class="hero-section" id="hero-wrap-${tabName}" ontouchstart="this._touchStartY=event.touches[0].clientY" ontouchend="heroToggleEdit('${tabName}',event)" onclick="heroToggleEdit('${tabName}',event)">
     ${mediaHtml}
     <div class="hero-overlay"></div>
     <div class="hero-text">
@@ -873,7 +873,14 @@ function renderHero(tabName){
 
 function heroToggleEdit(tabName,e){
   if(e && e.type==='click' && e._touchHandled) return;
-  if(e && e.type==='touchend'){e.preventDefault();e._touchHandled=true;}
+  if(e && e.type==='touchend'){
+    // スクロール判定：指が10px以上動いていたら無視
+    const t=e.changedTouches[0];
+    const el=e.currentTarget;
+    if(el._touchStartY!==undefined && Math.abs(t.clientY - el._touchStartY)>10) return;
+    e.preventDefault();
+    e._touchHandled=true;
+  }
   const ctrl=document.getElementById('hero-ctrl-'+tabName);
   if(!ctrl) return;
   const isVisible=ctrl.classList.contains('visible');
