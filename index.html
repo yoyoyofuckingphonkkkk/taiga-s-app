@@ -768,9 +768,9 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 <!-- Video fullscreen overlay (TikTok-style) -->
-<div id="videoFullscreen" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;background:#000;z-index:1000;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">
-  <button id="videoBackBtn" style="position:fixed;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;z-index:1020;padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent" onclick="closeVideoFullscreen()">←</button>
-  <div id="videoPlayIcon" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1015;opacity:0;pointer-events:none;transition:opacity .2s">
+<div id="videoFullscreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;width:100%;background:#000;z-index:9999;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:none;overscroll-behavior-y:none">
+  <button id="videoBackBtn" style="position:fixed;top:max(20px,env(safe-area-inset-top));left:20px;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:24px;z-index:10010;padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent" onclick="closeVideoFullscreen()">←</button>
+  <div id="videoPlayIcon" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:10005;opacity:0;pointer-events:none;transition:opacity .2s">
     <div style="width:0;height:0;border-left:24px solid #fff;border-top:16px solid transparent;border-bottom:16px solid transparent;margin-left:6px"></div>
   </div>
   <div id="videoScroll" style="width:100%;display:flex;flex-direction:column"></div>
@@ -4786,14 +4786,16 @@ function toggleVideoBackBtn(){
 function closeVideoFullscreen(){
   const fs=document.getElementById('videoFullscreen');
   fs.style.display='none';
+  fs.style.height='';
   document.querySelectorAll('#videoFullscreen video').forEach(v=>{v.pause();v.removeAttribute('src');v.load();});
   if(videoScrollObserver){videoScrollObserver.disconnect();videoScrollObserver=null;}
   // bodyのfixed固定を解除してスクロール位置を復元
   const scrollY=parseInt(document.body.dataset.scrollY||'0');
   document.body.style.position='';
   document.body.style.top='';
-  document.body.style.width='';
-  document.body.style.overflow='auto';
+  document.body.style.left='';
+  document.body.style.right='';
+  document.body.style.overflow='';
   window.scrollTo(0,scrollY);
   swipeEnabled=true;
   
@@ -4811,43 +4813,45 @@ function playVideoFullscreen(idx){
   if(!videos.length)return;
   if(idx===undefined)idx=Math.floor(Math.random()*videos.length);
   if(!videos[idx])return;
-  
+
   buildVideoQueue(idx);
-  
+
   const fullscreen=document.getElementById('videoFullscreen');
 
-  // bodyをfixedで固定
-  const scrollY=window.scrollY;
-  document.body.style.overflow='hidden';
+  // bodyをfixedで固定（iOSでのスクロール透け防止）
+  const scrollY=window.scrollY||window.pageYOffset;
   document.body.style.position='fixed';
   document.body.style.top=`-${scrollY}px`;
-  document.body.style.width='100%';
-  document.body.dataset.scrollY=scrollY;
+  document.body.style.left='0';
+  document.body.style.right='0';
+  document.body.style.overflow='hidden';
+  document.body.dataset.scrollY=String(scrollY);
   swipeEnabled=false;
 
-  // 高さをvisualViewportで確実に取得
-  const getH=()=>(window.visualViewport?window.visualViewport.height:window.innerHeight);
-  const h=getH();
-  fullscreen.style.cssText=`display:block;position:fixed;top:0;left:0;width:100vw;height:${h}px;background:#000;z-index:2000;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain`;
+  // 高さをvisualViewportで取得してvid-itemに使う
+  const h=window.visualViewport?window.visualViewport.height:window.innerHeight;
+  fullscreen.style.display='block';
+  fullscreen.style.height=h+'px';
 
   buildScrollItems(h);
-  
-  // scrollTopを2フレームで確実に0にする
+
+  // scrollTopを確実に0に
   fullscreen.scrollTop=0;
   requestAnimationFrame(()=>{
     fullscreen.scrollTop=0;
     requestAnimationFrame(()=>{fullscreen.scrollTop=0;});
   });
-  
+
   const items=document.querySelectorAll('.vid-item');
   if(items[0]){
     loadVideoForItem(items[0]);
     const v0=items[0].querySelector('video');
     v0.currentTime=0;
+    v0.muted=false;
     v0.play().catch(()=>{v0.muted=true;v0.play().catch(()=>{});});
   }
   if(items[1])loadVideoForItem(items[1]);
-  
+
   setupVideoScrollObserver();
   
   requestAnimationFrame(()=>{setH();requestAnimationFrame(setH);});
