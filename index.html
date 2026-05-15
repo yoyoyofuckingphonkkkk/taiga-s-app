@@ -276,11 +276,12 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 <div class="tab-content-wrap" id="tabContentWrap" style="min-height:100vh">
 <div class="section active" id="tab-study">
   <div id="hero-study"></div>
-  <div style="display:flex;gap:6px;margin-bottom:12px">
-    <button onclick="showGraphModal()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GRAPH</button>
-    <button onclick="openGoalsView()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GOALS</button>
+  <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+    <button onclick="setStudyTab('normal')" id="studyMainBtn" style="background:var(--accent);border:1px solid var(--accent);color:#000;font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">MAIN</button>
     <button id="studyViewToggle" onclick="toggleStudyView()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">TIMELINE</button>
     <button onclick="openReviewView()" id="reviewBtn" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em;position:relative">REVIEW<span id="reviewBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#f44;color:#fff;font-size:9px;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center"></span></button>
+    <button onclick="showGraphModal()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GRAPH</button>
+    <button onclick="openGoalsView()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GOALS</button>
   </div>
   <div id="goalsPreview"></div>
 
@@ -1398,6 +1399,7 @@ function setStudyTab(tab){ // 'normal' | 'timeline' | 'review'
 
   // ボタンの色リセット→アクティブのみ色付け
   const btns={
+    normal:   document.getElementById('studyMainBtn'),
     timeline: document.getElementById('studyViewToggle'),
     review:   document.getElementById('reviewBtn'),
   };
