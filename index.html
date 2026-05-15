@@ -615,29 +615,30 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 </div>
 
 <!-- Add Meal overlay -->
-<div id="addMealOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1050;align-items:flex-end;justify-content:center">
-  <div style="background:var(--surface);width:100%;max-width:430px;border-radius:16px 16px 0 0;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto">
-    <div style="font-family:var(--serif);font-style:italic;font-size:17px;margin-bottom:16px;text-align:center">Add Meal</div>
+<div id="addMealOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1050;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeAddMeal()">
+  <div style="background:var(--surface);width:100%;max-width:430px;border-radius:16px 16px 0 0;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-height:85dvh;height:85dvh;overflow-y:auto;display:flex;flex-direction:column">
+    <div style="font-family:var(--serif);font-style:italic;font-size:17px;margin-bottom:16px;text-align:center;flex-shrink:0">Add Meal</div>
     
     <!-- 写真 -->
-    <div id="mealPhotoPreview" style="width:100%;height:160px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;overflow:hidden;cursor:pointer;background:var(--surface2)" onclick="document.getElementById('mealPhotoInput').click()">
+    <div id="mealPhotoPreview" style="width:100%;height:140px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;overflow:hidden;cursor:pointer;background:var(--surface2);flex-shrink:0" onclick="document.getElementById('mealPhotoInput').click()">
       <span style="color:var(--muted);font-size:13px">📷 Tap to add photo</span>
     </div>
     <input type="file" id="mealPhotoInput" accept="image/*" style="display:none" onchange="previewMealPhoto(this)">
     
     <!-- Meal name -->
-    <input type="text" id="mealName" placeholder="Meal name (e.g. Grilled Chicken)" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:10px">
+    <input type="text" id="mealName" placeholder="Meal name (e.g. Grilled Chicken)" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:10px;flex-shrink:0">
     
     <!-- Details -->
-    <textarea id="mealDetails" placeholder="Ingredients / details (optional)" rows="3" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;resize:none;font-family:inherit;margin-bottom:12px"></textarea>
+    <textarea id="mealDetails" placeholder="Ingredients / details (optional)" rows="3" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;resize:none;font-family:inherit;margin-bottom:12px;flex-shrink:0"></textarea>
     
     <!-- AI Analyze -->
-    <button onclick="analyzeMealNutrition()" id="analyzeBtn" style="width:100%;padding:10px;border:0.5px solid var(--accent);border-radius:8px;background:transparent;color:var(--accent);font-size:13px;cursor:pointer;margin-bottom:8px">Analyze Nutrition with AI</button>
+    <button onclick="analyzeMealNutrition()" id="analyzeBtn" style="width:100%;padding:10px;border:0.5px solid var(--accent);border-radius:8px;background:transparent;color:var(--accent);font-size:13px;cursor:pointer;margin-bottom:8px;flex-shrink:0">Analyze Nutrition with AI</button>
     
     <!-- Nutrition result -->
-    <div id="mealNutritionResult" style="display:none;padding:10px 12px;border-radius:8px;background:var(--surface2);margin-bottom:12px;font-size:12px;line-height:1.8;color:var(--text2)"></div>
+    <div id="mealNutritionResult" style="display:none;padding:10px 12px;border-radius:8px;background:var(--surface2);margin-bottom:12px;font-size:12px;line-height:1.8;color:var(--text2);flex-shrink:0"></div>
     
-    <div style="display:flex;gap:8px">
+    <div style="flex:1"></div>
+    <div style="display:flex;gap:8px;flex-shrink:0;padding-top:8px">
       <button onclick="closeAddMeal()" class="modal-cancel" style="flex:1">Cancel</button>
       <button onclick="saveMeal()" class="modal-ok" style="flex:1">Save</button>
     </div>
@@ -1959,11 +1960,28 @@ function openAddMeal(){
   mealPhotoBase64=null;
   mealNutritionData=null;
   document.body.style.overflow='hidden';
+  // キーボード対応
+  if(window.visualViewport){
+    window._mealVVListener=()=>{
+      const overlay=document.getElementById('addMealOverlay');
+      if(!overlay)return;
+      const offsetBottom=window.innerHeight-(window.visualViewport.offsetTop+window.visualViewport.height);
+      overlay.style.paddingBottom=Math.max(0,offsetBottom)+'px';
+    };
+    window.visualViewport.addEventListener('resize',window._mealVVListener);
+    window.visualViewport.addEventListener('scroll',window._mealVVListener);
+  }
 }
 
 function closeAddMeal(){
   document.getElementById('addMealOverlay').style.display='none';
+  document.getElementById('addMealOverlay').style.paddingBottom='0';
   document.body.style.overflow='auto';
+  if(window.visualViewport&&window._mealVVListener){
+    window.visualViewport.removeEventListener('resize',window._mealVVListener);
+    window.visualViewport.removeEventListener('scroll',window._mealVVListener);
+    window._mealVVListener=null;
+  }
 }
 
 function previewMealPhoto(input){
