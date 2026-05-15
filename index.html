@@ -279,9 +279,23 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
   <div style="display:flex;gap:6px;margin-bottom:12px">
     <button onclick="showGraphModal()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GRAPH</button>
     <button onclick="openGoalsView()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GOALS</button>
+    <button id="studyViewToggle" onclick="toggleStudyView()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">TIMELINE</button>
   </div>
   <div id="goalsPreview"></div>
-  <div id="subjectList"></div>
+
+  <!-- 通常ビュー -->
+  <div id="studyNormalView">
+    <div id="subjectList"></div>
+  </div>
+
+  <!-- タイムラインビュー -->
+  <div id="studyTimelineView" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--muted);letter-spacing:.06em">TODAY'S SESSIONS</div>
+      <button onclick="openAddSessionModal()" style="background:var(--accent);border:none;border-radius:8px;color:#000;font-size:12px;padding:6px 14px;cursor:pointer;font-family:inherit">+ Add</button>
+    </div>
+    <div id="sessionTimeline"></div>
+  </div>
 </div>
 
 <div class="section" id="tab-check">
@@ -682,6 +696,58 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <div style="display:flex;gap:8px;margin-top:8px">
       <button onclick="closeFoodPreset()" class="modal-cancel" style="flex:1">Cancel</button>
       <button onclick="saveFoodPreset()" class="modal-ok" style="flex:1">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Session Modal -->
+<div id="addSessionOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1050;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeAddSessionModal()">
+  <div style="background:var(--surface);width:100%;max-width:430px;border-radius:16px 16px 0 0;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-height:80dvh;overflow-y:auto">
+    <div style="font-family:var(--serif);font-style:italic;font-size:17px;margin-bottom:16px;text-align:center">Add Session</div>
+
+    <!-- 科目選択 -->
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Subject</div>
+    <select id="sessionSubjectSel" onchange="renderSessionBookSel()" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:10px;font-family:inherit"></select>
+
+    <!-- 参考書選択 -->
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Textbook</div>
+    <select id="sessionBookSel" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:14px;font-family:inherit"></select>
+
+    <!-- 時間入力タブ -->
+    <div style="display:flex;gap:0;margin-bottom:14px;border:0.5px solid var(--border);border-radius:8px;overflow:hidden">
+      <button id="sessionTabManual" onclick="switchSessionTab('manual')" style="flex:1;padding:8px;background:var(--accent);color:#000;border:none;font-size:12px;cursor:pointer;font-family:inherit">手入力</button>
+      <button id="sessionTabTimer" onclick="switchSessionTab('timer')" style="flex:1;padding:8px;background:none;color:var(--muted);border:none;font-size:12px;cursor:pointer;font-family:inherit">タイマー</button>
+    </div>
+
+    <!-- 手入力パネル -->
+    <div id="sessionManualPanel">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Duration</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <input type="number" id="sessionHours" min="0" max="24" placeholder="0" style="flex:1;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:20px;box-sizing:border-box;text-align:center">
+        <span style="color:var(--muted);font-size:14px">h</span>
+        <input type="number" id="sessionMins" min="0" max="59" placeholder="0" style="flex:1;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:20px;box-sizing:border-box;text-align:center">
+        <span style="color:var(--muted);font-size:14px">m</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Time (optional)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <input type="time" id="sessionStartTime" style="flex:1;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
+        <span style="color:var(--muted)">〜</span>
+        <input type="time" id="sessionEndTime" style="flex:1;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
+      </div>
+    </div>
+
+    <!-- タイマーパネル -->
+    <div id="sessionTimerPanel" style="display:none;text-align:center;padding:10px 0 20px">
+      <div id="sessionTimerDisplay" style="font-family:'Bebas Neue',sans-serif;font-size:64px;color:var(--accent);letter-spacing:4px">00:00</div>
+      <div style="display:flex;justify-content:center;gap:12px;margin-top:12px">
+        <button onclick="toggleSessionTimer()" id="sessionTimerToggle" style="padding:10px 24px;border-radius:10px;background:var(--accent);border:none;color:#000;font-size:14px;cursor:pointer;font-family:inherit">▶ Start</button>
+        <button onclick="resetSessionTimer()" style="padding:10px 24px;border-radius:10px;background:none;border:0.5px solid var(--border);color:var(--muted);font-size:14px;cursor:pointer;font-family:inherit">Reset</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button onclick="closeAddSessionModal()" class="modal-cancel" style="flex:1">Cancel</button>
+      <button onclick="saveSession()" class="modal-ok" style="flex:1">Save</button>
     </div>
   </div>
 </div>
@@ -1287,6 +1353,226 @@ function updateRing(){
   document.getElementById('ringPct').textContent=Math.round(pct*100)+'%';
 }
 
+// ===== STUDY TIMELINE =====
+let studyViewMode = localStorage.getItem('ym4_study_view') || 'normal'; // 'normal' | 'timeline'
+let sessionTimerInterval = null;
+let sessionTimerElapsed = 0;
+let sessionTimerRunning = false;
+let sessionTimerStartAt = null; // タイマー開始のDate
+
+function toggleStudyView(){
+  studyViewMode = studyViewMode === 'normal' ? 'timeline' : 'normal';
+  localStorage.setItem('ym4_study_view', studyViewMode);
+  applyStudyView();
+}
+
+function applyStudyView(){
+  const btn = document.getElementById('studyViewToggle');
+  const normal = document.getElementById('studyNormalView');
+  const timeline = document.getElementById('studyTimelineView');
+  if(!normal||!timeline)return;
+  if(studyViewMode === 'timeline'){
+    normal.style.display = 'none';
+    timeline.style.display = 'block';
+    if(btn){btn.style.background='var(--accent)';btn.style.color='#000';}
+    renderSessionTimeline();
+  } else {
+    normal.style.display = 'block';
+    timeline.style.display = 'none';
+    if(btn){btn.style.background='none';btn.style.color='var(--text2)';}
+  }
+}
+
+function getStudySessions(){
+  return state.studySessions || [];
+}
+
+function renderSessionTimeline(){
+  const el = document.getElementById('sessionTimeline');
+  if(!el) return;
+  const sessions = getStudySessions();
+  if(sessions.length === 0){
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">セッションがありません<br><span style="font-size:11px">+ Add で追加してください</span></div>';
+    return;
+  }
+  // 時刻順ソート
+  const sorted = [...sessions].sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+  const totalMins = sessions.reduce((a,s) => a + (s.mins||0), 0);
+  const h = Math.floor(totalMins/60), m = totalMins%60;
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface);border-radius:10px;margin-bottom:16px;border:0.5px solid var(--border)">
+      <div style="font-size:11px;color:var(--muted)">Total Today</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);letter-spacing:2px">${h}h ${m}m</div>
+    </div>
+    ${sorted.map((s,i) => {
+      const subj = subjects.find(sub => sub.id === s.subjectId);
+      const book = subj?.books.find(b => b.id === s.bookId);
+      const sh = Math.floor((s.mins||0)/60), sm2 = (s.mins||0)%60;
+      const timeLabel = s.startTime&&s.endTime ? `${s.startTime} — ${s.endTime}` : s.startTime ? s.startTime+'〜' : '';
+      const colors = ['#4fc3f7','#a5d6a7','#ffcc80','#f48fb1','#ce93d8','#80cbc4','#fff59d','#ef9a9a'];
+      const color = colors[subjects.indexOf(subj) % colors.length] || 'var(--accent)';
+      return `
+        <div style="display:flex;gap:12px;margin-bottom:12px;align-items:flex-start">
+          <div style="display:flex;flex-direction:column;align-items:center;width:36px;flex-shrink:0">
+            <div style="width:10px;height:10px;border-radius:50%;background:${color};margin-top:4px;flex-shrink:0"></div>
+            ${i < sorted.length-1 ? `<div style="width:1px;flex:1;min-height:32px;background:var(--border);margin-top:4px"></div>` : ''}
+          </div>
+          <div style="flex:1;background:var(--surface);border-radius:10px;padding:12px 14px;border:0.5px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div style="font-size:13px;font-weight:500;color:${color}">${subj?.name||'Unknown'}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">${book?.name||'—'}</div>
+                ${timeLabel?`<div style="font-size:10px;color:var(--muted);margin-top:4px">${timeLabel}</div>`:''}
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--text);letter-spacing:1px">${sh?sh+'h ':''}${sm2}m</div>
+                <button onclick="deleteSession('${s.id}')" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 4px;line-height:1">×</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join('')}
+  `;
+}
+
+function deleteSession(id){
+  if(!confirm('このセッションを削除しますか？'))return;
+  if(!state.studySessions)return;
+  const s = state.studySessions.find(s=>s.id===id);
+  if(s){
+    // state.studyからも引き算
+    const subj = subjects.find(sub=>sub.id===s.subjectId);
+    const book = subj?.books.find(b=>b.id===s.bookId);
+    if(subj&&book){
+      if(!state.study[subj.id])state.study[subj.id]={};
+      state.study[subj.id][book.id] = Math.max(0,(state.study[subj.id][book.id]||0)-(s.mins||0));
+    }
+  }
+  state.studySessions = state.studySessions.filter(s=>s.id!==id);
+  saveState(); renderSessionTimeline(); updateRing(); calcScore();
+}
+
+function openAddSessionModal(){
+  document.getElementById('addSessionOverlay').style.display='flex';
+  // 科目セレクト
+  const sel = document.getElementById('sessionSubjectSel');
+  sel.innerHTML = subjects.map((s,i)=>`<option value="${i}">${s.name}</option>`).join('');
+  renderSessionBookSel();
+  switchSessionTab('manual');
+  document.getElementById('sessionHours').value='';
+  document.getElementById('sessionMins').value='';
+  // デフォルト時刻を現在時刻に
+  const now = new Date();
+  const pad = n=>String(n).padStart(2,'0');
+  document.getElementById('sessionEndTime').value=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  document.getElementById('sessionStartTime').value='';
+  resetSessionTimer();
+}
+
+function closeAddSessionModal(){
+  document.getElementById('addSessionOverlay').style.display='none';
+  if(sessionTimerInterval){clearInterval(sessionTimerInterval);sessionTimerInterval=null;}
+  sessionTimerRunning=false;
+}
+
+function renderSessionBookSel(){
+  const si = parseInt(document.getElementById('sessionSubjectSel').value)||0;
+  const books = subjects[si]?.books||[];
+  document.getElementById('sessionBookSel').innerHTML = books.map((b,i)=>`<option value="${i}">${b.name}</option>`).join('');
+}
+
+function switchSessionTab(tab){
+  const isManual = tab==='manual';
+  document.getElementById('sessionManualPanel').style.display = isManual?'block':'none';
+  document.getElementById('sessionTimerPanel').style.display = isManual?'none':'block';
+  document.getElementById('sessionTabManual').style.background = isManual?'var(--accent)':'none';
+  document.getElementById('sessionTabManual').style.color = isManual?'#000':'var(--muted)';
+  document.getElementById('sessionTabTimer').style.background = isManual?'none':'var(--accent)';
+  document.getElementById('sessionTabTimer').style.color = isManual?'var(--muted)':'#000';
+}
+
+function toggleSessionTimer(){
+  if(!sessionTimerRunning){
+    if(!sessionTimerStartAt) sessionTimerStartAt = new Date();
+    sessionTimerRunning=true;
+    document.getElementById('sessionTimerToggle').textContent='⏸ Pause';
+    sessionTimerInterval=setInterval(()=>{
+      sessionTimerElapsed++;
+      const m=Math.floor(sessionTimerElapsed/60),s=sessionTimerElapsed%60;
+      document.getElementById('sessionTimerDisplay').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    },1000);
+  } else {
+    sessionTimerRunning=false;
+    clearInterval(sessionTimerInterval);sessionTimerInterval=null;
+    document.getElementById('sessionTimerToggle').textContent='▶ Resume';
+  }
+}
+
+function resetSessionTimer(){
+  clearInterval(sessionTimerInterval);sessionTimerInterval=null;
+  sessionTimerRunning=false;sessionTimerElapsed=0;sessionTimerStartAt=null;
+  const tog=document.getElementById('sessionTimerToggle');
+  if(tog)tog.textContent='▶ Start';
+  const disp=document.getElementById('sessionTimerDisplay');
+  if(disp)disp.textContent='00:00';
+}
+
+function saveSession(){
+  const si=parseInt(document.getElementById('sessionSubjectSel').value)||0;
+  const bi=parseInt(document.getElementById('sessionBookSel').value)||0;
+  const subj=subjects[si];const book=subj?.books[bi];
+  if(!subj||!book){alert('科目・参考書を選択してください');return;}
+
+  let mins=0;
+  let startTime='',endTime='';
+  const isTimer=document.getElementById('sessionTimerPanel').style.display!=='none';
+
+  if(isTimer){
+    mins=Math.floor(sessionTimerElapsed/60);
+    if(mins<1){alert('1分以上計測してください');return;}
+    if(sessionTimerStartAt){
+      const pad=n=>String(n).padStart(2,'0');
+      const s=sessionTimerStartAt;
+      startTime=`${pad(s.getHours())}:${pad(s.getMinutes())}`;
+      const e=new Date();
+      endTime=`${pad(e.getHours())}:${pad(e.getMinutes())}`;
+    }
+  } else {
+    const h=parseInt(document.getElementById('sessionHours').value)||0;
+    const m=parseInt(document.getElementById('sessionMins').value)||0;
+    mins=h*60+m;
+    if(mins<1){alert('時間を入力してください');return;}
+    startTime=document.getElementById('sessionStartTime').value||'';
+    endTime=document.getElementById('sessionEndTime').value||'';
+    // 開始・終了から分数を自動計算
+    if(startTime&&endTime){
+      const [sh2,sm2]=startTime.split(':').map(Number);
+      const [eh,em]=endTime.split(':').map(Number);
+      const calc=(eh*60+em)-(sh2*60+sm2);
+      if(calc>0)mins=calc;
+    }
+  }
+
+  const session={
+    id:'ss_'+Date.now(),
+    subjectId:subj.id, bookId:book.id,
+    mins, startTime, endTime
+  };
+  if(!state.studySessions)state.studySessions=[];
+  state.studySessions.push(session);
+
+  // state.studyにも反映（スコア計算用）
+  if(!state.study[subj.id])state.study[subj.id]={};
+  state.study[subj.id][book.id]=(state.study[subj.id][book.id]||0)+mins;
+
+  saveState();
+  closeAddSessionModal();
+  renderSessionTimeline();
+  renderStudy();
+  updateRing();calcScore();
+}
+
 function renderStudy(){
   const el=document.getElementById('subjectList');el.innerHTML='';
   subjects.forEach((s,si)=>{
@@ -1429,7 +1715,32 @@ function updateTimerUI(){const m=Math.floor(timerElapsed/60),s=timerElapsed%60;c
 function toggleTimer(){timerRunning=!timerRunning;document.getElementById('timerPlayPause').textContent=timerRunning?'⏸':'▶';document.getElementById('timerPauseNote').textContent=timerRunning?'':'一h停止中 — Minimizeでタブに戻れます';}
 function confirmResetTimer(){if(confirm('タイマーをリセット（記録は保持）しますか？')){timerElapsed=0;timerAddedMins=0;updateTimerUI();}}
 function confirmStopTimer(){if(confirm('タイマーを終了して記録を保存しますか？'))stopTimer(true);}
-function stopTimer(save){clearInterval(timerInterval);timerInterval=null;timerActive=false;timerRunning=false;document.getElementById('timerOverlay').classList.remove('active');document.getElementById('timerMini').classList.remove('visible');if(save)saveState();renderStudy();}
+function stopTimer(save){
+  clearInterval(timerInterval);timerInterval=null;
+  const elapsed=timerElapsed;
+  timerActive=false;timerRunning=false;
+  document.getElementById('timerOverlay').classList.remove('active');
+  document.getElementById('timerMini').classList.remove('visible');
+  if(save&&elapsed>0){
+    // セッションとして記録
+    const mins=Math.floor(elapsed/60);
+    if(mins>0){
+      const subj=subjects.find(s=>s.id===timerSubjectId);
+      const book=subj?.books.find(b=>b.id===timerBookId);
+      if(subj&&book){
+        const now=new Date();const pad=n=>String(n).padStart(2,'0');
+        const endT=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        const startD=new Date(now.getTime()-elapsed*1000);
+        const startT=`${pad(startD.getHours())}:${pad(startD.getMinutes())}`;
+        if(!state.studySessions)state.studySessions=[];
+        state.studySessions.push({id:'ss_'+Date.now(),subjectId:subj.id,bookId:book.id,mins,startTime:startT,endTime:endT});
+      }
+    }
+    saveState();
+  }
+  renderStudy();
+  if(studyViewMode==='timeline')renderSessionTimeline();
+}
 function minimizeTimer(){timerRunning=false;document.getElementById('timerPlayPause').textContent='▶';document.getElementById('timerOverlay').classList.remove('active');const b=timerBi>=0?subjects[timerSi]?.books[timerBi]?.name:'';document.getElementById('timerMiniText').textContent=(b||'Timer')+' — paused';document.getElementById('timerMini').classList.add('visible');}
 function showTimer(){document.getElementById('timerOverlay').classList.add('active');document.getElementById('timerMini').classList.remove('visible');}
 
@@ -3687,6 +3998,7 @@ function switchTab(id,btn){
   document.getElementById('tab-'+id).classList.add('active');
   btn.classList.add('active');
   if(id==='record') renderRecord();
+  if(id==='study'){renderStudy();applyStudyView();}
 }
 
 function showStudyGraph(){
@@ -4163,7 +4475,7 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
   }catch(e){console.error('DB init error:',e);}
 
   try{
-    renderWidgets();renderStudy();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
+    renderWidgets();renderStudy();applyStudyView();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
   }catch(e){console.error('Render error:',e);}
 
   clearTimeout(_forceHide);
