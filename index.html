@@ -618,29 +618,70 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 <div id="addMealOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1050;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeAddMeal()">
   <div style="background:var(--surface);width:100%;max-width:430px;border-radius:16px 16px 0 0;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-height:85dvh;height:85dvh;overflow-y:auto;display:flex;flex-direction:column">
     <div style="font-family:var(--serif);font-style:italic;font-size:17px;margin-bottom:16px;text-align:center;flex-shrink:0">Add Meal</div>
-    
+
+    <!-- よく使う食品 -->
+    <div style="flex-shrink:0;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.06em">SAVED FOODS</div>
+        <button onclick="openAddFoodPreset()" style="background:none;border:0.5px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;padding:3px 8px;cursor:pointer">+ New</button>
+      </div>
+      <div id="foodPresetList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+
+    <div style="height:0.5px;background:var(--border);margin-bottom:14px;flex-shrink:0"></div>
+
     <!-- 写真 -->
     <div id="mealPhotoPreview" style="width:100%;height:140px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;overflow:hidden;cursor:pointer;background:var(--surface2);flex-shrink:0" onclick="document.getElementById('mealPhotoInput').click()">
       <span style="color:var(--muted);font-size:13px">📷 Tap to add photo</span>
     </div>
     <input type="file" id="mealPhotoInput" accept="image/*" style="display:none" onchange="previewMealPhoto(this)">
-    
+
     <!-- Meal name -->
     <input type="text" id="mealName" placeholder="Meal name (e.g. Grilled Chicken)" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:10px;flex-shrink:0">
-    
+
     <!-- Details -->
     <textarea id="mealDetails" placeholder="Ingredients / details (optional)" rows="3" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;resize:none;font-family:inherit;margin-bottom:12px;flex-shrink:0"></textarea>
-    
+
     <!-- AI Analyze -->
     <button onclick="analyzeMealNutrition()" id="analyzeBtn" style="width:100%;padding:10px;border:0.5px solid var(--accent);border-radius:8px;background:transparent;color:var(--accent);font-size:13px;cursor:pointer;margin-bottom:8px;flex-shrink:0">Analyze Nutrition with AI</button>
-    
+
     <!-- Nutrition result -->
     <div id="mealNutritionResult" style="display:none;padding:10px 12px;border-radius:8px;background:var(--surface2);margin-bottom:12px;font-size:12px;line-height:1.8;color:var(--text2);flex-shrink:0"></div>
-    
+
     <div style="flex:1"></div>
     <div style="display:flex;gap:8px;flex-shrink:0;padding-top:8px">
       <button onclick="closeAddMeal()" class="modal-cancel" style="flex:1">Cancel</button>
       <button onclick="saveMeal()" class="modal-ok" style="flex:1">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Food Preset 登録モーダル -->
+<div id="foodPresetOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1060;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeFoodPreset()">
+  <div style="background:var(--surface);width:100%;max-width:430px;border-radius:16px 16px 0 0;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-height:80dvh;overflow-y:auto">
+    <div style="font-family:var(--serif);font-style:italic;font-size:17px;margin-bottom:16px;text-align:center">New Saved Food</div>
+    <input type="text" id="presetName" placeholder="食品名 (e.g. 鶏胸肉100g)" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Calories (kcal)</div>
+        <input type="number" id="presetCal" placeholder="0" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Protein (g)</div>
+        <input type="number" id="presetProtein" placeholder="0" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Carbs (g)</div>
+        <input type="number" id="presetCarbs" placeholder="0" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Fat (g)</div>
+        <input type="number" id="presetFat" placeholder="0" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="closeFoodPreset()" class="modal-cancel" style="flex:1">Cancel</button>
+      <button onclick="saveFoodPreset()" class="modal-ok" style="flex:1">Save</button>
     </div>
   </div>
 </div>
@@ -1958,6 +1999,89 @@ function saveNutritionGoals(){
 let mealPhotoBase64=null;
 let mealNutritionData=null;
 
+// ===== FOOD PRESETS =====
+function getFoodPresets(){
+  try{return JSON.parse(localStorage.getItem('ym4_food_presets')||'[]');}catch{return[];}
+}
+function saveFoodPresets(arr){
+  localStorage.setItem('ym4_food_presets',JSON.stringify(arr));
+}
+
+function renderFoodPresetList(){
+  const el=document.getElementById('foodPresetList');
+  if(!el)return;
+  const presets=getFoodPresets();
+  if(presets.length===0){
+    el.innerHTML='<div style="font-size:11px;color:var(--muted);padding:4px 0">登録した食品がここに表示されます</div>';
+    return;
+  }
+  el.innerHTML='';
+  presets.forEach((p,i)=>{
+    const btn=document.createElement('button');
+    btn.style.cssText='display:flex;align-items:center;gap:6px;padding:6px 10px;border:0.5px solid var(--border);border-radius:20px;background:var(--surface2);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;max-width:100%';
+    btn.innerHTML=`<span>${p.name}</span><span style="color:var(--muted);font-size:10px">${p.calories}kcal</span><span onclick="event.stopPropagation();deleteFoodPreset(${i})" style="color:var(--muted);font-size:14px;line-height:1;padding-left:2px">×</span>`;
+    btn.onclick=()=>applyFoodPreset(p);
+    el.appendChild(btn);
+  });
+}
+
+function openAddFoodPreset(){
+  document.getElementById('foodPresetOverlay').style.display='flex';
+  ['presetName','presetCal','presetProtein','presetCarbs','presetFat'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+}
+
+function closeFoodPreset(){
+  document.getElementById('foodPresetOverlay').style.display='none';
+}
+
+function saveFoodPreset(){
+  const name=document.getElementById('presetName').value.trim();
+  if(!name){alert('食品名を入力してください');return;}
+  const preset={
+    name,
+    calories:parseFloat(document.getElementById('presetCal').value)||0,
+    protein:parseFloat(document.getElementById('presetProtein').value)||0,
+    carbs:parseFloat(document.getElementById('presetCarbs').value)||0,
+    fat:parseFloat(document.getElementById('presetFat').value)||0,
+  };
+  const arr=getFoodPresets();
+  arr.push(preset);
+  saveFoodPresets(arr);
+  closeFoodPreset();
+  renderFoodPresetList();
+}
+
+function deleteFoodPreset(i){
+  if(!confirm('この食品を削除しますか？'))return;
+  const arr=getFoodPresets();
+  arr.splice(i,1);
+  saveFoodPresets(arr);
+  renderFoodPresetList();
+}
+
+function applyFoodPreset(p){
+  if(!state.meals)state.meals=[];
+  const meal={
+    id:'meal_'+Date.now(),
+    name:p.name,
+    details:'',
+    photoId:null,
+    nutrition:{calories:p.calories,protein:p.protein,carbs:p.carbs,fat:p.fat},
+    time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
+  };
+  state.meals.push(meal);
+  saveState();
+  renderMealList();
+  closeAddMeal();
+  const flash=document.createElement('div');
+  flash.style.cssText='position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;padding:8px 20px;border-radius:20px;font-size:13px;z-index:2000;pointer-events:none;opacity:1;transition:opacity .4s';
+  flash.textContent=`✓ ${p.name} を追加しました`;
+  document.body.appendChild(flash);
+  setTimeout(()=>{flash.style.opacity='0';setTimeout(()=>flash.remove(),400);},1200);
+}
+
 function openAddMeal(){
   document.getElementById('addMealOverlay').style.display='flex';
   document.getElementById('mealName').value='';
@@ -1967,6 +2091,7 @@ function openAddMeal(){
   mealPhotoBase64=null;
   mealNutritionData=null;
   document.body.style.overflow='hidden';
+  renderFoodPresetList();
   // キーボード対応
   if(window.visualViewport){
     window._mealVVListener=()=>{
@@ -2010,23 +2135,52 @@ async function analyzeMealNutrition(){
   const details=document.getElementById('mealDetails').value.trim();
   if(!name&&!mealPhotoBase64){alert('Meal nameか写真を入力してください');return;}
   const btn=document.getElementById('analyzeBtn');
-  btn.textContent='Analyzing...';btn.disabled=true;
+  btn.textContent='🔍 Searching & Analyzing...';btn.disabled=true;
   try{
-    const prompt=`以下の食事の栄養素を詳しく分析してください。\n食事名: ${name||'(写真参照)'}\n${details?'詳細: '+details:''}\n\nJSON onlyで返してください（前後に文章不要）:\n{"calories":数字,"protein":数字,"carbs":数字,"fat":数字,"fiber":数字,"sugar":数字,"sodium":数字,"vitaminA":数字,"vitaminC":数字,"vitaminD":数字,"vitaminB12":数字,"calcium":数字,"iron":数字,"zinc":数字,"magnesium":数字,"potassium":数字,"summary":"一言コメント"}\n単位: calories=kcal, protein/carbs/fat/fiber/sugar=g, sodium/calcium/iron/zinc/magnesium/potassium=mg, vitaminA=μg, vitaminC/D/B12=μg。推定で構いません。`;
+    const prompt=`あなたは栄養士です。以下の食事の栄養素を正確に分析してください。
+
+食事名: ${name||'(写真参照)'}
+${details?'詳細・材料: '+details:''}
+
+【重要な指示】
+- 市販品・コンビニ商品・チェーン店メニューの場合は、メーカー公式や栄養データベースの実際の数値を使用すること
+- 手料理の場合は食材ごとに計算して合計すること
+- 写真がある場合は盛り付けや量も考慮すること
+- 推定の場合は多めに見積もること（少なめの見積もりは避ける）
+- 単位を厳守: calories=kcal, protein/carbs/fat/fiber/sugar=g, sodium/calcium/iron/zinc/magnesium/potassium=mg, vitaminA=μg, vitaminC=mg, vitaminD=μg, vitaminB12=μg
+
+以下のJSONのみ返してください（説明文・コードブロック不要）:
+{"calories":数字,"protein":数字,"carbs":数字,"fat":数字,"fiber":数字,"sugar":数字,"sodium":数字,"vitaminA":数字,"vitaminC":数字,"vitaminD":数字,"vitaminB12":数字,"calcium":数字,"iron":数字,"zinc":数字,"magnesium":数字,"potassium":数字,"summary":"データソースと精度についての一言（例：公式栄養成分表より／推定値）"}`;
+
     const parts=mealPhotoBase64
       ?[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:mealPhotoBase64}}]
       :[{text:prompt}];
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
+
+    const body={
+      contents:[{role:'user',parts}],
+      tools:[{google_search:{}}],
+      generation_config:{temperature:0.1}
+    };
+
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{role:'user',parts}]})
+      body:JSON.stringify(body)
     });
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
-    const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    mealNutritionData=JSON.parse(text.replace(/```json|```/g,'').trim());
+    const text=data.candidates?.[0]?.content?.parts?.find(p=>p.text)?.text||'';
+    const jsonStr=text.replace(/```json|```/g,'').trim();
+    // JSON部分だけ抽出（余計な文字が混じる場合対策）
+    const match=jsonStr.match(/\{[\s\S]*\}/);
+    if(!match)throw new Error('JSONが見つかりません: '+text.slice(0,100));
+    mealNutritionData=JSON.parse(match[0]);
     const r=mealNutritionData;
+    // web検索使用を表示
+    const usedSearch=data.candidates?.[0]?.content?.parts?.some(p=>p.executableCode||p.codeExecutionResult)||
+      data.candidates?.[0]?.groundingMetadata?.webSearchQueries?.length>0;
     document.getElementById('mealNutritionResult').style.display='block';
     document.getElementById('mealNutritionResult').innerHTML=`
+      ${usedSearch?'<div style="font-size:10px;color:var(--accent);margin-bottom:8px">🔍 Web検索で栄養情報を取得しました</div>':''}
       <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Macros</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:10px">
         <div style="text-align:center;padding:6px;background:var(--surface);border-radius:6px"><div style="font-size:15px;color:var(--accent);font-weight:bold">${r.calories}</div><div style="font-size:9px;color:var(--muted)">kcal</div></div>
@@ -2038,9 +2192,9 @@ async function analyzeMealNutrition(){
       </div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Vitamins & Minerals</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">
-        ${[['Vit A',r.vitaminA,'μg','#f96','(ビタミンA)'],['Vit C',r.vitaminC,'μg','#f60','(ビタミンC)'],['Vit D',r.vitaminD,'μg','#ff0','(ビタミンD)'],['Vit B12',r.vitaminB12,'μg','#6af','(ビタミンB12)'],['Calcium',r.calcium,'mg','#fff','(カルシウム)'],['Iron',r.iron,'mg','#f44','(鉄)'],['Zinc',r.zinc,'mg','#8cf','(亜鉛)'],['Magnesium',r.magnesium,'mg','#4d8','(マグネシウム)'],['Potassium',r.potassium,'mg','#a8f','(カリウム)'],['Sodium',r.sodium,'mg','#fa8','(ナトリウム)']].map(([label,val,unit,color,jp])=>`
+        ${[['Vit A',r.vitaminA,'μg','#f96'],['Vit C',r.vitaminC,'mg','#f60'],['Vit D',r.vitaminD,'μg','#ff0'],['Vit B12',r.vitaminB12,'μg','#6af'],['Calcium',r.calcium,'mg','#fff'],['Iron',r.iron,'mg','#f44'],['Zinc',r.zinc,'mg','#8cf'],['Magnesium',r.magnesium,'mg','#4d8'],['Potassium',r.potassium,'mg','#a8f'],['Sodium',r.sodium,'mg','#fa8']].map(([label,val,unit,color])=>`
           <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--surface);border-radius:6px">
-            <div><div style="font-size:11px;color:var(--muted)">${label}</div><div style="font-size:9px;color:var(--muted);opacity:.6">${jp}</div></div>
+            <div style="font-size:11px;color:var(--muted)">${label}</div>
             <span style="font-size:11px;color:${color};font-weight:500">${val||0}${unit}</span>
           </div>`).join('')}
       </div>
@@ -4374,11 +4528,11 @@ function deleteSelectedVideos(){
 function drawScoreGraph(scores){
   const svg=document.getElementById('scoreChart');
   svg.innerHTML='';
-  
+
   const w=400,h=300,padding=40;
   const graphW=w-padding*2,graphH=h-padding*2;
-  
-  // Draw axes
+
+  // Axes
   const axes=document.createElementNS('http://www.w3.org/2000/svg','g');
   axes.innerHTML=`
     <line x1="${padding}" y1="${h-padding}" x2="${w-padding}" y2="${h-padding}" stroke="var(--border)" stroke-width="1"/>
@@ -4387,31 +4541,90 @@ function drawScoreGraph(scores){
     <text x="10" y="${h-padding+15}" font-size="10" fill="var(--muted)">0</text>
   `;
   svg.appendChild(axes);
-  
-  // Draw line
-  const points=scores.map((s,i)=>{
+
+  // Line
+  const pts=scores.map((s,i)=>{
     const x=padding+(i/(scores.length-1||1))*graphW;
     const y=h-padding-(s.score/100)*graphH;
-    return `${x},${y}`;
-  }).join(' ');
-  
-  const line=document.createElementNS('http://www.w3.org/2000/svg','polyline');
-  line.setAttribute('points',points);
-  line.setAttribute('stroke','var(--accent)');
-  line.setAttribute('stroke-width','2');
-  line.setAttribute('fill','none');
-  svg.appendChild(line);
-  
-  // Draw points
-  scores.forEach((s,i)=>{
-    const x=padding+(i/(scores.length-1||1))*graphW;
-    const y=h-padding-(s.score/100)*graphH;
+    return{x,y,s};
+  });
+
+  const polyline=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+  polyline.setAttribute('points',pts.map(p=>`${p.x},${p.y}`).join(' '));
+  polyline.setAttribute('stroke','var(--accent)');
+  polyline.setAttribute('stroke-width','2');
+  polyline.setAttribute('fill','none');
+  svg.appendChild(polyline);
+
+  // Tooltip group（最前面）
+  const tooltip=document.createElementNS('http://www.w3.org/2000/svg','g');
+  tooltip.id='graphTooltip';
+  tooltip.style.display='none';
+  tooltip.innerHTML=`
+    <circle id="ttDot" r="5" fill="var(--accent)" stroke="#000" stroke-width="1.5"/>
+    <rect id="ttBox" rx="6" ry="6" fill="#111" stroke="var(--accent)" stroke-width="0.8" opacity="0.95"/>
+    <text id="ttDate" font-size="10" fill="var(--muted)" text-anchor="middle"></text>
+    <text id="ttScore" font-size="14" fill="var(--accent)" text-anchor="middle" font-family="'Bebas Neue',sans-serif" letter-spacing="1"></text>
+  `;
+  svg.appendChild(tooltip);
+
+  // Dots（タップ領域付き）
+  pts.forEach(p=>{
+    // 見えないタップ領域（大きめ）
+    const hit=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    hit.setAttribute('cx',p.x);
+    hit.setAttribute('cy',p.y);
+    hit.setAttribute('r','18');
+    hit.setAttribute('fill','transparent');
+    hit.style.cursor='pointer';
+
+    const showTip=()=>{
+      const tt=document.getElementById('graphTooltip');
+      const dot=document.getElementById('ttDot');
+      const box=document.getElementById('ttBox');
+      const dateEl=document.getElementById('ttDate');
+      const scoreEl=document.getElementById('ttScore');
+
+      const label=p.s.date.slice(5); // MM-DD
+      const scoreText=`${p.s.score}pt`;
+      const bw=72,bh=40;
+      // 右端はみ出し防止
+      const bx=Math.min(p.x-bw/2, w-padding-bw);
+      const by=p.y-bh-10<padding?p.y+10:p.y-bh-10;
+
+      dot.setAttribute('cx',p.x);
+      dot.setAttribute('cy',p.y);
+      box.setAttribute('x',bx);
+      box.setAttribute('y',by);
+      box.setAttribute('width',bw);
+      box.setAttribute('height',bh);
+      dateEl.setAttribute('x',bx+bw/2);
+      dateEl.setAttribute('y',by+14);
+      scoreEl.setAttribute('x',bx+bw/2);
+      scoreEl.setAttribute('y',by+32);
+      dateEl.textContent=label;
+      scoreEl.textContent=scoreText;
+      tt.style.display='';
+    };
+
+    hit.addEventListener('click',e=>{e.stopPropagation();showTip();});
+    hit.addEventListener('touchend',e=>{e.preventDefault();e.stopPropagation();showTip();},{passive:false});
+    svg.appendChild(hit);
+
+    // 見えるドット
     const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    circle.setAttribute('cx',x);
-    circle.setAttribute('cy',y);
+    circle.setAttribute('cx',p.x);
+    circle.setAttribute('cy',p.y);
     circle.setAttribute('r','3');
     circle.setAttribute('fill','var(--accent)');
+    circle.style.pointerEvents='none';
     svg.appendChild(circle);
+  });
+
+  // グラフ外タップでtooltip非表示
+  svg.addEventListener('click',()=>{
+    const tt=document.getElementById('graphTooltip');
+    if(tt)tt.style.display='none';
   });
 }
 
