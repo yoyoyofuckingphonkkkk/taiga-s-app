@@ -550,10 +550,12 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
   <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border);padding-top:max(14px,env(safe-area-inset-top));flex-shrink:0">
     <button onclick="closeTomorrowChecklist()" style="background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px 10px">←</button>
     <div style="flex:1;text-align:center;font-family:var(--serif);font-style:italic;font-size:18px">Tomorrow</div>
+    <button id="tmrEditBtn" onclick="toggleTmrEditMode()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:5px 10px;margin-right:6px">Edit</button>
     <button onclick="addTomorrowItem()" style="background:none;border:0.5px solid var(--accent);border-radius:8px;color:var(--accent);font-size:12px;cursor:pointer;padding:5px 10px">+ Add</button>
   </div>
   <div style="flex:1;overflow-y:auto;padding:14px 16px">
     <div id="tomorrowChecklistItems" class="card"></div>
+    <button id="tmrCreateGroupBtn" style="display:none;width:100%;padding:10px;margin-top:8px;background:none;border:0.5px solid var(--accent);border-radius:10px;color:var(--accent);font-size:13px;cursor:pointer" onclick="createTmrGroupFromSelected()">選択してグループを作成</button>
   </div>
 </div>
 
@@ -876,7 +878,10 @@ function getInitialState(){
   const prevGoal=prevKey?(allData[prevKey]?.goalMins||DEFAULT_GOAL_MINS):DEFAULT_GOAL_MINS;
   const prevSubjects=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.subjects||DEFAULT_SUBJECTS)):JSON.parse(JSON.stringify(DEFAULT_SUBJECTS));
   const prevGroups=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.checkGroups||[])):[];
-  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null,checkMemo:'',checkGroups:[]};
+  // Tomorrow画面で設定したグループを優先、なければ前日のグループを引き継ぐ
+  const tmrGroups=(()=>{try{return JSON.parse(localStorage.getItem('ym4_tmr_groups')||'[]');}catch{return[];}})();
+  const inheritedGroups=tmrGroups.length>0?tmrGroups:prevGroups;
+  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null,checkMemo:'',checkGroups:inheritedGroups};
 }
 
 let state=getInitialState();
@@ -2687,7 +2692,7 @@ async function restoreMealPhotos(){
 // ===== TOMORROW CHECKLIST =====
 function getTomorrowKey(){
   const d=new Date();
-  if(d.getHours()<4)d.setDate(d.getDate()+1); // 4時前は今日が前日扱いなので+1で明日
+  if(d.getHours()<4)d.setDate(d.getDate()+1);
   else d.setDate(d.getDate()+1);
   return d.toISOString().slice(0,10);
 }
@@ -2695,14 +2700,12 @@ function getTomorrowKey(){
 function getTomorrowItems(){
   const key=getTomorrowKey();
   const saved=allData[key];
-  // 明日のデータがあればそのcheckItems、なければ今日のをコピー
   return saved?.checkItems ? JSON.parse(JSON.stringify(saved.checkItems)) : JSON.parse(JSON.stringify(checkItems));
 }
 
 function saveTomorrowItems(items){
   const key=getTomorrowKey();
   if(!allData[key]){
-    // 明日のstateを初期化（今日ベース）
     allData[key]=JSON.parse(JSON.stringify({
       ...state,
       study:{},checks:{},diary:'',diaryDate:key,
@@ -2714,6 +2717,27 @@ function saveTomorrowItems(items){
   localStorage.setItem('ym4_all', JSON.stringify(allData));
 }
 
+// ===== TOMORROW GROUPS（永続保存） =====
+function getTmrGroups(){
+  try{return JSON.parse(localStorage.getItem('ym4_tmr_groups')||'[]');}catch{return[];}
+}
+function saveTmrGroups(groups){
+  localStorage.setItem('ym4_tmr_groups',JSON.stringify(groups));
+}
+
+let tmrEditMode=false;
+let tmrSelected=new Set();
+
+function toggleTmrEditMode(){
+  tmrEditMode=!tmrEditMode;
+  tmrSelected=new Set();
+  const btn=document.getElementById('tmrEditBtn');
+  btn.textContent=tmrEditMode?'Done':'Edit';
+  btn.style.color=tmrEditMode?'var(--accent)':'var(--muted)';
+  btn.style.borderColor=tmrEditMode?'var(--accent)':'var(--border)';
+  renderTomorrowItems();
+}
+
 function openTomorrowChecklist(){
   const overlay=document.getElementById('tomorrowChecklistOverlay');
   overlay.style.display='flex';
@@ -2721,6 +2745,10 @@ function openTomorrowChecklist(){
   document.body.style.overflow='hidden';
   document.body.style.position='fixed';
   document.body.style.width='100%';
+  tmrEditMode=false;
+  tmrSelected=new Set();
+  const btn=document.getElementById('tmrEditBtn');
+  if(btn){btn.textContent='Edit';btn.style.color='var(--muted)';btn.style.borderColor='var(--border)';}
   renderTomorrowItems();
 }
 
@@ -2733,48 +2761,138 @@ function closeTomorrowChecklist(){
 
 function renderTomorrowItems(){
   const items=getTomorrowItems();
+  const groups=getTmrGroups();
   const el=document.getElementById('tomorrowChecklistItems');
   el.innerHTML='';
-  if(items.length===0){
+
+  // グループ化されてないitemはgroupsに存在しないものだが、
+  // itemsにないidをgroupsから除去（クリーンアップ）
+  const itemIds=new Set(items.map(c=>c.id));
+  const cleanGroups=groups.map(g=>({...g,itemIds:g.itemIds.filter(id=>itemIds.has(id))})).filter(g=>g.itemIds.length>0);
+  if(JSON.stringify(cleanGroups)!==JSON.stringify(groups))saveTmrGroups(cleanGroups);
+
+  const groupedIds=new Set(cleanGroups.flatMap(g=>g.itemIds));
+
+  if(items.length===0&&cleanGroups.length===0){
     el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:24px">項目がありません</div>';
-    return;
   }
-  items.forEach((c,i)=>{
-    const div=document.createElement('div');
-    div.className='check-item';
-    div.style.cssText='display:flex;align-items:center';
 
-    const label=document.createElement('span');
-    label.className='check-label';label.textContent=c.label;label.style.flex='1';
-    label.style.cursor='pointer';
-    label.onclick=()=>{
-      const modal=document.createElement('div');
-      modal.className='modal-bg';
-      modal.innerHTML=`<div class="modal">
-        <div class="modal-title">Rename</div>
-        <input class="modal-input" id="tmrLabelInput" value="${c.label}">
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
-          <button class="modal-ok" style="flex:1" onclick="
-            const v=document.getElementById('tmrLabelInput').value.trim();
-            if(v){const its=getTomorrowItems();its[${i}].label=v;saveTomorrowItems(its);renderTomorrowItems();}
-            this.closest('.modal-bg').remove();
-          ">Save</button>
-        </div>
-      </div>`;
-      document.body.appendChild(modal);modal.classList.add('open');
-      setTimeout(()=>document.getElementById('tmrLabelInput')?.focus(),100);
-    };
+  // グループを先に描画
+  cleanGroups.forEach(g=>{
+    const gItems=items.filter(c=>g.itemIds.includes(c.id));
+    if(gItems.length===0)return;
+    const groupDiv=document.createElement('div');
+    groupDiv.style.cssText='margin-bottom:8px';
 
-    const delBtn=document.createElement('button');
-    delBtn.className='check-del';delBtn.textContent='×';
-    delBtn.onclick=()=>{
-      const its=getTomorrowItems();its.splice(i,1);saveTomorrowItems(its);renderTomorrowItems();
-    };
-
-    div.appendChild(label);div.appendChild(delBtn);
-    el.appendChild(div);
+    const header=document.createElement('div');
+    header.style.cssText='display:flex;align-items:center;padding:6px 0;gap:8px';
+    const nameEl=document.createElement('span');
+    nameEl.textContent=g.name;
+    nameEl.style.cssText='font-size:10px;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;flex:1';
+    if(tmrEditMode){
+      nameEl.style.cursor='pointer';
+      nameEl.onclick=()=>{
+        const m=document.createElement('div');m.className='modal-bg';
+        m.innerHTML=`<div class="modal"><div class="modal-title">Rename Group</div><input class="modal-input" id="tmrGrpInput" value="${g.name}"><div style="display:flex;gap:8px;margin-top:8px"><button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button><button class="modal-ok" style="flex:1" onclick="const v=document.getElementById('tmrGrpInput').value.trim();if(v){const gs=getTmrGroups();const grp=gs.find(x=>x.id==='${g.id}');if(grp)grp.name=v;saveTmrGroups(gs);renderTomorrowItems();}this.closest('.modal-bg').remove()">Save</button></div></div>`;
+        document.body.appendChild(m);m.classList.add('open');
+        setTimeout(()=>document.getElementById('tmrGrpInput')?.focus(),100);
+      };
+      const delG=document.createElement('button');
+      delG.textContent='解除';
+      delG.style.cssText='background:none;border:0.5px solid var(--muted);border-radius:6px;color:var(--muted);font-size:10px;padding:2px 8px;cursor:pointer';
+      delG.onclick=()=>{
+        const gs=getTmrGroups();
+        saveTmrGroups(gs.filter(x=>x.id!==g.id));
+        renderTomorrowItems();
+      };
+      header.appendChild(nameEl);header.appendChild(delG);
+    }else{
+      header.appendChild(nameEl);
+    }
+    groupDiv.appendChild(header);
+    gItems.forEach(c=>groupDiv.appendChild(renderTmrItem(c,items.indexOf(c),items)));
+    el.appendChild(groupDiv);
   });
+
+  // グループ化されてない項目
+  const ungrouped=items.filter(c=>!groupedIds.has(c.id));
+  if(ungrouped.length>0){
+    if(cleanGroups.length>0){
+      const sep=document.createElement('div');
+      sep.style.cssText='font-size:10px;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;padding:6px 0';
+      sep.textContent='Other';
+      el.appendChild(sep);
+    }
+    ungrouped.forEach(c=>el.appendChild(renderTmrItem(c,items.indexOf(c),items)));
+  }
+
+  const createBtn=document.getElementById('tmrCreateGroupBtn');
+  if(createBtn)createBtn.style.display=tmrEditMode&&tmrSelected.size>0?'block':'none';
+}
+
+function renderTmrItem(c,i,items){
+  const div=document.createElement('div');
+  div.className='check-item';
+  div.style.cssText='display:flex;align-items:center';
+
+  if(tmrEditMode){
+    const sel=document.createElement('div');
+    const isSelected=tmrSelected.has(c.id);
+    sel.style.cssText=`width:18px;height:18px;border-radius:50%;border:1.5px solid ${isSelected?'var(--accent)':'var(--border)'};background:${isSelected?'var(--accent)':'transparent'};margin-right:8px;flex-shrink:0;cursor:pointer;transition:all .15s`;
+    sel.onclick=()=>{
+      if(tmrSelected.has(c.id))tmrSelected.delete(c.id);
+      else tmrSelected.add(c.id);
+      renderTomorrowItems();
+    };
+    div.appendChild(sel);
+  }
+
+  const label=document.createElement('span');
+  label.className='check-label';label.textContent=c.label;label.style.flex='1';
+  label.style.cursor='pointer';
+  label.onclick=()=>{
+    const modal=document.createElement('div');
+    modal.className='modal-bg';
+    modal.innerHTML=`<div class="modal"><div class="modal-title">Rename</div><input class="modal-input" id="tmrLabelInput" value="${c.label}"><div style="display:flex;gap:8px;margin-top:8px"><button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button><button class="modal-ok" style="flex:1" onclick="const v=document.getElementById('tmrLabelInput').value.trim();if(v){const its=getTomorrowItems();its[${i}].label=v;saveTomorrowItems(its);renderTomorrowItems();}this.closest('.modal-bg').remove()">Save</button></div></div>`;
+    document.body.appendChild(modal);modal.classList.add('open');
+    setTimeout(()=>document.getElementById('tmrLabelInput')?.focus(),100);
+  };
+
+  const delBtn=document.createElement('button');
+  delBtn.className='check-del';delBtn.textContent='×';
+  delBtn.onclick=()=>{
+    if(!confirm('削除しますか？'))return;
+    const its=getTomorrowItems();its.splice(i,1);saveTomorrowItems(its);
+    // グループからも除去
+    const gs=getTmrGroups();
+    gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
+    saveTmrGroups(gs.filter(g=>g.itemIds.length>0));
+    renderTomorrowItems();
+  };
+
+  div.appendChild(label);div.appendChild(delBtn);
+  return div;
+}
+
+function createTmrGroupFromSelected(){
+  if(tmrSelected.size===0)return;
+  const modal=document.createElement('div');
+  modal.className='modal-bg';
+  modal.innerHTML=`<div class="modal"><div class="modal-title">Group Name</div><input class="modal-input" id="tmrGrpNameInput" placeholder="例: 朝のルーティン"><div style="display:flex;gap:8px;margin-top:8px"><button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button><button class="modal-ok" style="flex:1" onclick="
+    const v=document.getElementById('tmrGrpNameInput').value.trim();
+    if(v){
+      const gs=getTmrGroups();
+      // 既存グループから選択済みitemを除去
+      gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>!tmrSelected.has(id));});
+      gs.push({id:'tg'+Date.now(),name:v,itemIds:[...tmrSelected]});
+      saveTmrGroups(gs.filter(g=>g.itemIds.length>0));
+      tmrSelected=new Set();
+      renderTomorrowItems();
+    }
+    this.closest('.modal-bg').remove();
+  ">Create</button></div></div>`;
+  document.body.appendChild(modal);modal.classList.add('open');
+  setTimeout(()=>document.getElementById('tmrGrpNameInput')?.focus(),100);
 }
 
 function addTomorrowItem(){
