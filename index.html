@@ -5299,8 +5299,8 @@ function switchMotivationView(view){
             const data=await res.json();
             videos=(data.resources||[]).map(r=>({
               id:r.public_id,
-              name:r.public_id.split('/').pop().replace(/\.[^.]+$/,''),
-              url:buildCloudinaryUrl(r.public_id,r.format),
+              name:r.public_id.split('/').pop(),
+              url:`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/upload/${r.public_id}.${r.format||'mp4'}`,
               cloudPublicId:r.public_id
             }));
           }
@@ -5340,14 +5340,7 @@ function updateSelectCount(){
 
 // ===== CLOUDINARY ONLY =====
 
-// 確実に再生できるURL生成
-function buildCloudinaryUrl(publicId,format){
-  // public_idにすでに拡張子が含まれてる場合はそのまま使う
-  const ext=format||(publicId.match(/\.([a-z0-9]+)$/i)?.[1]);
-  const cleanId=publicId.replace(/\.[a-z0-9]+$/i,''); // 末尾の拡張子を除去
-  const finalExt=ext||'mp4';
-  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/upload/${cleanId}.${finalExt}`;
-}
+// SHA-1署名
 async function cloudinarySign(params){
   const sorted=Object.keys(params).sort().map(k=>`${k}=${params[k]}`).join('&');
   const str=sorted+CLOUDINARY_API_SECRET;
@@ -5366,8 +5359,8 @@ async function loadCloudVideos(){
     const data=await res.json();
     videos=(data.resources||[]).map(r=>({
       id:r.public_id,
-      name:r.public_id.split('/').pop().replace(/\.[^.]+$/,''),
-      url:buildCloudinaryUrl(r.public_id,r.format),
+      name:r.public_id.split('/').pop(),
+      url:`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/upload/${r.public_id}.${r.format||'mp4'}`,
       cloudPublicId:r.public_id
     }));
     if(countEl)countEl.textContent=`(${videos.length})`;
