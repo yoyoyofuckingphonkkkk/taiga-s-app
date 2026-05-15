@@ -1660,10 +1660,7 @@ function startReview(subjectId,bookId){
 }
 
 function todayStr(){
-  const h=new Date().getHours();
-  const d=new Date();
-  if(h<4)d.setDate(d.getDate()-1);
-  return d.toISOString().slice(0,10);
+  return TODAY_KEY;
 }
 
 function addDays(dateStr,n){
