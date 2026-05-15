@@ -4787,10 +4787,15 @@ function toggleVideoBackBtn(){
 function closeVideoFullscreen(){
   const fs=document.getElementById('videoFullscreen');
   fs.style.display='none';
-  // 全videoを停止
   document.querySelectorAll('#videoFullscreen video').forEach(v=>{v.pause();v.removeAttribute('src');v.load();});
   if(videoScrollObserver){videoScrollObserver.disconnect();videoScrollObserver=null;}
+  // bodyのfixed固定を解除してスクロール位置を復元
+  const scrollY=parseInt(document.body.dataset.scrollY||'0');
+  document.body.style.position='';
+  document.body.style.top='';
+  document.body.style.width='';
   document.body.style.overflow='auto';
+  window.scrollTo(0,scrollY);
   swipeEnabled=true;
   
   const home=document.getElementById('motivationHome');
@@ -4812,11 +4817,17 @@ function playVideoFullscreen(idx){
   
   const fullscreen=document.getElementById('videoFullscreen');
   fullscreen.style.display='block';
+  // bodyのスクロール位置を記録してfixedで固定
+  const scrollY=window.scrollY;
   document.body.style.overflow='hidden';
+  document.body.style.position='fixed';
+  document.body.style.top=`-${scrollY}px`;
+  document.body.style.width='100%';
+  document.body.dataset.scrollY=scrollY;
   swipeEnabled=false;
   
   const setH=()=>{
-    const h=window.innerHeight;
+    const h=window.visualViewport?window.visualViewport.height:window.innerHeight;
     fullscreen.style.height=h+'px';
     document.querySelectorAll('.vid-item').forEach(it=>{it.style.height=h+'px';});
   };
@@ -4824,6 +4835,7 @@ function playVideoFullscreen(idx){
   
   buildScrollItems();
   fullscreen.scrollTop=0;
+  requestAnimationFrame(()=>{fullscreen.scrollTop=0;});
   
   // 最初のvideoだけロード&再生
   const items=document.querySelectorAll('.vid-item');
