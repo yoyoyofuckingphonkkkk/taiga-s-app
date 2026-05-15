@@ -4818,10 +4818,11 @@ function playVideoFullscreen(idx){
 
   const fullscreen=document.getElementById('videoFullscreen');
 
-  // bodyをfixedで固定（iOSでのスクロール透け防止）
-  const scrollY=window.scrollY||window.pageYOffset;
+  // まず最上部にスクロールしてからfixedで固定
+  window.scrollTo(0,0);
+  const scrollY=0;
   document.body.style.position='fixed';
-  document.body.style.top=`-${scrollY}px`;
+  document.body.style.top='0';
   document.body.style.left='0';
   document.body.style.right='0';
   document.body.style.overflow='hidden';
