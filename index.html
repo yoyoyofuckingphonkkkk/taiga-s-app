@@ -4077,6 +4077,7 @@ function setupVideoScrollObserver(){
       if(entry.intersectionRatio>0.7){
         // この動画が画面の大半を占めてる→再生
         loadVideoForItem(item);
+        video.currentTime=0;
         video.muted=false;
         video.play().catch(()=>{video.muted=true;video.play().catch(()=>{});});
         currentVideoIdx=+video.dataset.vidIdx;
