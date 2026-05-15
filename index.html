@@ -280,6 +280,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <button onclick="showGraphModal()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GRAPH</button>
     <button onclick="openGoalsView()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">GOALS</button>
     <button id="studyViewToggle" onclick="toggleStudyView()" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em">TIMELINE</button>
+    <button onclick="openReviewView()" id="reviewBtn" style="background:none;border:1px solid var(--surface3);color:var(--text2);font-size:11px;cursor:pointer;padding:8px 12px;border-radius:3px;font-family:var(--display);letter-spacing:.2em;position:relative">REVIEW<span id="reviewBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#f44;color:#fff;font-size:9px;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center"></span></button>
   </div>
   <div id="goalsPreview"></div>
 
@@ -295,6 +296,15 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
       <button onclick="openAddSessionModal()" style="background:var(--accent);border:none;border-radius:8px;color:#000;font-size:12px;padding:6px 14px;cursor:pointer;font-family:inherit">+ Add</button>
     </div>
     <div id="sessionTimeline"></div>
+  </div>
+
+  <!-- レビュービュー -->
+  <div id="studyReviewView" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--muted);letter-spacing:.06em">REVIEW SCHEDULE</div>
+      <button onclick="closeReviewView()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:5px 10px;cursor:pointer">← Back</button>
+    </div>
+    <div id="reviewList"></div>
   </div>
 </div>
 
@@ -720,7 +730,11 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 
     <!-- 参考書選択 -->
     <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Textbook</div>
-    <select id="sessionBookSel" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:14px;font-family:inherit"></select>
+    <select id="sessionBookSel" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:10px;font-family:inherit"></select>
+
+    <!-- 範囲入力 -->
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Range <span style="opacity:.5">（例: p.30-45 / Chapter3 / 第1章）</span></div>
+    <input type="text" id="sessionRange" placeholder="p.30-45" style="width:100%;padding:10px 12px;border:0.5px solid var(--accent);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:14px">
 
     <!-- 時間入力タブ -->
     <div style="display:flex;gap:0;margin-bottom:14px;border:0.5px solid var(--border);border-radius:8px;overflow:hidden">
@@ -1372,28 +1386,44 @@ let sessionTimerElapsed = 0;
 let sessionTimerRunning = false;
 let sessionTimerStartAt = null; // タイマー開始のDate
 
+// 全STUDYタブのアクティブ状態を一括管理
+function setStudyTab(tab){ // 'normal' | 'timeline' | 'review'
+  studyViewMode = tab==='timeline'?'timeline':'normal';
+  if(tab!=='review') localStorage.setItem('ym4_study_view', studyViewMode);
+
+  // ビューの表示切替
+  document.getElementById('studyNormalView').style.display   = tab==='normal'  ?'block':'none';
+  document.getElementById('studyTimelineView').style.display = tab==='timeline'?'block':'none';
+  document.getElementById('studyReviewView').style.display   = tab==='review'  ?'block':'none';
+
+  // ボタンの色リセット→アクティブのみ色付け
+  const btns={
+    timeline: document.getElementById('studyViewToggle'),
+    review:   document.getElementById('reviewBtn'),
+  };
+  Object.entries(btns).forEach(([key,btn])=>{
+    if(!btn)return;
+    const active = key===tab;
+    btn.style.background   = active?'var(--accent)':'none';
+    btn.style.color        = active?'#000':'var(--text2)';
+    btn.style.borderColor  = active?'var(--accent)':'var(--surface3)';
+  });
+
+  // コンテンツ描画
+  if(tab==='timeline') renderSessionTimeline();
+  if(tab==='review')   renderReviewList();
+}
+
 function toggleStudyView(){
-  studyViewMode = studyViewMode === 'normal' ? 'timeline' : 'normal';
-  localStorage.setItem('ym4_study_view', studyViewMode);
-  applyStudyView();
+  setStudyTab(studyViewMode==='timeline'?'normal':'timeline');
 }
 
 function applyStudyView(){
-  const btn = document.getElementById('studyViewToggle');
-  const normal = document.getElementById('studyNormalView');
-  const timeline = document.getElementById('studyTimelineView');
-  if(!normal||!timeline)return;
-  if(studyViewMode === 'timeline'){
-    normal.style.display = 'none';
-    timeline.style.display = 'block';
-    if(btn){btn.style.background='var(--accent)';btn.style.color='#000';}
-    renderSessionTimeline();
-  } else {
-    normal.style.display = 'block';
-    timeline.style.display = 'none';
-    if(btn){btn.style.background='none';btn.style.color='var(--text2)';}
-  }
+  setStudyTab(studyViewMode==='timeline'?'timeline':'normal');
 }
+
+function openReviewView(){ setStudyTab('review'); }
+function closeReviewView(){ setStudyTab(studyViewMode==='timeline'?'timeline':'normal'); }
 
 function getStudySessions(){
   return state.studySessions || [];
@@ -1435,6 +1465,7 @@ function renderSessionTimeline(){
               <div>
                 <div style="font-size:13px;font-weight:500;color:${color}">${subj?.name||'Unknown'}</div>
                 <div style="font-size:11px;color:var(--muted);margin-top:2px">${book?.name||'—'}</div>
+                ${s.range?`<div style="font-size:11px;color:var(--accent);margin-top:3px">📌 ${s.range}</div>`:''}
                 ${timeLabel?`<div style="font-size:10px;color:var(--muted);margin-top:4px">${timeLabel}</div>`:''}
               </div>
               <div style="display:flex;align-items:center;gap:8px">
@@ -1467,14 +1498,13 @@ function deleteSession(id){
 
 function openAddSessionModal(){
   document.getElementById('addSessionOverlay').style.display='flex';
-  // 科目セレクト
   const sel = document.getElementById('sessionSubjectSel');
   sel.innerHTML = subjects.map((s,i)=>`<option value="${i}">${s.name}</option>`).join('');
   renderSessionBookSel();
   switchSessionTab('manual');
   document.getElementById('sessionHours').value='';
   document.getElementById('sessionMins').value='';
-  // デフォルト時刻を現在時刻に
+  document.getElementById('sessionRange').value='';
   const now = new Date();
   const pad = n=>String(n).padStart(2,'0');
   document.getElementById('sessionEndTime').value=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -1536,6 +1566,8 @@ function saveSession(){
   const subj=subjects[si];const book=subj?.books[bi];
   if(!subj||!book){alert('科目・参考書を選択してください');return;}
 
+  const range=document.getElementById('sessionRange').value.trim();
+
   let mins=0;
   let startTime='',endTime='';
   const isTimer=document.getElementById('sessionTimerPanel').style.display!=='none';
@@ -1557,7 +1589,6 @@ function saveSession(){
     if(mins<1){alert('時間を入力してください');return;}
     startTime=document.getElementById('sessionStartTime').value||'';
     endTime=document.getElementById('sessionEndTime').value||'';
-    // 開始・終了から分数を自動計算
     if(startTime&&endTime){
       const [sh2,sm2]=startTime.split(':').map(Number);
       const [eh,em]=endTime.split(':').map(Number);
@@ -1569,7 +1600,7 @@ function saveSession(){
   const session={
     id:'ss_'+Date.now(),
     subjectId:subj.id, bookId:book.id,
-    mins, startTime, endTime
+    mins, startTime, endTime, range
   };
   if(!state.studySessions)state.studySessions=[];
   state.studySessions.push(session);
@@ -1578,11 +1609,192 @@ function saveSession(){
   if(!state.study[subj.id])state.study[subj.id]={};
   state.study[subj.id][book.id]=(state.study[subj.id][book.id]||0)+mins;
 
+  // 範囲が入力されていたら復習スケジュールに自動登録
+  if(range){
+    const d=getReviewData();
+    const rKey=`${subj.id}_${book.id}_${Date.now()}`;
+    const today=todayStr();
+    d[rKey]={
+      subjectId:subj.id, bookId:book.id, range,
+      startDate:today, step:0,
+      nextReview:addDays(today,REVIEW_INTERVALS[0])
+    };
+    saveReviewData(d);
+    updateReviewBadge();
+  }
+
   saveState();
   closeAddSessionModal();
   renderSessionTimeline();
   renderStudy();
   updateRing();calcScore();
+}
+
+// ===== SPACED REPETITION (Anki式) =====
+const REVIEW_INTERVALS=[1,3,7,14,30]; // 日数
+
+function getReviewData(){
+  try{return JSON.parse(localStorage.getItem('ym4_review_data')||'{}');}catch{return{};}
+}
+function saveReviewData(d){localStorage.setItem('ym4_review_data',JSON.stringify(d));}
+
+// 参考書の学習を開始（key: subjectId_bookId）
+function startReview(subjectId,bookId){
+  const d=getReviewData();
+  const key=`${subjectId}_${bookId}`;
+  if(d[key]){
+    if(!confirm('すでに学習中です。リセットして最初から始めますか？'))return;
+  }
+  const today=todayStr();
+  d[key]={startDate:today,step:0,nextReview:addDays(today,REVIEW_INTERVALS[0]),doneToday:false};
+  saveReviewData(d);
+  updateReviewBadge();
+  renderReviewList();
+  const flash=document.createElement('div');
+  flash.style.cssText='position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;padding:8px 20px;border-radius:20px;font-size:13px;z-index:9999;pointer-events:none';
+  flash.textContent='✓ 復習スケジュールを開始しました';
+  document.body.appendChild(flash);
+  setTimeout(()=>flash.remove(),1500);
+}
+
+function todayStr(){
+  const h=new Date().getHours();
+  const d=new Date();
+  if(h<4)d.setDate(d.getDate()-1);
+  return d.toISOString().slice(0,10);
+}
+
+function addDays(dateStr,n){
+  const d=new Date(dateStr);
+  d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
+
+function diffDays(a,b){
+  return Math.round((new Date(b)-new Date(a))/(1000*60*60*24));
+}
+
+// 今日復習すべき参考書を取得
+function getTodayReviews(){
+  const d=getReviewData();
+  const today=todayStr();
+  return Object.entries(d).filter(([key,v])=>v.nextReview<=today&&v.step<REVIEW_INTERVALS.length);
+}
+
+function updateReviewBadge(){
+  const badge=document.getElementById('reviewBadge');
+  if(!badge)return;
+  const count=getTodayReviews().length;
+  badge.style.display=count>0?'block':'none';
+  badge.textContent=String(count);
+}
+
+function completeReview(key){
+  const d=getReviewData();
+  if(!d[key])return;
+  const v=d[key];
+  const nextStep=v.step+1;
+  if(nextStep>=REVIEW_INTERVALS.length){
+    // 全ステップ完了
+    if(confirm('🎉 全復習完了！記録を削除しますか？')){
+      delete d[key];
+    }else{
+      v.step=nextStep;v.nextReview='9999-99-99';v.doneToday=true;
+    }
+  }else{
+    v.step=nextStep;
+    v.nextReview=addDays(todayStr(),REVIEW_INTERVALS[nextStep]);
+    v.doneToday=true;
+  }
+  saveReviewData(d);
+  updateReviewBadge();
+  renderReviewList();
+}
+
+function deleteReview(key){
+  if(!confirm('この復習スケジュールを削除しますか？'))return;
+  const d=getReviewData();
+  delete d[key];
+  saveReviewData(d);
+  updateReviewBadge();
+  renderReviewList();
+}
+
+function renderReviewList(){
+  const el=document.getElementById('reviewList');
+  if(!el)return;
+  const d=getReviewData();
+  const today=todayStr();
+  const entries=Object.entries(d);
+
+  if(entries.length===0){
+    el.innerHTML=`
+      <div style="text-align:center;padding:32px 0;color:var(--muted)">
+        <div style="font-size:32px;margin-bottom:12px">📚</div>
+        <div style="font-size:13px;margin-bottom:6px">復習スケジュールがありません</div>
+        <div style="font-size:11px">参考書の ▶ ボタンから学習を開始してください</div>
+      </div>`;
+    return;
+  }
+
+  // 今日・期限切れ・予定に分類
+  const overdue=entries.filter(([,v])=>v.nextReview<today&&v.step<REVIEW_INTERVALS.length);
+  const dueToday=entries.filter(([,v])=>v.nextReview===today&&v.step<REVIEW_INTERVALS.length);
+  const upcoming=entries.filter(([,v])=>v.nextReview>today&&v.step<REVIEW_INTERVALS.length);
+  const completed=entries.filter(([,v])=>v.step>=REVIEW_INTERVALS.length);
+
+  const renderCard=(key,v,urgent)=>{
+    const subj=subjects.find(s=>s.id===v.subjectId);
+    const book=subj?.books.find(b=>b.id===v.bookId);
+    if(!subj||!book)return '';
+    const step=v.step;
+    const totalSteps=REVIEW_INTERVALS.length;
+    const daysUntil=diffDays(today,v.nextReview);
+    const isDue=v.nextReview<=today;
+    const isOverdue=v.nextReview<today;
+    const nextLabel=step<totalSteps?`次: ${REVIEW_INTERVALS[step]}日後`:'完了';
+    const intervalLabel=step>0?`${REVIEW_INTERVALS[step-1]}日後に復習済`:`初回学習後`;
+    return `
+      <div style="background:var(--surface);border:0.5px solid ${urgent?'#f44':isDue?'var(--accent)':'var(--border)'};border-radius:12px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600;color:${isDue?'var(--accent)':'var(--text)'};margin-bottom:2px">${v.range||'(範囲未設定)'}</div>
+            <div style="font-size:11px;color:var(--muted)">${book.name} — ${subj.name}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:8px">
+            ${isDue
+              ?`<button onclick="completeReview('${key}')" style="padding:6px 14px;background:var(--accent);border:none;border-radius:8px;color:#000;font-size:12px;cursor:pointer;font-family:inherit">✓ Done</button>`
+              :`<div style="font-size:12px;color:var(--muted);white-space:nowrap">${daysUntil}日後</div>`
+            }
+            <button onclick="deleteReview('${key}')" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:2px;line-height:1">×</button>
+          </div>
+        </div>
+        <!-- ステップ進捗 -->
+        <div style="display:flex;gap:3px;margin-bottom:6px">
+          ${REVIEW_INTERVALS.map((_,i)=>`<div style="flex:1;height:3px;border-radius:2px;background:${i<step?'var(--accent)':'var(--surface2)'}"></div>`).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <div style="font-size:10px;color:var(--muted)">${intervalLabel} → ${nextLabel}</div>
+          <div style="font-size:10px;color:var(--muted)">${step}/${totalSteps}</div>
+        </div>
+        ${isOverdue?`<div style="font-size:10px;color:#f44;margin-top:4px">⚠ ${Math.abs(daysUntil)}日超過</div>`:''}
+      </div>`;
+  };
+
+  let html='';
+  if(overdue.length>0){
+    html+=`<div style="font-size:10px;color:#f44;letter-spacing:.08em;margin-bottom:8px">⚠ 期限超過 (${overdue.length})</div>`;
+    html+=overdue.map(([k,v])=>renderCard(k,v,true)).join('');
+  }
+  if(dueToday.length>0){
+    html+=`<div style="font-size:10px;color:var(--accent);letter-spacing:.08em;margin:${overdue.length?'16px':0} 0 8px">TODAY (${dueToday.length})</div>`;
+    html+=dueToday.map(([k,v])=>renderCard(k,v,false)).join('');
+  }
+  if(upcoming.length>0){
+    html+=`<div style="font-size:10px;color:var(--muted);letter-spacing:.08em;margin:${(overdue.length||dueToday.length)?'16px':0} 0 8px">UPCOMING</div>`;
+    html+=upcoming.map(([k,v])=>renderCard(k,v,false)).join('');
+  }
+  el.innerHTML=html;
 }
 
 function renderStudy(){
@@ -4600,7 +4812,7 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
   }catch(e){console.error('DB init error:',e);}
 
   try{
-    renderWidgets();renderStudy();applyStudyView();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();
+    renderWidgets();renderStudy();applyStudyView();renderChecks();renderExercise();updateRing();calcScore();renderQuotesList();renderMotivQuotePreview();renderRecord();updateReviewBadge();
   }catch(e){console.error('Render error:',e);}
 
   clearTimeout(_forceHide);
