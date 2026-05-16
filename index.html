@@ -911,9 +911,9 @@ function getInitialState(){
   const prevGoal=prevKey?(allData[prevKey]?.goalMins||DEFAULT_GOAL_MINS):DEFAULT_GOAL_MINS;
   const prevSubjects=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.subjects||DEFAULT_SUBJECTS)):JSON.parse(JSON.stringify(DEFAULT_SUBJECTS));
   const prevGroups=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.checkGroups||[])):[];
-  // Tomorrow画面で設定したグループを優先、なければ前日のグループを引き継ぐ
+  const prevNutritionGoals=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.nutritionGoals||{})):{};
   const inheritedGroups=tmrGroups.length>0?tmrGroups:prevGroups;
-  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null,checkMemo:'',checkGroups:inheritedGroups};
+  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null,checkMemo:'',checkGroups:inheritedGroups,nutritionGoals:prevNutritionGoals};
 }
 
 let state=getInitialState();
@@ -5088,7 +5088,7 @@ function renderRecord(){
     </div>
     <div class="record-body">
       <div class="record-item"><span>Study</span><span class="record-val">${minsToStr(sm)}</span></div>
-      <div class="record-item"><span>Checks</span><span class="record-val">${ch}/${checkItems.length}</span></div>
+      <div class="record-item"><span>Checks</span><span class="record-val">${ch}/${(r.checkItems||checkItems).length}</span></div>
       <div class="record-item"><span>Exercise</span><span class="record-val">${r.health?.exercise||0}min</span></div>
       <div class="record-item"><span>Meals</span><span class="record-val">${(r.meals||[]).length} meals</span></div>
     </div>`;
