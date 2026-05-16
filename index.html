@@ -2230,7 +2230,7 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
     div.appendChild(delBtn);
 
     let dragging=false;
-    handle.addEventListener('touchstart',e=>{dragSrc=i;dragging=true;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
+    handle.addEventListener('touchstart',e=>{e.preventDefault();dragSrc=i;dragging=true;div.style.opacity='0.5';e.stopPropagation();},{passive:false});
 
     div.addEventListener('touchmove',e=>{
       if(!dragging)return;
@@ -3214,7 +3214,10 @@ function renderTmrItem(c,i,items){
 
     // draggingフラグ（このスコープ内で共有）
     let tmrDragging=false;
-    handle.addEventListener('touchstart',e=>{tmrDragging=true;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
+    handle.addEventListener('touchstart',e=>{
+      e.preventDefault(); // スクロール開始を即座に阻止
+      tmrDragging=true;div.style.opacity='0.5';e.stopPropagation();
+    },{passive:false});
 
     div.addEventListener('touchmove',e=>{
       if(!tmrDragging)return;
