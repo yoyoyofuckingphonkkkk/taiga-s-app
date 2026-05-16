@@ -564,7 +564,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <button id="tmrEditBtn" onclick="toggleTmrEditMode()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:5px 10px;margin-right:6px">Edit</button>
     <button onclick="addTomorrowItem()" style="background:none;border:0.5px solid var(--accent);border-radius:8px;color:var(--accent);font-size:12px;cursor:pointer;padding:5px 10px">+ Add</button>
   </div>
-  <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px">
+  <div id="tmrScrollContainer" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px">
     <div id="tomorrowChecklistItems" class="card"></div>
     <button id="tmrCreateGroupBtn" style="display:none;width:100%;padding:10px;margin-top:8px;background:none;border:0.5px solid var(--accent);border-radius:10px;color:var(--accent);font-size:13px;cursor:pointer" onclick="createTmrGroupFromSelected()">選択してグループを作成</button>
   </div>
@@ -2286,20 +2286,30 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
     },{passive:false});
     div.addEventListener('touchend',e=>{
       div.style.opacity='1';
-      // グループヘッダー上で離したらグループに追加
       const touch=e.changedTouches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="group"]');
       if(groupHeader&&dragSrc!==null){
+        // グループヘッダーにドロップ → グループに追加
         const gid=groupHeader.dataset.groupId;
         const item=checkItems[dragSrc];
         if(item){
           const groups=state.checkGroups||[];
-          // 既存グループからは除去
           groups.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==item.id);});
           const g=groups.find(x=>x.id===gid);
           if(g)g.itemIds.push(item.id);
           saveState();renderChecks();
+        }
+      } else if(dragSrc!==null){
+        // グループ外にドロップ → 所属グループから除去
+        const item=checkItems[dragSrc];
+        if(item){
+          const groups=state.checkGroups||[];
+          const wasGrouped=groups.some(g=>g.itemIds.includes(item.id));
+          if(wasGrouped){
+            groups.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==item.id);});
+            saveState();renderChecks();
+          }
         }
       }
       document.querySelectorAll('[data-drop-target="group"]').forEach(h=>{h.style.background='';});
@@ -3051,15 +3061,17 @@ function toggleTmrEditMode(){
 function openTomorrowChecklist(){
   const overlay=document.getElementById('tomorrowChecklistOverlay');
   overlay.style.display='flex';
-  const scrollEl=overlay.querySelector('[style*="overflow-y"]');
-  if(scrollEl)scrollEl.scrollTop=0;
   tmrEditMode=false;
   tmrSelected=new Set();
   const btn=document.getElementById('tmrEditBtn');
   if(btn){btn.textContent='Edit';btn.style.color='var(--muted)';btn.style.borderColor='var(--border)';}
   renderTomorrowItems();
-  // レンダリング後にもリセット
-  requestAnimationFrame(()=>{if(scrollEl)scrollEl.scrollTop=0;});
+  // レンダリング完了後に確実にトップへ
+  const scrollEl=document.getElementById('tmrScrollContainer');
+  requestAnimationFrame(()=>{
+    if(scrollEl)scrollEl.scrollTop=0;
+    requestAnimationFrame(()=>{if(scrollEl)scrollEl.scrollTop=0;});
+  });
 }
 
 function closeTomorrowChecklist(){
@@ -3235,12 +3247,21 @@ function renderTmrItem(c,i,items){
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="tmrGroup"]');
       if(groupHeader&&i!==null){
+        // グループに追加
         const gid=groupHeader.dataset.groupId;
         const gs=getTmrGroups();
         gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
         const g=gs.find(x=>x.id===gid);
         if(g)g.itemIds.push(c.id);
         saveTmrGroups(gs);renderTomorrowItems();
+      } else {
+        // グループ外にドロップ → 所属グループから除去
+        const gs=getTmrGroups();
+        const wasGrouped=gs.some(g=>g.itemIds.includes(c.id));
+        if(wasGrouped){
+          gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
+          saveTmrGroups(gs);renderTomorrowItems();
+        }
       }
       document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>{h.style.background='';});
     });
