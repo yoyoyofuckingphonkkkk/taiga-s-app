@@ -2212,11 +2212,14 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
     };
     div.appendChild(sel);
 
-    // ドラッグハンドル
+    // ドラッグハンドル（☰のみでドラッグ開始）
     const handle=document.createElement('span');
     handle.textContent='☰';
-    handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none';
-    handle.addEventListener('touchstart',e=>{dragSrc=i;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
+    handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none;user-select:none';
+    let dragging=false;
+    handle.addEventListener('touchstart',e=>{
+      dragSrc=i;dragging=true;div.style.opacity='0.5';e.stopPropagation();
+    },{passive:true});
     div.appendChild(handle);
   }
 
@@ -2256,22 +2259,18 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
 
   if(checkEditMode){
     div.addEventListener('touchmove',e=>{
+      if(!dragging)return; // ☰からのみ移動可
       e.preventDefault();
       const touch=e.touches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
-
-      // グループヘッダーにドロップ → グループに追加
       const groupHeader=target?.closest('[data-drop-target="group"]');
       if(groupHeader&&dragSrc!==null){
-        // ハイライト
         document.querySelectorAll('[data-drop-target="group"]').forEach(h=>h.style.background='');
         groupHeader.style.background='rgba(255,255,255,0.08)';
         groupHeader.style.borderRadius='6px';
         return;
       }
       document.querySelectorAll('[data-drop-target="group"]').forEach(h=>{h.style.background='';});
-
-      // 通常の並び替え
       const targetItem=target?.closest('.check-item');
       if(targetItem&&targetItem!==div){
         const allItems=[...document.getElementById('checklist').querySelectorAll('.check-item')];
@@ -2285,12 +2284,13 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
       }
     },{passive:false});
     div.addEventListener('touchend',e=>{
+      if(!dragging){return;}
+      dragging=false;
       div.style.opacity='1';
       const touch=e.changedTouches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="group"]');
       if(groupHeader&&dragSrc!==null){
-        // グループヘッダーにドロップ → グループに追加
         const gid=groupHeader.dataset.groupId;
         const item=checkItems[dragSrc];
         if(item){
@@ -2301,7 +2301,6 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
           saveState();renderChecks();
         }
       } else if(dragSrc!==null){
-        // グループ外にドロップ → 所属グループから除去
         const item=checkItems[dragSrc];
         if(item){
           const groups=state.checkGroups||[];
@@ -3059,6 +3058,7 @@ function toggleTmrEditMode(){
 }
 
 function openTomorrowChecklist(){
+  window.scrollTo(0,0);
   const overlay=document.getElementById('tomorrowChecklistOverlay');
   overlay.style.display='flex';
   tmrEditMode=false;
@@ -3066,7 +3066,6 @@ function openTomorrowChecklist(){
   const btn=document.getElementById('tmrEditBtn');
   if(btn){btn.textContent='Edit';btn.style.color='var(--muted)';btn.style.borderColor='var(--border)';}
   renderTomorrowItems();
-  // レンダリング完了後に確実にトップへ
   const scrollEl=document.getElementById('tmrScrollContainer');
   requestAnimationFrame(()=>{
     if(scrollEl)scrollEl.scrollTop=0;
@@ -3218,19 +3217,18 @@ function renderTmrItem(c,i,items){
   };
 
   if(tmrEditMode){
-    // ドラッグハンドル
     const handle=document.createElement('span');
     handle.textContent='☰';
-    handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none';
-    let tmrDragIdx=null;
-    handle.addEventListener('touchstart',e=>{tmrDragIdx=i;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
+    handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none;user-select:none';
+    let tmrDragging=false;
+    handle.addEventListener('touchstart',e=>{tmrDragging=true;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
     div.insertBefore(handle,div.firstChild);
 
     div.addEventListener('touchmove',e=>{
+      if(!tmrDragging)return;
       e.preventDefault();
       const touch=e.touches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
-      // グループヘッダーにドロップ
       const groupHeader=target?.closest('[data-drop-target="tmrGroup"]');
       if(groupHeader){
         document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>h.style.background='');
@@ -3242,12 +3240,13 @@ function renderTmrItem(c,i,items){
     },{passive:false});
 
     div.addEventListener('touchend',e=>{
+      if(!tmrDragging)return;
+      tmrDragging=false;
       div.style.opacity='1';
       const touch=e.changedTouches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="tmrGroup"]');
-      if(groupHeader&&i!==null){
-        // グループに追加
+      if(groupHeader){
         const gid=groupHeader.dataset.groupId;
         const gs=getTmrGroups();
         gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
@@ -3255,7 +3254,6 @@ function renderTmrItem(c,i,items){
         if(g)g.itemIds.push(c.id);
         saveTmrGroups(gs);renderTomorrowItems();
       } else {
-        // グループ外にドロップ → 所属グループから除去
         const gs=getTmrGroups();
         const wasGrouped=gs.some(g=>g.itemIds.includes(c.id));
         if(wasGrouped){
@@ -4944,6 +4942,7 @@ let swipeEnabled=true;
 
 function handleSwipe(){
   if(!swipeEnabled)return;
+  if(checkEditMode)return; // edit中はタブスワイプ無効
   const dx=touchEndX-touchStartX;
   const dy=touchEndY-touchStartY;
   if(Math.abs(dx)<Math.abs(dy)||Math.abs(dx)<50)return;
