@@ -2201,73 +2201,45 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
   div.style.cssText='display:flex;align-items:center';
 
   if(checkEditMode){
-    // チェックボックス代わりの選択ボタン
     const sel=document.createElement('div');
     const isSelected=checkSelected.has(c.id);
     sel.style.cssText=`width:18px;height:18px;border-radius:50%;border:1.5px solid ${isSelected?'var(--accent)':'var(--border)'};background:${isSelected?'var(--accent)':'transparent'};margin-right:8px;flex-shrink:0;cursor:pointer;transition:all .15s`;
-    sel.onclick=()=>{
-      if(checkSelected.has(c.id))checkSelected.delete(c.id);
-      else checkSelected.add(c.id);
-      renderChecks();
-    };
+    sel.onclick=()=>{if(checkSelected.has(c.id))checkSelected.delete(c.id);else checkSelected.add(c.id);renderChecks();};
     div.appendChild(sel);
 
-    // ドラッグハンドル（☰のみでドラッグ開始）
     const handle=document.createElement('span');
     handle.textContent='☰';
     handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none;user-select:none';
-    let dragging=false;
-    handle.addEventListener('touchstart',e=>{
-      dragSrc=i;dragging=true;div.style.opacity='0.5';e.stopPropagation();
-    },{passive:true});
     div.appendChild(handle);
-  }
 
-  const checkBox=document.createElement('div');
-  checkBox.className='check-box'+(done?' done':'');
-  if(!checkEditMode)checkBox.onclick=()=>toggleCheck(c.id,checkBox);
-  div.appendChild(checkBox);
+    const label=document.createElement('span');
+    label.className='check-label';label.textContent=c.label;label.style.flex='1';label.style.cursor='pointer';
+    label.onclick=()=>editCheckLabel(i);
+    div.appendChild(label);
 
-  const label=document.createElement('span');
-  label.className='check-label';label.textContent=c.label;label.style.flex='1';
-  if(checkEditMode){label.style.cursor='pointer';label.onclick=()=>editCheckLabel(i);}
-  else label.onclick=()=>toggleCheck(c.id,checkBox);
-  div.appendChild(label);
+    const delBtn=document.createElement('button');
+    delBtn.className='check-del';delBtn.textContent='x';delBtn.type='button';
+    delBtn.onclick=(e)=>{
+      e.preventDefault();e.stopPropagation();
+      if(!confirm('削除しますか?'))return;
+      checkItems.splice(i,1);
+      state.checkGroups=(state.checkGroups||[]).map(g=>({...g,itemIds:g.itemIds.filter(id=>id!==c.id)}));
+      saveChecks();renderChecks();calcScore();saveState();
+    };
+    div.appendChild(delBtn);
 
-  const delBtn=document.createElement('button');
-  delBtn.className='check-del';delBtn.textContent='×';delBtn.type='button';
-  delBtn.onclick=(e)=>{
-    e.preventDefault();e.stopPropagation();
-    const modal=document.createElement('div');
-    modal.className='modal-bg';
-    modal.innerHTML=`<div class="modal" style="text-align:center">
-      <div class="modal-title">Delete</div>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:16px">"${c.label}"を削除しますか？</div>
-      <div style="display:flex;gap:8px">
-        <button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button>
-        <button class="modal-ok" style="flex:1;background:#f44" onclick="
-          checkItems.splice(${i},1);
-          state.checkGroups=(state.checkGroups||[]).map(g=>({...g,itemIds:g.itemIds.filter(id=>id!=='${c.id}')}));
-          saveChecks();renderChecks();calcScore();saveState();
-          this.closest('.modal-bg').remove();
-        ">Delete</button>
-      </div>
-    </div>`;
-    document.body.appendChild(modal);modal.classList.add('open');
-  };
-  div.appendChild(delBtn);
+    let dragging=false;
+    handle.addEventListener('touchstart',e=>{dragSrc=i;dragging=true;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
 
-  if(checkEditMode){
     div.addEventListener('touchmove',e=>{
-      if(!dragging)return; // ☰からのみ移動可
+      if(!dragging)return;
       e.preventDefault();
       const touch=e.touches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="group"]');
-      if(groupHeader&&dragSrc!==null){
+      if(groupHeader){
         document.querySelectorAll('[data-drop-target="group"]').forEach(h=>h.style.background='');
-        groupHeader.style.background='rgba(255,255,255,0.08)';
-        groupHeader.style.borderRadius='6px';
+        groupHeader.style.background='rgba(255,255,255,0.08)';groupHeader.style.borderRadius='6px';
         return;
       }
       document.querySelectorAll('[data-drop-target="group"]').forEach(h=>{h.style.background='';});
@@ -2278,15 +2250,14 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
         if(toIdx>=0&&toIdx!==dragSrc){
           const moved=checkItems.splice(dragSrc,1)[0];
           checkItems.splice(toIdx,0,moved);
-          dragSrc=toIdx;
-          saveChecks();renderChecks();saveState();
+          dragSrc=toIdx;saveChecks();renderChecks();saveState();
         }
       }
     },{passive:false});
+
     div.addEventListener('touchend',e=>{
-      if(!dragging){return;}
-      dragging=false;
-      div.style.opacity='1';
+      if(!dragging)return;
+      dragging=false;div.style.opacity='1';
       const touch=e.changedTouches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="group"]');
@@ -2314,7 +2285,28 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
       document.querySelectorAll('[data-drop-target="group"]').forEach(h=>{h.style.background='';});
       dragSrc=null;
     });
+
+  } else {
+    const checkBox=document.createElement('div');
+    checkBox.className='check-box'+(done?' done':'');
+    checkBox.onclick=()=>toggleCheck(c.id,checkBox);
+    div.appendChild(checkBox);
+    const label=document.createElement('span');
+    label.className='check-label';label.textContent=c.label;label.style.flex='1';
+    label.onclick=()=>toggleCheck(c.id,checkBox);
+    div.appendChild(label);
+    const delBtn=document.createElement('button');
+    delBtn.className='check-del';delBtn.textContent='x';delBtn.type='button';
+    delBtn.onclick=(e)=>{
+      e.preventDefault();e.stopPropagation();
+      if(!confirm('削除しますか?'))return;
+      checkItems.splice(i,1);
+      state.checkGroups=(state.checkGroups||[]).map(g=>({...g,itemIds:g.itemIds.filter(id=>id!==c.id)}));
+      saveChecks();renderChecks();calcScore();saveState();
+    };
+    div.appendChild(delBtn);
   }
+
   return div;
 }
 
@@ -3167,6 +3159,7 @@ function renderTmrItem(c,i,items){
   const div=document.createElement('div');
   div.className='check-item';
   div.style.cssText='display:flex;align-items:center';
+  div.dataset.cid=c.id;
 
   if(tmrEditMode){
     const sel=document.createElement('div');
@@ -3247,6 +3240,7 @@ function renderTmrItem(c,i,items){
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="tmrGroup"]');
       if(groupHeader){
+        // 別グループ or 同グループヘッダーにドロップ
         const gid=groupHeader.dataset.groupId;
         const gs=getTmrGroups();
         gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
@@ -3254,11 +3248,18 @@ function renderTmrItem(c,i,items){
         if(g)g.itemIds.push(c.id);
         saveTmrGroups(gs);renderTomorrowItems();
       } else {
+        // グループ外にドロップ → ただし同じグループ内のアイテム上ならスキップ
         const gs=getTmrGroups();
-        const wasGrouped=gs.some(g=>g.itemIds.includes(c.id));
-        if(wasGrouped){
-          gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
-          saveTmrGroups(gs);renderTomorrowItems();
+        const myGroup=gs.find(g=>g.itemIds.includes(c.id));
+        if(myGroup){
+          // ドロップ先が同グループ内アイテムかチェック
+          const targetItem=target?.closest('.check-item');
+          const targetItemId=targetItem?.dataset?.cid;
+          const droppedOnSameGroup=targetItemId&&myGroup.itemIds.includes(targetItemId);
+          if(!droppedOnSameGroup){
+            gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
+            saveTmrGroups(gs);renderTomorrowItems();
+          }
         }
       }
       document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>{h.style.background='';});
