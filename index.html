@@ -3228,6 +3228,34 @@ function renderTmrItem(c,i,items){
         return;
       }
       document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>{h.style.background='';});
+      // 同グループ内の並び替え
+      const targetItem=target?.closest('.check-item');
+      if(targetItem&&targetItem!==div){
+        const targetCid=targetItem.dataset?.cid;
+        if(!targetCid)return;
+        const gs=getTmrGroups();
+        const myGroup=gs.find(g=>g.itemIds.includes(c.id));
+        const targetInSameGroup=myGroup&&myGroup.itemIds.includes(targetCid);
+        if(targetInSameGroup){
+          const fromIdx=myGroup.itemIds.indexOf(c.id);
+          const toIdx=myGroup.itemIds.indexOf(targetCid);
+          if(fromIdx!==-1&&toIdx!==-1&&fromIdx!==toIdx){
+            myGroup.itemIds.splice(fromIdx,1);
+            myGroup.itemIds.splice(toIdx,0,c.id);
+            saveTmrGroups(gs);renderTomorrowItems();
+          }
+        } else {
+          // グループなし同士の並び替え
+          const its=getTomorrowItems();
+          const fromIdx=its.findIndex(x=>x.id===c.id);
+          const toIdx=its.findIndex(x=>x.id===targetCid);
+          if(fromIdx!==-1&&toIdx!==-1&&fromIdx!==toIdx){
+            const moved=its.splice(fromIdx,1)[0];
+            its.splice(toIdx,0,moved);
+            saveTomorrowItems(its);renderTomorrowItems();
+          }
+        }
+      }
     },{passive:false});
 
     div.addEventListener('touchend',e=>{
