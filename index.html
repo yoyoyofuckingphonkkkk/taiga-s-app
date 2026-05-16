@@ -1766,6 +1766,7 @@ function renderReviewList(){
     const isOverdue=v.nextReview<today;
     const nextLabel=step<totalSteps?`次: ${REVIEW_INTERVALS[step]}日後`:'完了';
     const intervalLabel=step>0?`${REVIEW_INTERVALS[step-1]}日後に復習済`:`初回学習後`;
+    const safeKey=encodeURIComponent(key);
     return `
       <div style="background:var(--surface);border:0.5px solid ${urgent?'#f44':isDue?'var(--accent)':'var(--border)'};border-radius:12px;padding:14px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
@@ -1775,13 +1776,12 @@ function renderReviewList(){
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:8px">
             ${isDue
-              ?`<button onclick="completeReview('${key}')" style="padding:6px 14px;background:var(--accent);border:none;border-radius:8px;color:#000;font-size:12px;cursor:pointer;font-family:inherit">✓ Done</button>`
+              ?`<button data-rkey="${safeKey}" onclick="completeReview(decodeURIComponent(this.dataset.rkey))" style="padding:6px 14px;background:var(--accent);border:none;border-radius:8px;color:#000;font-size:12px;cursor:pointer;font-family:inherit">✓ Done</button>`
               :`<div style="font-size:12px;color:var(--muted);white-space:nowrap">${daysUntil}日後</div>`
             }
-            <button onclick="deleteReview('${key}')" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:2px;line-height:1">×</button>
+            <button data-rkey="${safeKey}" onclick="deleteReview(decodeURIComponent(this.dataset.rkey))" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:2px;line-height:1">×</button>
           </div>
         </div>
-        <!-- ステップ進捗 -->
         <div style="display:flex;gap:3px;margin-bottom:6px">
           ${REVIEW_INTERVALS.map((_,i)=>`<div style="flex:1;height:3px;border-radius:2px;background:${i<step?'var(--accent)':'var(--surface2)'}"></div>`).join('')}
         </div>
@@ -2033,6 +2033,50 @@ function editCheckLabel(i){
   setTimeout(()=>document.getElementById('checkLabelInput')?.focus(),100);
 }
 
+function addItemToGroup(gid){
+  const groups=state.checkGroups||[];
+  const groupedIds=new Set(groups.flatMap(g=>g.itemIds));
+  const ungrouped=checkItems.filter(c=>!groupedIds.has(c.id));
+  if(ungrouped.length===0){alert('追加できる項目がありません');return;}
+  const modal=document.createElement('div');
+  modal.className='modal-bg';
+  const listDiv=document.createElement('div');
+  listDiv.style.cssText='max-height:240px;overflow-y:auto;margin:12px 0';
+  ungrouped.forEach(c=>{
+    const label=document.createElement('label');
+    label.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--border2);cursor:pointer';
+    const cb=document.createElement('input');
+    cb.type='checkbox';cb.dataset.id=c.id;cb.style.cssText='width:16px;height:16px';
+    const span=document.createElement('span');
+    span.style.fontSize='14px';span.textContent=c.label;
+    label.appendChild(cb);label.appendChild(span);
+    listDiv.appendChild(label);
+  });
+  const inner=document.createElement('div');
+  inner.className='modal';
+  const title=document.createElement('div');
+  title.className='modal-title';title.textContent='グループに追加';
+  const btns=document.createElement('div');
+  btns.style.cssText='display:flex;gap:8px';
+  const cancel=document.createElement('button');
+  cancel.className='modal-cancel';cancel.style.flex='1';cancel.textContent='Cancel';
+  cancel.onclick=()=>modal.remove();
+  const ok=document.createElement('button');
+  ok.className='modal-ok';ok.style.flex='1';ok.textContent='追加';
+  ok.onclick=()=>{
+    const checked=[...listDiv.querySelectorAll('input:checked')].map(el=>el.dataset.id);
+    if(checked.length===0){alert('項目を選択してください');return;}
+    const gs=state.checkGroups||[];
+    const g=gs.find(x=>x.id===gid);
+    if(g){g.itemIds=[...g.itemIds,...checked];}
+    saveState();renderChecks();modal.remove();
+  };
+  btns.appendChild(cancel);btns.appendChild(ok);
+  inner.appendChild(title);inner.appendChild(listDiv);inner.appendChild(btns);
+  modal.appendChild(inner);
+  document.body.appendChild(modal);modal.classList.add('open');
+}
+
 function editGroupName(gid){
   const g=(state.checkGroups||[]).find(g=>g.id===gid);
   if(!g)return;
@@ -2103,6 +2147,8 @@ function renderChecks(){
     // グループヘッダー
     const header=document.createElement('div');
     header.style.cssText='display:flex;align-items:center;padding:6px 0;gap:8px';
+    header.dataset.groupId=g.id;
+    header.dataset.dropTarget='group';
     const nameEl=document.createElement('span');
     nameEl.textContent=g.name;
     nameEl.style.cssText='font-size:10px;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;flex:1';
@@ -2213,6 +2259,19 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
       e.preventDefault();
       const touch=e.touches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
+
+      // グループヘッダーにドロップ → グループに追加
+      const groupHeader=target?.closest('[data-drop-target="group"]');
+      if(groupHeader&&dragSrc!==null){
+        // ハイライト
+        document.querySelectorAll('[data-drop-target="group"]').forEach(h=>h.style.background='');
+        groupHeader.style.background='rgba(255,255,255,0.08)';
+        groupHeader.style.borderRadius='6px';
+        return;
+      }
+      document.querySelectorAll('[data-drop-target="group"]').forEach(h=>{h.style.background='';});
+
+      // 通常の並び替え
       const targetItem=target?.closest('.check-item');
       if(targetItem&&targetItem!==div){
         const allItems=[...document.getElementById('checklist').querySelectorAll('.check-item')];
@@ -2225,7 +2284,27 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
         }
       }
     },{passive:false});
-    div.addEventListener('touchend',()=>{div.style.opacity='1';dragSrc=null;});
+    div.addEventListener('touchend',e=>{
+      div.style.opacity='1';
+      // グループヘッダー上で離したらグループに追加
+      const touch=e.changedTouches[0];
+      const target=document.elementFromPoint(touch.clientX,touch.clientY);
+      const groupHeader=target?.closest('[data-drop-target="group"]');
+      if(groupHeader&&dragSrc!==null){
+        const gid=groupHeader.dataset.groupId;
+        const item=checkItems[dragSrc];
+        if(item){
+          const groups=state.checkGroups||[];
+          // 既存グループからは除去
+          groups.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==item.id);});
+          const g=groups.find(x=>x.id===gid);
+          if(g)g.itemIds.push(item.id);
+          saveState();renderChecks();
+        }
+      }
+      document.querySelectorAll('[data-drop-target="group"]').forEach(h=>{h.style.background='';});
+      dragSrc=null;
+    });
   }
   return div;
 }
@@ -2972,12 +3051,15 @@ function toggleTmrEditMode(){
 function openTomorrowChecklist(){
   const overlay=document.getElementById('tomorrowChecklistOverlay');
   overlay.style.display='flex';
-  overlay.scrollTop=0;
+  const scrollEl=overlay.querySelector('[style*="overflow-y"]');
+  if(scrollEl)scrollEl.scrollTop=0;
   tmrEditMode=false;
   tmrSelected=new Set();
   const btn=document.getElementById('tmrEditBtn');
   if(btn){btn.textContent='Edit';btn.style.color='var(--muted)';btn.style.borderColor='var(--border)';}
   renderTomorrowItems();
+  // レンダリング後にもリセット
+  requestAnimationFrame(()=>{if(scrollEl)scrollEl.scrollTop=0;});
 }
 
 function closeTomorrowChecklist(){
@@ -3011,6 +3093,8 @@ function renderTomorrowItems(){
 
     const header=document.createElement('div');
     header.style.cssText='display:flex;align-items:center;padding:6px 0;gap:8px';
+    header.dataset.groupId=g.id;
+    header.dataset.dropTarget='tmrGroup';
     const nameEl=document.createElement('span');
     nameEl.textContent=g.name;
     nameEl.style.cssText='font-size:10px;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;flex:1';
@@ -3018,9 +3102,22 @@ function renderTomorrowItems(){
       nameEl.style.cursor='pointer';
       nameEl.onclick=()=>{
         const m=document.createElement('div');m.className='modal-bg';
-        m.innerHTML=`<div class="modal"><div class="modal-title">Rename Group</div><input class="modal-input" id="tmrGrpInput" value="${g.name}"><div style="display:flex;gap:8px;margin-top:8px"><button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button><button class="modal-ok" style="flex:1" onclick="const v=document.getElementById('tmrGrpInput').value.trim();if(v){const gs=getTmrGroups();const grp=gs.find(x=>x.id==='${g.id}');if(grp)grp.name=v;saveTmrGroups(gs);renderTomorrowItems();}this.closest('.modal-bg').remove()">Save</button></div></div>`;
+        const inner=document.createElement('div');inner.className='modal';
+        const title=document.createElement('div');title.className='modal-title';title.textContent='Rename Group';
+        const inp=document.createElement('input');inp.className='modal-input';inp.value=g.name;inp.id='tmrGrpInput';
+        const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;margin-top:8px';
+        const cancel=document.createElement('button');cancel.className='modal-cancel';cancel.style.flex='1';cancel.textContent='Cancel';cancel.onclick=()=>m.remove();
+        const save=document.createElement('button');save.className='modal-ok';save.style.flex='1';save.textContent='Save';
+        save.onclick=()=>{
+          const v=inp.value.trim();
+          if(v){const gs=getTmrGroups();const grp=gs.find(x=>x.id===g.id);if(grp)grp.name=v;saveTmrGroups(gs);renderTomorrowItems();}
+          m.remove();
+        };
+        row.appendChild(cancel);row.appendChild(save);
+        inner.appendChild(title);inner.appendChild(inp);inner.appendChild(row);
+        m.appendChild(inner);
         document.body.appendChild(m);m.classList.add('open');
-        setTimeout(()=>document.getElementById('tmrGrpInput')?.focus(),100);
+        setTimeout(()=>inp.focus(),100);
       };
       const delG=document.createElement('button');
       delG.textContent='解除';
@@ -3078,9 +3175,22 @@ function renderTmrItem(c,i,items){
   label.onclick=()=>{
     const modal=document.createElement('div');
     modal.className='modal-bg';
-    modal.innerHTML=`<div class="modal"><div class="modal-title">Rename</div><input class="modal-input" id="tmrLabelInput" value="${c.label}"><div style="display:flex;gap:8px;margin-top:8px"><button class="modal-cancel" style="flex:1" onclick="this.closest('.modal-bg').remove()">Cancel</button><button class="modal-ok" style="flex:1" onclick="const v=document.getElementById('tmrLabelInput').value.trim();if(v){const its=getTomorrowItems();its[${i}].label=v;saveTomorrowItems(its);renderTomorrowItems();}this.closest('.modal-bg').remove()">Save</button></div></div>`;
+    const inner=document.createElement('div');inner.className='modal';
+    const title=document.createElement('div');title.className='modal-title';title.textContent='Rename';
+    const inp=document.createElement('input');inp.className='modal-input';inp.value=c.label;
+    const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;margin-top:8px';
+    const cancel=document.createElement('button');cancel.className='modal-cancel';cancel.style.flex='1';cancel.textContent='Cancel';cancel.onclick=()=>modal.remove();
+    const save=document.createElement('button');save.className='modal-ok';save.style.flex='1';save.textContent='Save';
+    save.onclick=()=>{
+      const v=inp.value.trim();
+      if(v){const its=getTomorrowItems();its[i].label=v;saveTomorrowItems(its);renderTomorrowItems();}
+      modal.remove();
+    };
+    row.appendChild(cancel);row.appendChild(save);
+    inner.appendChild(title);inner.appendChild(inp);inner.appendChild(row);
+    modal.appendChild(inner);
     document.body.appendChild(modal);modal.classList.add('open');
-    setTimeout(()=>document.getElementById('tmrLabelInput')?.focus(),100);
+    setTimeout(()=>inp.focus(),100);
   };
 
   const delBtn=document.createElement('button');
@@ -3094,6 +3204,47 @@ function renderTmrItem(c,i,items){
     saveTmrGroups(gs.filter(g=>g.itemIds.length>0));
     renderTomorrowItems();
   };
+
+  if(tmrEditMode){
+    // ドラッグハンドル
+    const handle=document.createElement('span');
+    handle.textContent='☰';
+    handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none';
+    let tmrDragIdx=null;
+    handle.addEventListener('touchstart',e=>{tmrDragIdx=i;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
+    div.insertBefore(handle,div.firstChild);
+
+    div.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      const touch=e.touches[0];
+      const target=document.elementFromPoint(touch.clientX,touch.clientY);
+      // グループヘッダーにドロップ
+      const groupHeader=target?.closest('[data-drop-target="tmrGroup"]');
+      if(groupHeader){
+        document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>h.style.background='');
+        groupHeader.style.background='rgba(255,255,255,0.08)';
+        groupHeader.style.borderRadius='6px';
+        return;
+      }
+      document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>{h.style.background='';});
+    },{passive:false});
+
+    div.addEventListener('touchend',e=>{
+      div.style.opacity='1';
+      const touch=e.changedTouches[0];
+      const target=document.elementFromPoint(touch.clientX,touch.clientY);
+      const groupHeader=target?.closest('[data-drop-target="tmrGroup"]');
+      if(groupHeader&&i!==null){
+        const gid=groupHeader.dataset.groupId;
+        const gs=getTmrGroups();
+        gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
+        const g=gs.find(x=>x.id===gid);
+        if(g)g.itemIds.push(c.id);
+        saveTmrGroups(gs);renderTomorrowItems();
+      }
+      document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>{h.style.background='';});
+    });
+  }
 
   div.appendChild(label);div.appendChild(delBtn);
   return div;
