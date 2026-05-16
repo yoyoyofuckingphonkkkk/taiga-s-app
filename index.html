@@ -3169,72 +3169,62 @@ function renderTmrItem(c,i,items){
   div.dataset.cid=c.id;
 
   if(tmrEditMode){
+    // 選択ボタン
     const sel=document.createElement('div');
     const isSelected=tmrSelected.has(c.id);
     sel.style.cssText=`width:18px;height:18px;border-radius:50%;border:1.5px solid ${isSelected?'var(--accent)':'var(--border)'};background:${isSelected?'var(--accent)':'transparent'};margin-right:8px;flex-shrink:0;cursor:pointer;transition:all .15s`;
-    sel.onclick=()=>{
-      if(tmrSelected.has(c.id))tmrSelected.delete(c.id);
-      else tmrSelected.add(c.id);
-      renderTomorrowItems();
-    };
+    sel.onclick=()=>{if(tmrSelected.has(c.id))tmrSelected.delete(c.id);else tmrSelected.add(c.id);renderTomorrowItems();};
     div.appendChild(sel);
-  }
 
-  const label=document.createElement('span');
-  label.className='check-label';label.textContent=c.label;label.style.flex='1';
-  label.style.cursor='pointer';
-  label.onclick=()=>{
-    const modal=document.createElement('div');
-    modal.className='modal-bg';
-    const inner=document.createElement('div');inner.className='modal';
-    const title=document.createElement('div');title.className='modal-title';title.textContent='Rename';
-    const inp=document.createElement('input');inp.className='modal-input';inp.value=c.label;
-    const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;margin-top:8px';
-    const cancel=document.createElement('button');cancel.className='modal-cancel';cancel.style.flex='1';cancel.textContent='Cancel';cancel.onclick=()=>modal.remove();
-    const save=document.createElement('button');save.className='modal-ok';save.style.flex='1';save.textContent='Save';
-    save.onclick=()=>{
-      const v=inp.value.trim();
-      if(v){const its=getTomorrowItems();its[i].label=v;saveTomorrowItems(its);renderTomorrowItems();}
-      modal.remove();
-    };
-    row.appendChild(cancel);row.appendChild(save);
-    inner.appendChild(title);inner.appendChild(inp);inner.appendChild(row);
-    modal.appendChild(inner);
-    document.body.appendChild(modal);modal.classList.add('open');
-    setTimeout(()=>inp.focus(),100);
-  };
-
-  const delBtn=document.createElement('button');
-  delBtn.className='check-del';delBtn.textContent='×';
-  delBtn.onclick=()=>{
-    if(!confirm('削除しますか？'))return;
-    const its=getTomorrowItems();its.splice(i,1);saveTomorrowItems(its);
-    // グループからも除去
-    const gs=getTmrGroups();
-    gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
-    saveTmrGroups(gs.filter(g=>g.itemIds.length>0));
-    renderTomorrowItems();
-  };
-
-  if(tmrEditMode){
+    // ドラッグハンドル
     const handle=document.createElement('span');
     handle.textContent='☰';
     handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none;user-select:none';
+    div.appendChild(handle);
+
+    // ラベル
+    const label=document.createElement('span');
+    label.className='check-label';label.textContent=c.label;label.style.flex='1';label.style.cursor='pointer';
+    label.onclick=()=>{
+      const modal=document.createElement('div');modal.className='modal-bg';
+      const inner=document.createElement('div');inner.className='modal';
+      const title=document.createElement('div');title.className='modal-title';title.textContent='Rename';
+      const inp=document.createElement('input');inp.className='modal-input';inp.value=c.label;
+      const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;margin-top:8px';
+      const cancel=document.createElement('button');cancel.className='modal-cancel';cancel.style.flex='1';cancel.textContent='Cancel';cancel.onclick=()=>modal.remove();
+      const save=document.createElement('button');save.className='modal-ok';save.style.flex='1';save.textContent='Save';
+      save.onclick=()=>{const v=inp.value.trim();if(v){const its=getTomorrowItems();its[i].label=v;saveTomorrowItems(its);renderTomorrowItems();}modal.remove();};
+      row.appendChild(cancel);row.appendChild(save);
+      inner.appendChild(title);inner.appendChild(inp);inner.appendChild(row);
+      modal.appendChild(inner);document.body.appendChild(modal);modal.classList.add('open');
+      setTimeout(()=>inp.focus(),100);
+    };
+    div.appendChild(label);
+
+    // 削除ボタン
+    const delBtn=document.createElement('button');
+    delBtn.className='check-del';delBtn.textContent='×';
+    delBtn.onclick=()=>{
+      if(!confirm('削除しますか？'))return;
+      const its=getTomorrowItems();its.splice(i,1);saveTomorrowItems(its);
+      const gs=getTmrGroups();gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
+      saveTmrGroups(gs.filter(g=>g.itemIds.length>0));renderTomorrowItems();
+    };
+    div.appendChild(delBtn);
+
+    // draggingフラグ（このスコープ内で共有）
     let tmrDragging=false;
     handle.addEventListener('touchstart',e=>{tmrDragging=true;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
-    // selの後ろ、labelの前に挿入
-    div.insertBefore(handle, label);
 
     div.addEventListener('touchmove',e=>{
-      if(!tmrDragging){return;} // ドラッグ中でない→スクロールに任せる（preventDefault不要）
+      if(!tmrDragging)return;
       e.preventDefault();
       const touch=e.touches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="tmrGroup"]');
       if(groupHeader){
         document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>h.style.background='');
-        groupHeader.style.background='rgba(255,255,255,0.08)';
-        groupHeader.style.borderRadius='6px';
+        groupHeader.style.background='rgba(255,255,255,0.08)';groupHeader.style.borderRadius='6px';
         return;
       }
       document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>{h.style.background='';});
@@ -3242,8 +3232,7 @@ function renderTmrItem(c,i,items){
 
     div.addEventListener('touchend',e=>{
       if(!tmrDragging)return;
-      tmrDragging=false;
-      div.style.opacity='1';
+      tmrDragging=false;div.style.opacity='1';
       const touch=e.changedTouches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="tmrGroup"]');
@@ -3269,9 +3258,23 @@ function renderTmrItem(c,i,items){
       }
       document.querySelectorAll('[data-drop-target="tmrGroup"]').forEach(h=>{h.style.background='';});
     });
+
+  } else {
+    // 通常モード
+    const label=document.createElement('span');
+    label.className='check-label';label.textContent=c.label;label.style.flex='1';
+    div.appendChild(label);
+    const delBtn=document.createElement('button');
+    delBtn.className='check-del';delBtn.textContent='×';
+    delBtn.onclick=()=>{
+      if(!confirm('削除しますか？'))return;
+      const its=getTomorrowItems();its.splice(i,1);saveTomorrowItems(its);
+      const gs=getTmrGroups();gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
+      saveTmrGroups(gs.filter(g=>g.itemIds.length>0));renderTomorrowItems();
+    };
+    div.appendChild(delBtn);
   }
 
-  div.appendChild(label);div.appendChild(delBtn);
   return div;
 }
 
