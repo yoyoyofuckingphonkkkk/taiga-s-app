@@ -2199,6 +2199,7 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
   const div=document.createElement('div');
   div.className='check-item'+(done?' done':'');
   div.style.cssText='display:flex;align-items:center';
+  div.dataset.cid=c.id;
 
   if(checkEditMode){
     const sel=document.createElement('div');
@@ -2275,10 +2276,16 @@ function renderCheckItem(c,i,dragSrc,groupedIds){
         const item=checkItems[dragSrc];
         if(item){
           const groups=state.checkGroups||[];
-          const wasGrouped=groups.some(g=>g.itemIds.includes(item.id));
-          if(wasGrouped){
-            groups.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==item.id);});
-            saveState();renderChecks();
+          const myGroup=groups.find(g=>g.itemIds.includes(item.id));
+          if(myGroup){
+            // ドロップ先が同グループ内アイテムならスキップ
+            const targetItem=target?.closest('.check-item');
+            const targetItemId=targetItem?.dataset?.cid;
+            const droppedOnSameGroup=targetItemId&&myGroup.itemIds.includes(targetItemId);
+            if(!droppedOnSameGroup){
+              groups.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==item.id);});
+              saveState();renderChecks();
+            }
           }
         }
       }
@@ -3215,10 +3222,11 @@ function renderTmrItem(c,i,items){
     handle.style.cssText='color:var(--muted);font-size:16px;padding:0 8px;cursor:grab;touch-action:none;user-select:none';
     let tmrDragging=false;
     handle.addEventListener('touchstart',e=>{tmrDragging=true;div.style.opacity='0.5';e.stopPropagation();},{passive:true});
-    div.insertBefore(handle,div.firstChild);
+    // selの後ろ、labelの前に挿入
+    div.insertBefore(handle, label);
 
     div.addEventListener('touchmove',e=>{
-      if(!tmrDragging)return;
+      if(!tmrDragging){return;} // ドラッグ中でない→スクロールに任せる（preventDefault不要）
       e.preventDefault();
       const touch=e.touches[0];
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
@@ -3240,7 +3248,6 @@ function renderTmrItem(c,i,items){
       const target=document.elementFromPoint(touch.clientX,touch.clientY);
       const groupHeader=target?.closest('[data-drop-target="tmrGroup"]');
       if(groupHeader){
-        // 別グループ or 同グループヘッダーにドロップ
         const gid=groupHeader.dataset.groupId;
         const gs=getTmrGroups();
         gs.forEach(g=>{g.itemIds=g.itemIds.filter(id=>id!==c.id);});
@@ -3248,11 +3255,9 @@ function renderTmrItem(c,i,items){
         if(g)g.itemIds.push(c.id);
         saveTmrGroups(gs);renderTomorrowItems();
       } else {
-        // グループ外にドロップ → ただし同じグループ内のアイテム上ならスキップ
         const gs=getTmrGroups();
         const myGroup=gs.find(g=>g.itemIds.includes(c.id));
         if(myGroup){
-          // ドロップ先が同グループ内アイテムかチェック
           const targetItem=target?.closest('.check-item');
           const targetItemId=targetItem?.dataset?.cid;
           const droppedOnSameGroup=targetItemId&&myGroup.itemIds.includes(targetItemId);
