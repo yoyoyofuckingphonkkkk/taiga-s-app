@@ -398,20 +398,20 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <!-- 総消費カロリー -->
     <div id="totalKcalCard" style="margin-bottom:14px;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px">
       <div style="font-size:10px;color:var(--muted);letter-spacing:.08em;margin-bottom:10px">TODAY'S CALORIES BURNED</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
         <div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px">
           <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Cardio</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--green)" id="kcalCardio">0</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)" id="kcalCardio">0</div>
           <div style="font-size:9px;color:var(--muted)">kcal</div>
         </div>
         <div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px">
           <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Strength</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent2)" id="kcalStrength">0</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--accent2)" id="kcalStrength">0</div>
           <div style="font-size:9px;color:var(--muted)">kcal</div>
         </div>
         <div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;border:0.5px solid var(--accent)">
           <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Total</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent)" id="kcalTotal">0</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--accent)" id="kcalTotal">0</div>
           <div style="font-size:9px;color:var(--muted)">kcal</div>
         </div>
       </div>
@@ -5295,28 +5295,33 @@ function setupVideoScrollObserver(){
       const item=entry.target;
       const video=item.querySelector('video');
       if(entry.intersectionRatio>0.7){
-        // この動画が画面の大半を占めてる→再生
         loadVideoForItem(item);
         video.currentTime=0;
         video.muted=false;
         video.play().catch(()=>{video.muted=true;video.play().catch(()=>{});});
         currentVideoIdx=+video.dataset.vidIdx;
-        // 前後もプリロード（ただしmute）
-        const prevSibling=item.previousElementSibling;
-        const nextSibling=item.nextElementSibling;
-        if(prevSibling){loadVideoForItem(prevSibling);prevSibling.querySelector('video').muted=true;}
-        if(nextSibling){loadVideoForItem(nextSibling);nextSibling.querySelector('video').muted=true;}
-        // 再生アイコン消す
+
+        // 前後1つだけプリロード、それ以上は解放
+        const allItems=[...document.querySelectorAll('.vid-item')];
+        const curIdx=allItems.indexOf(item);
+        allItems.forEach((it,i)=>{
+          if(i===curIdx-1||i===curIdx+1){
+            loadVideoForItem(it);
+            it.querySelector('video').muted=true;
+          } else if(i!==curIdx){
+            unloadVideoForItem(it); // 2つ以上離れたら解放
+          }
+        });
+
         const playIcon=document.getElementById('videoPlayIcon');
         if(playIcon)playIcon.style.opacity='0';
       }else if(entry.intersectionRatio<0.3){
-        // 画面外→停止
         video.pause();
         video.muted=true;
       }
     });
   },{root:fs,threshold:[0.3,0.7]});
-  
+
   document.querySelectorAll('.vid-item').forEach(it=>videoScrollObserver.observe(it));
 }
 
@@ -5333,7 +5338,11 @@ function loadVideoForItem(item){
 
 function unloadVideoForItem(item){
   const video=item.querySelector('video');
-  if(video){video.pause();}
+  if(video&&video.src){
+    video.pause();
+    video.removeAttribute('src');
+    video.load(); // メモリを解放
+  }
 }
 
 
