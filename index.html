@@ -523,7 +523,7 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 <div class="section" id="tab-motivation">
   <div id="hero-motivation"></div>
   
-  <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:12px">
+  <div id="motivationHome" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
     
     <!-- Tap to Play - big left -->
     <div style="grid-column:1;grid-row:1/3;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px;cursor:pointer" onclick="switchMotivationView('videos')">
@@ -537,9 +537,19 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     </div>
     
     <!-- Quotes - bottom right -->
-    <div style="grid-column:2;grid-row:2;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;cursor:pointer;min-height:120px;overflow:hidden" onclick="switchMotivationView('quotes')">
+    <div style="grid-column:2;grid-row:2;background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:16px;cursor:pointer;min-height:100px;overflow:hidden" onclick="switchMotivationView('quotes')">
       <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:8px">QUOTES</div>
       <div id="motivQuotePreview" style="font-size:13px;color:var(--accent);font-style:italic;line-height:1.5"></div>
+    </div>
+
+    <!-- Daily AI Summary - full width bottom -->
+    <div style="grid-column:1/3;background:var(--surface);border:0.5px solid var(--accent);border-radius:16px;padding:16px;cursor:pointer;display:flex;align-items:center;gap:14px" onclick="openDailyAISummary()">
+      <div style="font-size:28px">🤖</div>
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.1em;color:var(--accent)">TODAY'S SUMMARY</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">1日のまとめとアドバイスをAIに聞く</div>
+      </div>
+      <div style="margin-left:auto;font-size:18px;color:var(--accent)">→</div>
     </div>
 
   </div>
@@ -721,27 +731,10 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
 
 <!-- Food Preset 登録モーダル -->
 <div id="foodPresetOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1060;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeFoodPreset()">
-  <div style="background:var(--surface);width:100%;max-width:430px;border-radius:16px 16px 0 0;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-height:80dvh;overflow-y:auto">
+  <div style="background:var(--surface);width:100%;max-width:430px;border-radius:16px 16px 0 0;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-height:85dvh;overflow-y:auto">
     <div style="font-family:var(--serif);font-style:italic;font-size:17px;margin-bottom:16px;text-align:center">New Saved Food</div>
-    <input type="text" id="presetName" placeholder="食品名 (e.g. 鶏胸肉100g)" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:8px">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Calories (kcal)</div>
-        <input type="number" id="presetCal" placeholder="0" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
-      </div>
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Protein (g)</div>
-        <input type="number" id="presetProtein" placeholder="0" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
-      </div>
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Carbs (g)</div>
-        <input type="number" id="presetCarbs" placeholder="0" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
-      </div>
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Fat (g)</div>
-        <input type="number" id="presetFat" placeholder="0" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
-      </div>
-    </div>
+    <input type="text" id="presetName" placeholder="食品名 (e.g. 鶏胸肉100g)" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;margin-bottom:10px">
+    <div id="presetNutritionInputs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px"></div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button onclick="closeFoodPreset()" class="modal-cancel" style="flex:1">Cancel</button>
       <button onclick="saveFoodPreset()" class="modal-ok" style="flex:1">Save</button>
@@ -922,13 +915,21 @@ function getInitialState(){
   const tmrGroups=(()=>{try{return JSON.parse(localStorage.getItem('ym4_tmr_groups')||'[]');}catch{return[];}})();
   if(saved){
     const parsed=JSON.parse(saved);
-    // 今日のstateがあってもtmr_groupsがあればcheckGroupsに反映
+    // tmr_groupsがあればcheckGroupsに反映
     if(tmrGroups.length>0&&(!parsed.checkGroups||parsed.checkGroups.length===0)){
       parsed.checkGroups=tmrGroups;
-      localStorage.setItem('ym4_'+TODAY_KEY,JSON.stringify(parsed));
-      allData[TODAY_KEY]=parsed;
-      localStorage.setItem('ym4_all',JSON.stringify(allData));
     }
+    // nutritionGoalsが空なら前日から引き継ぐ
+    if(!parsed.nutritionGoals||Object.keys(parsed.nutritionGoals).length===0){
+      const sortedKeys=Object.keys(allData).sort();
+      const prevKey=sortedKeys.filter(k=>k<TODAY_KEY).pop();
+      if(prevKey&&allData[prevKey]?.nutritionGoals){
+        parsed.nutritionGoals=JSON.parse(JSON.stringify(allData[prevKey].nutritionGoals));
+      }
+    }
+    localStorage.setItem('ym4_'+TODAY_KEY,JSON.stringify(parsed));
+    allData[TODAY_KEY]=parsed;
+    localStorage.setItem('ym4_all',JSON.stringify(allData));
     return parsed;
   }
   const sortedKeys=Object.keys(allData).sort();
@@ -2814,9 +2815,14 @@ function renderFoodPresetList(){
 
 function openAddFoodPreset(){
   document.getElementById('foodPresetOverlay').style.display='flex';
-  ['presetName','presetCal','presetProtein','presetCarbs','presetFat'].forEach(id=>{
-    document.getElementById(id).value='';
-  });
+  document.getElementById('presetName').value='';
+  // NUTRITION_GOAL_FIELDSで入力欄を動的生成
+  const grid=document.getElementById('presetNutritionInputs');
+  grid.innerHTML=NUTRITION_GOAL_FIELDS.map(f=>`
+    <div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${f.label} (${f.unit})</div>
+      <input type="number" id="preset_${f.key}" placeholder="0" style="width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
+    </div>`).join('');
 }
 
 function closeFoodPreset(){
@@ -2826,13 +2832,12 @@ function closeFoodPreset(){
 function saveFoodPreset(){
   const name=document.getElementById('presetName').value.trim();
   if(!name){alert('食品名を入力してください');return;}
-  const preset={
-    name,
-    calories:parseFloat(document.getElementById('presetCal').value)||0,
-    protein:parseFloat(document.getElementById('presetProtein').value)||0,
-    carbs:parseFloat(document.getElementById('presetCarbs').value)||0,
-    fat:parseFloat(document.getElementById('presetFat').value)||0,
-  };
+  const preset={name};
+  NUTRITION_GOAL_FIELDS.forEach(f=>{
+    preset[f.key]=parseFloat(document.getElementById('preset_'+f.key)?.value)||0;
+  });
+  // 後方互換のためcaloriesをcalにもマップ
+  preset.calories=preset.calories||0;
   const arr=getFoodPresets();
   arr.push(preset);
   saveFoodPresets(arr);
@@ -2850,12 +2855,14 @@ function deleteFoodPreset(i){
 
 function applyFoodPreset(p){
   if(!state.meals)state.meals=[];
+  const nutrition={};
+  NUTRITION_GOAL_FIELDS.forEach(f=>{nutrition[f.key]=p[f.key]||0;});
   const meal={
     id:'meal_'+Date.now(),
     name:p.name,
     details:'',
     photoId:null,
-    nutrition:{calories:p.calories,protein:p.protein,carbs:p.carbs,fat:p.fat},
+    nutrition,
     time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
   };
   state.meals.push(meal);
@@ -3109,7 +3116,8 @@ function renderMealList(){
             </div>
           </div>`;
         }).join('')}
-      </div>`;
+      </div>
+      <button onclick="openNutritionAI()" style="width:100%;margin-top:10px;padding:10px;background:none;border:0.5px solid var(--accent);border-radius:10px;color:var(--accent);font-size:13px;cursor:pointer;font-family:inherit">🤖 今日の食事をAIにアドバイスしてもらう</button>`;
     calcScore();
   }else if(sumEl){sumEl.innerHTML='';}
 }
@@ -4074,6 +4082,168 @@ function toggleFullscreen(){
 // ===== AI CHAT =====
 let aiHistory=JSON.parse(localStorage.getItem('ym4_ai_history')||'[]');
 
+function openDailyAISummary(){
+  const key=localStorage.getItem('ym4_ai_key');
+  if(!key){alert('APIキーを設定してください（パンサーロゴ→⚙）');return;}
+
+  // ===== 全データ収集 =====
+  const score=calcScoreFor(state);
+  const w=getScoreWeights();
+
+  // Study
+  const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study?.[s.id]?.[b.id]||0),0),0);
+  const studyGoal=state.goalMins||DEFAULT_GOAL_MINS;
+  const studyDetails=subjects.map(s=>{
+    const books=s.books.map(b=>{
+      const m=state.study?.[s.id]?.[b.id]||0;
+      return m>0?`${b.name}:${Math.floor(m/60)}h${m%60}m`:null;
+    }).filter(Boolean).join('、');
+    const tot=s.books.reduce((a,b)=>a+(state.study?.[s.id]?.[b.id]||0),0);
+    return tot>0?`${s.name}（${books}）`:null;
+  }).filter(Boolean).join(' / ');
+
+  // Timeline sessions
+  const sessions=(state.studySessions||[]).map(s=>{
+    const subj=subjects.find(x=>x.id===s.subjectId);
+    const book=subj?.books.find(b=>b.id===s.bookId);
+    const time=s.startTime&&s.endTime?` ${s.startTime}-${s.endTime}`:'';
+    return `・${subj?.name||''}「${book?.name||''}」${s.range?` [${s.range}]`:''}${Math.floor(s.mins/60)}h${s.mins%60}m${time}`;
+  }).join('\n');
+
+  // Check
+  const n=Math.max(1,checkItems.length);
+  const checkDone=Object.values(state.checks||{}).filter(Boolean).length;
+  const checkedItems=checkItems.filter(c=>state.checks?.[c.id]).map(c=>c.label).join('、');
+  const uncheckedItems=checkItems.filter(c=>!state.checks?.[c.id]).map(c=>c.label).join('、');
+
+  // Exercise
+  const exGoals=getExGoals();
+  const strengthSummary=(state.strengthDaily||[]).map(id=>{
+    const ex=strengthList.find(e=>e.id===id);
+    const d=state.strength?.[id];
+    if(!ex||!d)return null;
+    const sets=d.sets||[];
+    const vol=sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
+    const setsStr=sets.map((s,i)=>`Set${i+1}:${s.reps}rep×${s.weight}kg`).join(' ');
+    return `・${ex.name}（${setsStr}）総負荷量${vol}kg`;
+  }).filter(Boolean).join('\n');
+
+  const cardioSummary=Object.entries(state.cardio||{}).filter(([,d])=>d.distance||d.time).map(([id,d])=>{
+    const ex=cardioList.find(e=>e.id===id);
+    return `・${ex?.name||id}: ${d.distance||0}km ${d.time||0}分`;
+  }).join('\n');
+
+  // Nutrition
+  const meals=state.meals||[];
+  const t=calcMealTotals(meals);
+  const goals=state.nutritionGoals||{};
+  const mealList=meals.map(m=>{
+    const n=m.nutrition||{};
+    return `・${m.name}（${n.calories||0}kcal P:${n.protein||0}g C:${n.carbs||0}g F:${n.fat||0}g）`;
+  }).join('\n');
+  const nutritionSummary=NUTRITION_GOAL_FIELDS.filter(f=>(t[f.key]||0)>0).map(f=>{
+    const val=t[f.key]||0;
+    const goal=goals[f.key];
+    return `${f.label}:${Number.isInteger(val)?val:val.toFixed(1)}${f.unit}${goal?`/${goal}${f.unit}(${Math.round(val/goal*100)}%)`:'' }`;
+  }).join(' / ');
+
+  // Body
+  const bodyStr=[
+    state.bodyWeight?`体重:${state.bodyWeight}kg`:'',
+    state.bodyFat?`体脂肪率:${state.bodyFat}%`:'',
+    state.muscleMass?`筋肉量:${state.muscleMass}kg`:'',
+  ].filter(Boolean).join(' ');
+
+  // Health
+  const sleep=state.health?.sleep||0;
+  const healthMemo=state.healthMemo||'';
+
+  // Diary
+  const diary=state.diary||'';
+
+  const prompt=`今日（${TODAY_KEY}）の1日のデータを分析して、総合的なまとめとアドバイスをお願いします。
+
+━━━ LIFE SCORE: ${score}点 ━━━
+
+【勉強】
+合計: ${Math.floor(sm/60)}h${sm%60}m / 目標${Math.floor(studyGoal/60)}h（達成率${Math.round(sm/studyGoal*100)}%）
+${studyDetails||'記録なし'}
+${sessions?'セッション:\n'+sessions:''}
+
+【チェックリスト】
+${checkDone}/${n} 完了
+✓ ${checkedItems||'なし'}
+✗ ${uncheckedItems||'なし'}
+
+【筋トレ】
+${strengthSummary||'記録なし'}
+
+【有酸素】
+${cardioSummary||'記録なし'}
+
+【食事】
+${mealList||'記録なし'}
+栄養素: ${nutritionSummary||'記録なし'}
+
+【体】${bodyStr||'記録なし'}
+睡眠: ${sleep}h
+${healthMemo?'健康メモ: '+healthMemo:''}
+
+【日記】
+${diary||'記録なし'}
+
+このデータをもとに1日の総合的なまとめとアドバイスをお願いします。`;
+
+  openAIChat();
+  setTimeout(async()=>{
+    const input=document.getElementById('aiInput');
+    if(input){input.value=prompt;await aiSend();}
+  },300);
+}
+
+function openNutritionAI(){
+  const key=localStorage.getItem('ym4_ai_key');
+  if(!key){alert('APIキーを設定してください（パンサーロゴ→⚙）');return;}
+
+  const meals=state.meals||[];
+  const t=calcMealTotals(meals);
+  const goals=state.nutritionGoals||{};
+
+  // 今日の食事データをまとめる
+  const mealList=meals.map(m=>{
+    const n=m.nutrition||{};
+    return `・${m.name}（${n.calories||0}kcal P:${n.protein||0}g C:${n.carbs||0}g F:${n.fat||0}g）`;
+  }).join('\n');
+
+  const goalSummary=Object.entries(goals).filter(([k,v])=>v>0).map(([k,v])=>{
+    const field=NUTRITION_GOAL_FIELDS.find(f=>f.key===k);
+    const actual=t[k]||0;
+    const pct=Math.round(actual/v*100);
+    return `${field?.label||k}: ${actual}/${v}${field?.unit||''} (${pct}%)`;
+  }).join('、');
+
+  const prompt=`今日（${TODAY_KEY}）の食事記録を分析して、具体的なアドバイスをください。
+
+【今日の食事】
+${mealList||'記録なし'}
+
+【栄養素トータル vs 目標】
+${goalSummary||'目標未設定'}
+
+不足している栄養素、過剰な栄養素、改善点、明日に向けた具体的な提案をお願いします。`;
+
+  // AIチャットを開いて初回メッセージを自動送信
+  openAIChat();
+  // 少し待ってから送信（チャットが開いてから）
+  setTimeout(async()=>{
+    const input=document.getElementById('aiInput');
+    if(input){
+      input.value=prompt;
+      await aiSend();
+    }
+  },300);
+}
+
 function openAIChat(){
   document.getElementById('aiChatOverlay').style.display='flex';
   document.body.style.overflow='hidden';
@@ -4615,109 +4785,222 @@ function renderExerciseGraph(type){
   });
 }
 
+// ===== SCORE WEIGHTS =====
+const DEFAULT_WEIGHTS={study:65,exercise:10,nutrition:10,checks:10,diary:5};
+function getScoreWeights(){
+  try{return JSON.parse(localStorage.getItem('ym4_score_weights')||'null')||{...DEFAULT_WEIGHTS};}
+  catch{return{...DEFAULT_WEIGHTS};}
+}
+function saveScoreWeights(w){localStorage.setItem('ym4_score_weights',JSON.stringify(w));}
+
+// 筋トレ・有酸素の目標値
+function getExGoals(){
+  try{return JSON.parse(localStorage.getItem('ym4_ex_goals')||'null')||{strengthVol:3000,cardioDistance:5};}
+  catch{return{strengthVol:3000,cardioDistance:5};}
+}
+function saveExGoals(g){localStorage.setItem('ym4_ex_goals',JSON.stringify(g));}
+
+function calcExerciseScore(r,maxPt){
+  const exGoals=getExGoals();
+  // 筋トレスコア: 今日の総負荷量 / 目標負荷量
+  const totalVol=(r.strengthDaily||[]).reduce((a,id)=>{
+    const d=r.strength?.[id];if(!d)return a;
+    const sets=d.sets||[{reps:d.reps||0,weight:d.weight||0}];
+    return a+sets.reduce((a2,s)=>a2+(s.reps||0)*(s.weight||0),0);
+  },0);
+  const strengthRatio=exGoals.strengthVol>0?Math.min(1,totalVol/exGoals.strengthVol):0;
+
+  // 有酸素スコア: 今日の総時間 / 目標時間
+  const totalCardioDistance=Object.values(r.cardio||{}).reduce((a,d)=>a+(d.distance||0),0);
+  const cardioRatio=exGoals.cardioDistance>0?Math.min(1,totalCardioDistance/exGoals.cardioDistance):0;
+
+  // 高い方を採用
+  return Math.min(maxPt,Math.max(strengthRatio,cardioRatio)*maxPt);
+}
+
 function calcScoreFor(r){
+  const w=getScoreWeights();
   const _subs=r.subjects||subjects;const sm=_subs.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(r.study?.[s.id]?.[b.id]||0),0),0);
-  
-  // 65% Study
   const _goal=r.goalMins||DEFAULT_GOAL_MINS;
-  const studyScore=Math.min(65,(sm/_goal)*65);
-  
-  // 10% Exercise (30min = 100%)
-  const exScore=Math.min(10,(r.health?.exercise||0)/30*10);
-  
-  // 10% Nutrition
+  const studyScore=Math.min(w.study,(sm/_goal)*w.study);
+  const exScore=calcExerciseScore(r,w.exercise);
   let nutritionScore=0;
   const goals=r.nutritionGoals||{};
   const goalKeys=Object.keys(goals).filter(k=>goals[k]>0);
   if(goalKeys.length>0&&(r.meals||[]).length>0){
     const totals=calcMealTotals(r.meals||[]);
     const scores=goalKeys.map(k=>{
-      const goal=goals[k];
-      const actual=totals[k]||0;
-      // 目標に近いほど高スコア（超過は0.8倍でペナルティ）
-      if(actual<=goal) return actual/goal;
-      else return Math.max(0,1-(actual-goal)/goal*0.5);
+      const goal=goals[k];const actual=totals[k]||0;
+      return actual<=goal?actual/goal:Math.max(0,1-(actual-goal)/goal*0.5);
     });
-    nutritionScore=Math.min(10,(scores.reduce((a,b)=>a+b,0)/scores.length)*10);
+    nutritionScore=Math.min(w.nutrition,(scores.reduce((a,b)=>a+b,0)/scores.length)*w.nutrition);
   }
-  
-  // 10% Checks
   const n=Math.max(1,(r.checkItems||checkItems).length);
-  const checkScore=(Object.values(r.checks||{}).filter(Boolean).length/n)*10;
-  
-  // 5% Diary
-  const diaryScore=(r.diary?.length||0)>0?5:0;
-  
+  const checkScore=(Object.values(r.checks||{}).filter(Boolean).length/n)*w.checks;
+  const diaryScore=(r.diary?.length||0)>0?w.diary:0;
   return Math.min(100,Math.round(studyScore+exScore+nutritionScore+checkScore+diaryScore));
 }
 function calcScore(){document.getElementById('topScore').textContent=calcScoreFor(state);}
 
 function showScoreBreakdown(){
+  const w=getScoreWeights();
+  const exGoals=getExGoals();
   const sm=subjects.reduce((a,s)=>a+s.books.reduce((a2,b)=>a2+(state.study?.[s.id]?.[b.id]||0),0),0);
   const _goal=state.goalMins||DEFAULT_GOAL_MINS;
-  const studyScore=Math.min(65,(sm/_goal)*65);
-  const exScore=Math.min(10,(state.health?.exercise||0)/30*10);
+  const studyScore=Math.min(w.study,(sm/_goal)*w.study);
+  const exScore=calcExerciseScore(state,w.exercise);
   const n=Math.max(1,checkItems.length);
-  const checkScore=(Object.values(state.checks||{}).filter(Boolean).length/n)*10;
-  const diaryScore=(state.diary?.length||0)>0?5:0;
+  const checkScore=(Object.values(state.checks||{}).filter(Boolean).length/n)*w.checks;
+  const diaryScore=(state.diary?.length||0)>0?w.diary:0;
   const goals=state.nutritionGoals||{};
   const goalKeys=Object.keys(goals).filter(k=>goals[k]>0);
   let nutritionScore=0;
   if(goalKeys.length>0&&(state.meals||[]).length>0){
     const totals=calcMealTotals(state.meals||[]);
     const scores=goalKeys.map(k=>{const goal=goals[k];const actual=totals[k]||0;return actual<=goal?actual/goal:Math.max(0,1-(actual-goal)/goal*0.5);});
-    nutritionScore=Math.min(10,(scores.reduce((a,b)=>a+b,0)/scores.length)*10);
+    nutritionScore=Math.min(w.nutrition,(scores.reduce((a,b)=>a+b,0)/scores.length)*w.nutrition);
   }
   const total=Math.round(studyScore+exScore+nutritionScore+checkScore+diaryScore);
-  
+  const totalVol=(state.strengthDaily||[]).reduce((a,id)=>{
+    const d=state.strength?.[id];if(!d)return a;
+    const sets=d.sets||[{reps:d.reps||0,weight:d.weight||0}];
+    return a+sets.reduce((a2,s)=>a2+(s.reps||0)*(s.weight||0),0);
+  },0);
+  const totalCardioDistance=Object.values(state.cardio||{}).reduce((a,d)=>a+(d.distance||0),0);
+  const items=[
+    {key:'study',label:'Study',score:studyScore,color:'var(--accent)',detail:minsToStr(sm)+' / '+minsToStr(_goal)},
+    {key:'exercise',label:'Exercise',score:exScore,color:'var(--green)',detail:'筋トレ '+totalVol+'kg/'+exGoals.strengthVol+'kg | 有酸素 '+totalCardioDistance+'km/'+exGoals.cardioDistance+'km'},
+    {key:'nutrition',label:'Nutrition',score:nutritionScore,color:'var(--accent2)',detail:''},
+    {key:'checks',label:'Checks',score:checkScore,color:'#4fc3f7',detail:Object.values(state.checks||{}).filter(Boolean).length+'/'+n},
+    {key:'diary',label:'Diary',score:diaryScore,color:'#ce93d8',detail:(state.diary?.length||0)>0?'✓':'—'},
+  ];
+  const modal=document.createElement('div');
+  modal.className='modal-bg';modal.id='scoreModal';
+  const rows=items.map(it=>{
+    const det=it.detail?'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+it.detail+'</div>':'';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border-radius:10px"><div style="flex:1"><div style="font-size:12px;color:var(--text);font-weight:500">'+it.label+'</div>'+det+'</div><div style="text-align:right"><span style="font-family:Bebas Neue,sans-serif;font-size:22px;color:'+it.color+'">'+Math.round(it.score)+'</span><span style="font-size:10px;color:var(--muted)"> / '+w[it.key]+'</span></div></div>';
+  }).join('');
+  modal.innerHTML='<div class="modal" style="max-width:320px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div class="modal-title" style="margin:0">Score Breakdown</div><button onclick="showWeightEditor()" style="background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:11px;padding:4px 10px;cursor:pointer">Edit 配点</button></div><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'+rows+'</div><div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:12px;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">TOTAL</div><div style="font-family:Bebas Neue,sans-serif;font-size:36px;color:var(--accent)">'+total+'</div></div><button onclick="showExGoalEditor()" style="width:100%;padding:8px;background:none;border:0.5px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;margin-bottom:8px">Exercise目標を設定</button><button class="modal-cancel" style="width:100%">Close</button></div>';
+  document.body.appendChild(modal);modal.classList.add('open');
+  // Closeボタン
+  modal.querySelector('.modal-cancel').onclick=()=>document.getElementById('scoreModal')?.remove();
+}
+
+function showExGoalEditor(){
+  document.getElementById('scoreModal')?.remove();
+  const g=getExGoals();
+  const modal=document.createElement('div');modal.className='modal-bg';modal.id='exGoalModal';
+  const inner=document.createElement('div');inner.className='modal';inner.style.maxWidth='300px';
+  const title=document.createElement('div');title.className='modal-title';title.textContent='Exercise 目標設定';
+  inner.appendChild(title);
+  const hint=document.createElement('div');
+  hint.style.cssText='font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6';
+  hint.textContent='筋トレか有酸素どちらか一方で目標達成すれば満点';
+  inner.appendChild(hint);
+  [{key:'strengthVol',label:'筋トレ目標 総負荷量',unit:'kg',val:g.strengthVol},{key:'cardioDistance',label:'有酸素目標 距離',unit:'km',val:g.cardioDistance}].forEach(item=>{
+    const row=document.createElement('div');row.style.marginBottom='12px';
+    const lbl=document.createElement('div');lbl.style.cssText='font-size:11px;color:var(--muted);margin-bottom:4px';lbl.textContent=item.label;
+    const inp=document.createElement('input');
+    inp.type='number';inp.min='0';inp.value=item.val;inp.id='exGoal_'+item.key;
+    inp.style.cssText='width:100%;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:16px;box-sizing:border-box;text-align:right';
+    const suffix=document.createElement('div');suffix.style.cssText='font-size:11px;color:var(--muted);margin-top:2px;text-align:right';suffix.textContent=item.unit;
+    row.appendChild(lbl);row.appendChild(inp);row.appendChild(suffix);inner.appendChild(row);
+  });
+  const btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:8px;margin-top:4px';
+  const cancel=document.createElement('button');cancel.className='modal-cancel';cancel.style.flex='1';cancel.textContent='Cancel';cancel.onclick=()=>modal.remove();
+  const save=document.createElement('button');save.className='modal-ok';save.style.flex='1';save.textContent='Save';
+  save.onclick=()=>{
+    saveExGoals({strengthVol:+document.getElementById('exGoal_strengthVol').value||3000,cardioDistance:+document.getElementById('exGoal_cardioDistance').value||5});
+    calcScore();modal.remove();showScoreBreakdown();
+  };
+  btnRow.appendChild(cancel);btnRow.appendChild(save);inner.appendChild(btnRow);
+  modal.appendChild(inner);document.body.appendChild(modal);modal.classList.add('open');
+}
+
+
+
+function showWeightEditor(){
+  document.getElementById('scoreModal')?.remove();
+  const w=getScoreWeights();
   const modal=document.createElement('div');
   modal.className='modal-bg';
-  modal.id='scoreModal';
-  modal.innerHTML=`
-    <div class="modal" style="max-width:300px">
-      <div class="modal-title">Score Breakdown</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-        <div class="card" style="margin-bottom:0;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Study</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(studyScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">65%</div>
-        </div>
-        <div class="card" style="margin-bottom:0;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Exercise</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(exScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">10%</div>
-        </div>
-        <div class="card" style="margin-bottom:0;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Nutrition</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(nutritionScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">10%</div>
-        </div>
-        <div class="card" style="margin-bottom:0;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Checks</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(checkScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">10%</div>
-        </div>
-        <div class="card" style="margin-bottom:0;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Diary</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${Math.round(diaryScore)}</div>
-          <div style="font-size:9px;color:var(--muted)">5%</div>
-        </div>
-      </div>
-      <div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:12px;text-align:center">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">TOTAL</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent)">${total}</div>
-      </div>
-      <div style="font-size:11px;color:var(--muted);line-height:1.6">
-        <div>Study: ${Math.round(sm/6)}/360m</div>
-        <div>Exercise: ${state.health?.exercise||0}/30m</div>
-        <div>Checks: ${Object.values(state.checks||{}).filter(Boolean).length}/${n}</div>
-        <div>d記: ${(state.diary?.length||0)>0?'✓':'○'}</div>
-      </div>
-      <button class="modal-cancel" onclick="document.getElementById('scoreModal').remove()" style="margin-top:12px;width:100%">Close</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.classList.add('open');
+  modal.id='weightEditorModal';
+
+  const items=[
+    {key:'study',label:'Study'},
+    {key:'exercise',label:'Exercise'},
+    {key:'nutrition',label:'Nutrition'},
+    {key:'checks',label:'Checks'},
+    {key:'diary',label:'Diary'},
+  ];
+
+  const inner=document.createElement('div');
+  inner.className='modal';
+  inner.style.maxWidth='320px';
+
+  const title=document.createElement('div');
+  title.className='modal-title';title.textContent='配点を編集';
+  inner.appendChild(title);
+
+  const hint=document.createElement('div');
+  hint.style.cssText='font-size:11px;color:var(--muted);margin-bottom:12px';
+  hint.textContent='合計が100になるように設定してください';
+  inner.appendChild(hint);
+
+  const totalEl=document.createElement('div');
+  totalEl.style.cssText='text-align:center;margin-bottom:12px;font-family:"Bebas Neue",sans-serif;font-size:24px';
+
+  const inputs={};
+  const updateTotal=()=>{
+    const sum=Object.values(inputs).reduce((a,inp)=>a+(+inp.value||0),0);
+    totalEl.textContent=`合計: ${sum}pt`;
+    totalEl.style.color=sum===100?'var(--accent)':'#f44';
+  };
+
+  items.forEach(it=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:8px';
+    const lbl=document.createElement('div');
+    lbl.style.cssText='flex:1;font-size:13px;color:var(--text)';
+    lbl.textContent=it.label;
+    const inp=document.createElement('input');
+    inp.type='number';inp.min='0';inp.max='100';inp.value=w[it.key];
+    inp.style.cssText='width:64px;padding:6px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);text-align:center;font-size:16px;font-family:"Bebas Neue",sans-serif';
+    inp.oninput=updateTotal;
+    inputs[it.key]=inp;
+    const pt=document.createElement('div');
+    pt.style.cssText='font-size:11px;color:var(--muted);width:16px';pt.textContent='pt';
+    row.appendChild(lbl);row.appendChild(inp);row.appendChild(pt);
+    inner.appendChild(row);
+  });
+
+  inner.appendChild(totalEl);
+  updateTotal();
+
+  const btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;gap:8px;margin-top:12px';
+  const reset=document.createElement('button');
+  reset.className='modal-cancel';reset.style.flex='1';reset.textContent='Reset';
+  reset.onclick=()=>{
+    Object.entries(DEFAULT_WEIGHTS).forEach(([k,v])=>{inputs[k].value=v;});
+    updateTotal();
+  };
+  const save=document.createElement('button');
+  save.className='modal-ok';save.style.flex='1';save.textContent='Save';
+  save.onclick=()=>{
+    const sum=Object.values(inputs).reduce((a,inp)=>a+(+inp.value||0),0);
+    if(sum!==100){alert('合計が100になるように設定してください（現在: '+sum+'）');return;}
+    const newW={};
+    items.forEach(it=>{newW[it.key]=+inputs[it.key].value;});
+    saveScoreWeights(newW);
+    calcScore();
+    modal.remove();
+    showScoreBreakdown();
+  };
+  btnRow.appendChild(reset);btnRow.appendChild(save);
+  inner.appendChild(btnRow);
+  modal.appendChild(inner);
+  document.body.appendChild(modal);modal.classList.add('open');
 }
 
 function switchTab(id,btn){
