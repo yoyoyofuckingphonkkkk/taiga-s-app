@@ -395,6 +395,27 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
       <div id="bodyCompGraphContainer"></div>
     </div>
     <div class="health-grid" id="healthGrid"></div>
+    <!-- 総消費カロリー -->
+    <div id="totalKcalCard" style="margin-bottom:14px;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.08em;margin-bottom:10px">TODAY'S CALORIES BURNED</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Cardio</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--green)" id="kcalCardio">0</div>
+          <div style="font-size:9px;color:var(--muted)">kcal</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Strength</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent2)" id="kcalStrength">0</div>
+          <div style="font-size:9px;color:var(--muted)">kcal</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;border:0.5px solid var(--accent)">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Total</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent)" id="kcalTotal">0</div>
+          <div style="font-size:9px;color:var(--muted)">kcal</div>
+        </div>
+      </div>
+    </div>
     <div style="margin-top:14px">
       <div class="sec-label">Body Memo</div>
       <textarea class="diary-area" id="healthMemo" placeholder="体調メモ..." style="min-height:80px"></textarea>
@@ -409,10 +430,18 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     
     <div class="health-section-label" style="margin-top:14px">Workout Menu</div>
     <div id="strengthMasterList" style="max-height:300px;overflow-y:auto"></div>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <input type="text" id="strengthExerciseName" placeholder="Exercise name" style="flex:1;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:13px">
-      <input type="text" id="strengthExerciseUnit" placeholder="Unit" style="width:60px;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:13px">
-      <button class="add-btn" style="width:auto;margin:0;padding:8px 12px" onclick="addStrengthExercise()">Add</button>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+      <div style="display:flex;gap:8px">
+        <input type="text" id="strengthExerciseName" placeholder="Exercise name" style="flex:1;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:13px">
+        <button class="add-btn" style="width:auto;margin:0;padding:8px 12px" onclick="addStrengthExercise()">Add</button>
+      </div>
+      <select id="strengthExerciseCategory" style="width:100%;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:13px">
+        <option value="large">大筋群（スクワット・デッドリフト・ベンチプレス等）</option>
+        <option value="medium" selected>中筋群（ローイング・ショルダープレス等）</option>
+        <option value="small">小筋群（アームカール・サイドレイズ等）</option>
+        <option value="core">体幹（プランク・クランチ等）</option>
+        <option value="bodyweight">自重（腕立て・懸垂等）</option>
+      </select>
     </div>
   </div>
   
@@ -2327,6 +2356,7 @@ function switchHealthView(view){
   document.querySelectorAll('.health-subtab-btn').forEach(b=>b.classList.remove('active'));
   if(view==='overview'){
     document.getElementById('healthOverview').style.display='block';
+    updateKcalCard();
     event.target.classList.add('active');
   }else if(view==='strength'){
     document.getElementById('healthStrength').style.display='block';
@@ -2341,13 +2371,22 @@ function switchHealthView(view){
   }
 }
 
-function renderExercise(){renderCardio();renderStrength();}
+function updateKcalCard(){
+  const k=calcTodayTotalKcal();
+  const c=document.getElementById('kcalCardio');
+  const s=document.getElementById('kcalStrength');
+  const t=document.getElementById('kcalTotal');
+  if(c)c.textContent=k.cardio;
+  if(s)s.textContent=k.strength;
+  if(t)t.textContent=k.total;
+}
 
-function calcCardioCalories(distance,time){
+function renderExercise(){renderCardio();renderStrength();updateKcalCard();}
+
+function calcCardioCalories(distance,time,bodyWeight){
   if(!distance||!time)return 0;
-  const bw=+(localStorage.getItem('ym4_bodyweight')||70);
+  const bw=bodyWeight||(+(localStorage.getItem('ym4_bodyweight')||70));
   const speed=distance/(time/60); // km/h
-  // MET from 2024 Compendium interpolation by speed
   let met;
   if(speed<=6.4)met=6.0;
   else if(speed<=8.0)met=8.3;
@@ -2358,15 +2397,15 @@ function calcCardioCalories(distance,time){
   else if(speed<=16.1)met=12.8;
   else if(speed<=17.7)met=14.5;
   else met=16.0;
-  // Calories = MET × weight(kg) × duration(h)
   return Math.round(met*bw*(time/60));
 }
 
 function renderCardio(){
   const el=document.getElementById('cardioList');el.innerHTML='';
+  const bwToday=state.bodyWeight||(+(localStorage.getItem('ym4_bodyweight')||70));
   cardioList.forEach((ex,i)=>{
     const data=state.cardio[ex.id]||{distance:0,time:0};
-    const kcal=calcCardioCalories(data.distance,data.time);
+    const kcal=calcCardioCalories(data.distance,data.time,bwToday);
     const div=document.createElement('div');div.className='ex-card';div.dataset.cardioId=ex.id;
     div.innerHTML=`<div class="ex-header" onclick="this.nextElementSibling.classList.toggle('open')">
       <div class="ex-title">${ex.name}</div>
@@ -2400,12 +2439,57 @@ function setCardio(id,field,v){
   const ex=cardioList.find(e=>e.id===id);
   if(ex){
     const data=state.cardio[id];
-    const kcal=calcCardioCalories(data.distance,data.time);
+    const bw=state.bodyWeight||(+(localStorage.getItem('ym4_bodyweight')||70));
+    const kcal=calcCardioCalories(data.distance,data.time,bw);
     const card=document.querySelector(`[data-cardio-id="${id}"] .ex-header span`);
     if(card)card.textContent=`${data.distance||0}km ${data.time||0}m ${kcal?kcal+'kcal':''}`;
   }
 }
 function delCardioEx(i){if(!confirm('Delete?'))return;cardioList.splice(i,1);saveCardio();renderCardio();}
+// カテゴリ別係数
+const STRENGTH_KCAL_COEF={
+  large:    {vol:0.0006, reps:0.5},  // 大筋群: 総負荷量×0.0006 or reps×0.5
+  medium:   {vol:0.0004, reps:0.35}, // 中筋群
+  small:    {vol:0.0002, reps:0.2},  // 小筋群
+  core:     {vol:0.0002, reps:0.15}, // 体幹
+  bodyweight:{vol:0,     reps:0.4},  // 自重: repsのみ
+};
+
+function calcStrengthCaloriesFromVolume(volume){
+  // 後方互換（旧コード用、カテゴリなし）
+  if(!volume)return 0;
+  return Math.round(volume*0.0004);
+}
+
+function calcStrengthKcalByCategory(sets,category){
+  const coef=STRENGTH_KCAL_COEF[category]||STRENGTH_KCAL_COEF.medium;
+  const totalVol=sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
+  const totalReps=sets.reduce((a,s)=>a+(s.reps||0),0);
+  if(category==='bodyweight'||totalVol===0){
+    return Math.round(totalReps*coef.reps);
+  }
+  return Math.round(totalVol*coef.vol);
+}
+
+function calcTodayTotalKcal(){
+  const bw=state.bodyWeight||(+(localStorage.getItem('ym4_bodyweight')||70));
+  let cardioKcal=0;
+  cardioList.forEach(ex=>{
+    const d=state.cardio?.[ex.id];
+    if(d)cardioKcal+=calcCardioCalories(d.distance,d.time,bw)||0;
+  });
+  let strengthKcal=0;
+  (state.strengthDaily||[]).forEach(id=>{
+    const d=state.strength?.[id];
+    if(!d)return;
+    const sets=d.sets||[{reps:d.reps||0,weight:d.weight||0}];
+    const ex=strengthList.find(e=>e.id===id);
+    const category=ex?.category||'medium';
+    strengthKcal+=calcStrengthKcalByCategory(sets,category);
+  });
+  return {cardio:Math.round(cardioKcal),strength:Math.round(strengthKcal),total:Math.round(cardioKcal+strengthKcal)};
+}
+
 function calcStrengthCalories(time,intensity){
   if(!time)return 0;
   const bw=+(localStorage.getItem('ym4_bodyweight')||70);
@@ -2417,109 +2501,173 @@ function calcStrengthCalories(time,intensity){
 }
 
 function renderStrength(){
-  // Render daily exercises
   const dailyEl=document.getElementById('strengthDailyList');
   dailyEl.innerHTML='';
-  
-  // Daily total calories
-  let totalKcal=0;
-  if(state.strengthDaily && state.strengthDaily.length>0){
+
+  if(state.strengthDaily&&state.strengthDaily.length>0){
     state.strengthDaily.forEach((id,idx)=>{
       const ex=strengthList.find(e=>e.id===id);
       if(!ex)return;
-      
-      const dailyData=state.strength[id]||{reps:0,weight:0,memo:'',time:0,intensity:'moderate'};
-      const kcal=calcStrengthCalories(dailyData.time,dailyData.intensity);
-      totalKcal+=kcal;
-      
+
+      // マイグレーション: 旧形式({reps,weight})→新形式({sets:[...]})
+      if(!state.strength[id])state.strength[id]={sets:[{reps:0,weight:0}],memo:'',intensity:'moderate',time:0};
+      if(!state.strength[id].sets){
+        state.strength[id].sets=[{reps:state.strength[id].reps||0,weight:state.strength[id].weight||0}];
+      }
+      const data=state.strength[id];
+
+      // 合計ボリューム計算
+      const totalVol=data.sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
+
       const div=document.createElement('div');
-      div.className='card';
-      div.style.marginBottom='8px';
-      div.innerHTML=`
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      div.className='card';div.style.marginBottom='8px';
+
+      // ヘッダー
+      const header=document.createElement('div');
+      header.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
+      header.innerHTML=`
+        <div>
           <div style="font-weight:bold;font-size:14px;color:var(--accent)">${ex.name}</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            ${kcal?`<span style="font-family:'Bebas Neue',sans-serif;font-size:14px;color:var(--accent2)">${kcal}kcal</span>`:''}
-            <button class="del-btn" onclick="delFromDaily(${idx})" style="width:20px;height:20px">×</button>
-          </div>
+          ${totalVol>0?`<div style="font-size:11px;color:var(--muted)">Total: ${totalVol}kg</div>`:''}
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-          <div>
-            <div style="font-size:10px;color:var(--muted);margin-bottom:2px">reps数</div>
-            <input type="number" min="0" value="${dailyData.reps||0}" style="width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--accent2);text-align:center;font-size:12px" oninput="setStrengthDaily('${id}','reps',+this.value)">
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--muted);margin-bottom:2px">重量</div>
-            <input type="number" min="0" value="${dailyData.weight||0}" style="width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--accent2);text-align:center;font-size:12px" oninput="setStrengthDaily('${id}','weight',+this.value)">
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--muted);margin-bottom:2px">強度</div>
-            <select style="width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px" onchange="setStrengthDaily('${id}','intensity',this.value)">
-              <option value="light" ${dailyData.intensity==='light'?'selected':''}>軽め</option>
-              <option value="moderate" ${(!dailyData.intensity||dailyData.intensity==='moderate')?'selected':''}>普通</option>
-              <option value="hard" ${dailyData.intensity==='hard'?'selected':''}>きつめ</option>
-              <option value="circuit" ${dailyData.intensity==='circuit'?'selected':''}>サーキット</option>
-            </select>
-          </div>
-        </div>
-        <input type="text" value="${dailyData.memo||''}" placeholder="memo" style="width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text2);font-size:12px;box-sizing:border-box" oninput="setStrengthDaily('${id}','memo',this.value)">
-      `;
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="del-btn" onclick="delFromDaily(${idx})" style="width:20px;height:20px">×</button>
+        </div>`;
+      div.appendChild(header);
+
+      // セットリスト
+      const setsEl=document.createElement('div');
+      setsEl.id=`sets_${id}`;
+
+      const renderSets=()=>{
+        setsEl.innerHTML='';
+        // ヘッダー行
+        const hrow=document.createElement('div');
+        hrow.style.cssText='display:grid;grid-template-columns:32px 1fr 1fr 28px;gap:4px;margin-bottom:4px';
+        hrow.innerHTML=`<div style="font-size:10px;color:var(--muted);text-align:center">Set</div><div style="font-size:10px;color:var(--muted);text-align:center">Reps</div><div style="font-size:10px;color:var(--muted);text-align:center">Weight(kg)</div><div></div>`;
+        setsEl.appendChild(hrow);
+
+        data.sets.forEach((s,si)=>{
+          const row=document.createElement('div');
+          row.style.cssText='display:grid;grid-template-columns:32px 1fr 1fr 28px;gap:4px;margin-bottom:4px;align-items:center';
+
+          const setNum=document.createElement('div');
+          setNum.style.cssText='font-size:12px;color:var(--muted);text-align:center;line-height:32px';
+          setNum.textContent=si+1;
+
+          const repsInput=document.createElement('input');
+          repsInput.type='number';repsInput.min='0';repsInput.value=s.reps||0;
+          repsInput.style.cssText='width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--accent2);text-align:center;font-size:14px;box-sizing:border-box';
+          repsInput.oninput=()=>{data.sets[si].reps=+repsInput.value;saveState();calcScore();
+            // ボリューム更新
+            const vol=data.sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
+            header.querySelector('div div:last-child')&&(header.querySelector('div div:last-child').textContent=vol>0?`Total: ${vol}kg`:'');
+          };
+
+          const weightInput=document.createElement('input');
+          weightInput.type='number';weightInput.min='0';weightInput.step='0.5';weightInput.value=s.weight||0;
+          weightInput.style.cssText='width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--accent2);text-align:center;font-size:14px;box-sizing:border-box';
+          weightInput.oninput=()=>{data.sets[si].weight=+weightInput.value;saveState();calcScore();};
+
+          const delSet=document.createElement('button');
+          delSet.textContent='×';
+          delSet.style.cssText='background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:0';
+          delSet.onclick=()=>{
+            if(data.sets.length<=1)return;
+            data.sets.splice(si,1);saveState();renderSets();calcScore();
+          };
+
+          row.appendChild(setNum);row.appendChild(repsInput);row.appendChild(weightInput);row.appendChild(delSet);
+          setsEl.appendChild(row);
+        });
+
+        // + Add Set ボタン
+        const addSetBtn=document.createElement('button');
+        addSetBtn.style.cssText='width:100%;padding:6px;margin-top:4px;background:none;border:0.5px dashed var(--border);border-radius:6px;color:var(--muted);font-size:12px;cursor:pointer';
+        addSetBtn.textContent='+ Add Set';
+        addSetBtn.onclick=()=>{
+          const last=data.sets[data.sets.length-1]||{reps:0,weight:0};
+          data.sets.push({reps:last.reps,weight:last.weight});
+          saveState();renderSets();
+        };
+        setsEl.appendChild(addSetBtn);
+
+        // サマリーバー
+        const vol=data.sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
+        const maxW=Math.max(...data.sets.map(s=>s.weight||0));
+        const maxR=Math.max(...data.sets.map(s=>s.reps||0));
+        if(vol>0||maxW>0){
+          const summary=document.createElement('div');
+          summary.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:8px;border:0.5px solid var(--border)';
+          summary.innerHTML=`
+            <div style="font-size:10px;color:var(--muted);line-height:1.6">
+              <div>Max Weight: <span style="color:var(--accent)">${maxW}kg</span></div>
+              <div>Max Reps: <span style="color:var(--accent2)">${maxR}</span></div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:10px;color:var(--muted)">${data.sets.length} sets</div>
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--accent2);letter-spacing:1px">${vol}<span style="font-size:12px">kg</span></div>
+            </div>`;
+          setsEl.appendChild(summary);
+        }
+      };
+      renderSets();
+      div.appendChild(setsEl);
+
+      const memoInput=document.createElement('input');
+      memoInput.type='text';memoInput.value=data.memo||'';memoInput.placeholder='memo';
+      memoInput.style.cssText='width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text2);font-size:12px;box-sizing:border-box;margin-top:6px';
+      memoInput.oninput=()=>setStrengthDaily(id,'memo',memoInput.value);
+      div.appendChild(memoInput);
+
       dailyEl.appendChild(div);
     });
-    
-    if(totalKcal>0){
-      const totalDiv=document.createElement('div');
-      totalDiv.style.cssText='text-align:right;font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--accent2);margin-bottom:8px';
-      totalDiv.textContent=`合計 ${totalKcal} kcal`;
-      dailyEl.insertBefore(totalDiv,dailyEl.firstChild);
-    }
   }else{
     dailyEl.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px">Add from Workout Menu</div>';
   }
-  
-  // Render master list
+
+  // マスターリスト
   const masterEl=document.getElementById('strengthMasterList');
   masterEl.innerHTML='';
+  const CATEGORY_LABEL={large:'大筋群',medium:'中筋群',small:'小筋群',core:'体幹',bodyweight:'自重'};
   strengthList.forEach(ex=>{
-    const isDailySelected=state.strengthDaily && state.strengthDaily.includes(ex.id);
+    const isDailySelected=state.strengthDaily&&state.strengthDaily.includes(ex.id);
     const div=document.createElement('div');
-    div.className='card';
-    div.style.marginBottom='6px';
+    div.className='card';div.style.marginBottom='6px';
     div.style.background=isDailySelected?'var(--surface3)':'var(--surface2)';
     div.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="flex:1">
           <div style="font-size:13px;color:var(--text)">${ex.name}</div>
-          <div style="font-size:11px;color:var(--muted)">Unit: ${ex.unit}</div>
+          <div style="font-size:10px;color:var(--muted)">${CATEGORY_LABEL[ex.category||'medium']||'中筋群'}</div>
         </div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;align-items:center">
+          <select onchange="updateExCategory('${ex.id}',this.value)" style="padding:4px 6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface);color:var(--muted);font-size:10px;cursor:pointer">
+            ${['large','medium','small','core','bodyweight'].map(c=>`<option value="${c}"${(ex.category||'medium')===c?' selected':''}>${CATEGORY_LABEL[c]}</option>`).join('')}
+          </select>
           <button class="add-btn" style="width:auto;margin:0;padding:6px 12px;font-size:12px" onclick="addToDaily('${ex.id}')">${isDailySelected?'済':'Add'}</button>
           <button class="del-btn" style="width:24px;height:24px;font-size:12px" onclick="delStrEx('${ex.id}')">×</button>
         </div>
-      </div>
-    `;
+      </div>`;
     masterEl.appendChild(div);
   });
 }
 
 function addStrengthExercise(){
   const name=document.getElementById('strengthExerciseName').value;
-  const unit=document.getElementById('strengthExerciseUnit').value||'reps';
+  const category=document.getElementById('strengthExerciseCategory').value||'medium';
   if(!name)return;
-  
-  strengthList.push({id:'st'+Date.now(),name,unit});
+  strengthList.push({id:'st'+Date.now(),name,unit:'reps',category});
   saveStrength();
   renderStrength();
-  
   document.getElementById('strengthExerciseName').value='';
-  document.getElementById('strengthExerciseUnit').value='';
 }
 
 function addToDaily(id){
   if(!state.strengthDaily)state.strengthDaily=[];
   if(!state.strengthDaily.includes(id)){
     state.strengthDaily.push(id);
-    if(!state.strength[id])state.strength[id]={reps:0,weight:0,memo:''};
+    if(!state.strength[id])state.strength[id]={sets:[{reps:0,weight:0}],memo:'',intensity:'moderate',time:0};
     saveState();renderStrength();calcScore();
   }
 }
@@ -2535,6 +2683,11 @@ function setStrengthDaily(id,field,value){
   if(!state.strength[id])state.strength[id]={reps:0,weight:0,memo:''};
   state.strength[id][field]=value;
   saveState();calcScore();
+}
+
+function updateExCategory(id,category){
+  const ex=strengthList.find(e=>e.id===id);
+  if(ex){ex.category=category;saveStrength();updateKcalCard();}
 }
 
 function delStrEx(id){
@@ -3759,23 +3912,32 @@ function showRecordDetail(date){
           const ex=strengthList.find(e=>e.id===id);
           const d=r.strength?.[id]||{};
           if(!ex)return;
-          const vol=(d.reps||0)*(d.weight||0);
-          html+=`<div style="margin-bottom:6px;font-size:11px"><span style="color:var(--accent3)">${ex.name}</span><span style="color:var(--text2);margin-left:8px">${d.reps||0}reps × ${d.weight||0}kg${vol?` = ${vol}kg`:''}</span>${d.time?`<span style="color:var(--muted);margin-left:6px">${d.time}m</span>`:''}</div>`;
+          // sets形式対応
+          const sets=d.sets||[{reps:d.reps||0,weight:d.weight||0}];
+          const totalVol=sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
+          const totalReps=sets.reduce((a,s)=>a+(s.reps||0),0);
+          const category=ex.category||'medium';
+          const kcal=calcStrengthKcalByCategory(sets,category);
+          html+=`<div style="margin-bottom:10px">
+            <div style="font-size:11px;color:var(--accent3);margin-bottom:4px">${ex.name} <span style="color:var(--muted);font-size:10px">${totalReps}reps / ${totalVol}kg vol / ${kcal}kcal</span></div>
+            ${sets.map((s,i)=>`<div style="font-size:11px;color:var(--text2);margin-left:8px">Set${i+1}: ${s.reps||0}reps × ${s.weight||0}kg = ${(s.reps||0)*(s.weight||0)}kg</div>`).join('')}
+          </div>`;
         });
         html+='</div></div>';
         return html;
       })()}
       
       ${(()=>{
-        // Cardio
+        // Cardio（その日の体重を使用）
         const cd=r.cardio||{};
         const entries=Object.entries(cd).filter(([id,d])=>d.distance||d.time);
         if(!entries.length)return '';
+        const bw=r.bodyWeight||(+(localStorage.getItem('ym4_bodyweight')||70));
         let html='<div style="margin-bottom:12px"><div style="font-size:12px;color:var(--accent);font-weight:bold;margin-bottom:8px">Cardio</div><div style="background:var(--surface);border-radius:12px;padding:12px">';
         entries.forEach(([id,d])=>{
           const ex=cardioList.find(e=>e.id===id);
           const name=ex?ex.name:id;
-          const kcal=calcCardioCalories(d.distance,d.time);
+          const kcal=calcCardioCalories(d.distance,d.time,bw);
           html+=`<div style="margin-bottom:6px;font-size:11px"><span style="color:var(--green)">${name}</span><span style="color:var(--text2);margin-left:8px">${d.distance||0}km ${d.time||0}m${kcal?` ${kcal}kcal`:''}</span></div>`;
         });
         html+='</div></div>';
@@ -4318,15 +4480,24 @@ function getExGraphValue(r,exId,metric,type){
   if(type==='strength'){
     const d=r.strength?.[exId];
     if(!d)return null;
-    if(metric==='volume')return (d.reps||0)*(d.weight||0);
-    if(metric==='reps')return d.reps||0;
-    if(metric==='kcal')return calcStrengthCalories(d.time||0,d.intensity||'moderate');
+    const sets=d.sets||[{reps:d.reps||0,weight:d.weight||0}];
+    const totalVol=sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
+    const totalReps=sets.reduce((a,s)=>a+(s.reps||0),0);
+    if(metric==='volume')return totalVol;
+    if(metric==='reps')return totalReps;
+    if(metric==='kcal'){
+      const ex=strengthList.find(e=>e.id===exId);
+      return calcStrengthKcalByCategory(sets,ex?.category||'medium');
+    }
   }else{
     const d=r.cardio?.[exId];
     if(!d)return null;
     if(metric==='distance')return d.distance||0;
     if(metric==='time')return d.time||0;
-    if(metric==='kcal')return calcCardioCalories(d.distance,d.time);
+    if(metric==='kcal'){
+      const bw=r.bodyWeight||(+(localStorage.getItem('ym4_bodyweight')||70));
+      return calcCardioCalories(d.distance,d.time,bw);
+    }
   }
   return null;
 }
@@ -4335,10 +4506,10 @@ function renderExerciseGraph(type){
   const exId=document.getElementById('graphExercise').value;
   const metric=document.getElementById('graphMetric').value;
   const period=window._exGraphPeriod||7;
-  
+
   const exercises=type==='strength'?strengthList:cardioList;
   const ex=exercises.find(e=>e.id===exId);
-  
+
   // Collect data
   const keys=Object.keys(allData).sort();
   const now=new Date();
@@ -4422,11 +4593,15 @@ function renderExerciseGraph(type){
     let detail='';
     if(type==='strength'){
       const d=r.strength?.[exId]||{};
-      detail=`${d.reps||0}reps × ${d.weight||0}kg`;
-      if(d.time)detail+=` ${d.time}m`;
+      const sets=d.sets||[{reps:d.reps||0,weight:d.weight||0}];
+      const totalVol=sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
+      const totalReps=sets.reduce((a,s)=>a+(s.reps||0),0);
+      detail=`${sets.length}セット | ${totalReps}reps | Vol: ${totalVol}kg`;
     }else{
       const d=r.cardio?.[exId]||{};
-      detail=`${d.distance||0}km ${d.time||0}m`;
+      const bw=r.bodyWeight||(+(localStorage.getItem('ym4_bodyweight')||70));
+      const kcal=calcCardioCalories(d.distance,d.time,bw);
+      detail=`${d.distance||0}km ${d.time||0}m${kcal?' '+kcal+'kcal':''}`;
     }
     
     div.innerHTML=`
