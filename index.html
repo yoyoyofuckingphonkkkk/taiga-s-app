@@ -5966,7 +5966,7 @@ async function loadCloudVideos(){
       name:r.public_id.split('/').pop(),
       url:`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/video/upload/${r.public_id}.${r.format||'mp4'}`,
       cloudPublicId:r.public_id
-    }));
+    })).sort((a,b)=>b.id.localeCompare(a.id));
     if(countEl)countEl.textContent=`(${videos.length})`;
     renderVideoManagementList();
   }catch(e){
