@@ -2549,7 +2549,7 @@ function renderStrength(){
         // ヘッダー行
         const hrow=document.createElement('div');
         hrow.style.cssText='display:grid;grid-template-columns:32px 1fr 1fr 28px;gap:4px;margin-bottom:4px';
-        hrow.innerHTML=`<div style="font-size:10px;color:var(--muted);text-align:center">Set</div><div style="font-size:10px;color:var(--muted);text-align:center">Reps</div><div style="font-size:10px;color:var(--muted);text-align:center">Weight(kg)</div><div></div>`;
+        hrow.innerHTML=`<div style="font-size:10px;color:var(--muted);text-align:center">Set</div><div style="font-size:10px;color:var(--muted);text-align:center">Weight(kg)</div><div style="font-size:10px;color:var(--muted);text-align:center">Reps</div><div></div>`;
         setsEl.appendChild(hrow);
 
         data.sets.forEach((s,si)=>{
@@ -2582,7 +2582,7 @@ function renderStrength(){
             data.sets.splice(si,1);saveState();renderSets();calcScore();
           };
 
-          row.appendChild(setNum);row.appendChild(repsInput);row.appendChild(weightInput);row.appendChild(delSet);
+          row.appendChild(setNum);row.appendChild(weightInput);row.appendChild(repsInput);row.appendChild(delSet);
           setsEl.appendChild(row);
         });
 
@@ -2672,9 +2672,31 @@ function addToDaily(id){
   if(!state.strengthDaily)state.strengthDaily=[];
   if(!state.strengthDaily.includes(id)){
     state.strengthDaily.push(id);
-    if(!state.strength[id])state.strength[id]={sets:[{reps:0,weight:0}],memo:'',intensity:'moderate',time:0};
+    if(!state.strength[id]){
+      // 前回のセットデータを探す
+      const prevSets=getPrevStrengthSets(id);
+      state.strength[id]={sets:prevSets,memo:'',intensity:'moderate',time:0};
+    }
     saveState();renderStrength();calcScore();
   }
+}
+
+function getPrevStrengthSets(id){
+  // allDataから今日より前の日を新しい順に探す
+  const pastKeys=Object.keys(allData).filter(k=>k<TODAY_KEY).sort().reverse();
+  for(const key of pastKeys){
+    const r=allData[key];
+    if(r?.strengthDaily?.includes(id)&&r?.strength?.[id]){
+      const d=r.strength[id];
+      const sets=d.sets||[{reps:d.reps||0,weight:d.weight||0}];
+      if(sets.length>0&&sets.some(s=>(s.reps||0)+(s.weight||0)>0)){
+        // 前回のセットをそのままコピー
+        return sets.map(s=>({reps:s.reps||0,weight:s.weight||0}));
+      }
+    }
+  }
+  // 前回データなし
+  return [{reps:0,weight:0}];
 }
 
 function delFromDaily(idx){
