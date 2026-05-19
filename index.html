@@ -2561,43 +2561,57 @@ function renderStrength(){
 
       const renderSets=()=>{
         setsEl.innerHTML='';
-        // ヘッダー行
+        // ヘッダー行（列追加：✓ | Set | Weight | Reps | ×）
         const hrow=document.createElement('div');
-        hrow.style.cssText='display:grid;grid-template-columns:32px 1fr 1fr 28px;gap:4px;margin-bottom:4px';
-        hrow.innerHTML=`<div style="font-size:10px;color:var(--muted);text-align:center">Set</div><div style="font-size:10px;color:var(--muted);text-align:center">Weight(kg)</div><div style="font-size:10px;color:var(--muted);text-align:center">Reps</div><div></div>`;
+        hrow.style.cssText='display:grid;grid-template-columns:28px 28px 1fr 1fr 28px;gap:4px;margin-bottom:4px';
+        hrow.innerHTML=`<div></div><div style="font-size:10px;color:var(--muted);text-align:center">Set</div><div style="font-size:10px;color:var(--muted);text-align:center">Weight(kg)</div><div style="font-size:10px;color:var(--muted);text-align:center">Reps</div><div></div>`;
         setsEl.appendChild(hrow);
 
+        if(!data.setsDone)data.setsDone=[];
+
         data.sets.forEach((s,si)=>{
+          const done=!!data.setsDone[si];
           const row=document.createElement('div');
-          row.style.cssText='display:grid;grid-template-columns:32px 1fr 1fr 28px;gap:4px;margin-bottom:4px;align-items:center';
+          row.style.cssText=`display:grid;grid-template-columns:28px 28px 1fr 1fr 28px;gap:4px;margin-bottom:4px;align-items:center;opacity:${done?'0.45':'1'};transition:opacity .2s`;
+
+          // ✓ チェックボタン
+          const checkBtn=document.createElement('button');
+          checkBtn.style.cssText=`width:24px;height:24px;border-radius:6px;border:1.5px solid ${done?'var(--accent)':'var(--border)'};background:${done?'var(--accent)':'none'};color:${done?'#000':'var(--muted)'};font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0`;
+          checkBtn.textContent=done?'✓':'';
+          checkBtn.onclick=()=>{
+            if(!data.setsDone)data.setsDone=[];
+            data.setsDone[si]=!data.setsDone[si];
+            saveState();renderSets();
+          };
 
           const setNum=document.createElement('div');
-          setNum.style.cssText='font-size:12px;color:var(--muted);text-align:center;line-height:32px';
+          setNum.style.cssText='font-size:12px;color:var(--muted);text-align:center;line-height:24px';
           setNum.textContent=si+1;
-
-          const repsInput=document.createElement('input');
-          repsInput.type='number';repsInput.min='0';repsInput.value=s.reps||0;
-          repsInput.style.cssText='width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--accent2);text-align:center;font-size:14px;box-sizing:border-box';
-          repsInput.oninput=()=>{data.sets[si].reps=+repsInput.value;saveState();calcScore();
-            // ボリューム更新
-            const vol=data.sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
-            header.querySelector('div div:last-child')&&(header.querySelector('div div:last-child').textContent=vol>0?`Total: ${vol}kg`:'');
-          };
 
           const weightInput=document.createElement('input');
           weightInput.type='number';weightInput.min='0';weightInput.step='0.5';weightInput.value=s.weight||0;
           weightInput.style.cssText='width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--accent2);text-align:center;font-size:14px;box-sizing:border-box';
           weightInput.oninput=()=>{data.sets[si].weight=+weightInput.value;saveState();calcScore();};
 
+          const repsInput=document.createElement('input');
+          repsInput.type='number';repsInput.min='0';repsInput.value=s.reps||0;
+          repsInput.style.cssText='width:100%;padding:6px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--accent2);text-align:center;font-size:14px;box-sizing:border-box';
+          repsInput.oninput=()=>{data.sets[si].reps=+repsInput.value;saveState();calcScore();
+            const vol=data.sets.reduce((a,s)=>a+(s.reps||0)*(s.weight||0),0);
+            header.querySelector('div div:last-child')&&(header.querySelector('div div:last-child').textContent=vol>0?`Total: ${vol}kg`:'');
+          };
+
           const delSet=document.createElement('button');
           delSet.textContent='×';
           delSet.style.cssText='background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:0';
           delSet.onclick=()=>{
             if(data.sets.length<=1)return;
-            data.sets.splice(si,1);saveState();renderSets();calcScore();
+            data.sets.splice(si,1);
+            if(data.setsDone)data.setsDone.splice(si,1);
+            saveState();renderSets();calcScore();
           };
 
-          row.appendChild(setNum);row.appendChild(weightInput);row.appendChild(repsInput);row.appendChild(delSet);
+          row.appendChild(checkBtn);row.appendChild(setNum);row.appendChild(weightInput);row.appendChild(repsInput);row.appendChild(delSet);
           setsEl.appendChild(row);
         });
 
@@ -2608,6 +2622,8 @@ function renderStrength(){
         addSetBtn.onclick=()=>{
           const last=data.sets[data.sets.length-1]||{reps:0,weight:0};
           data.sets.push({reps:last.reps,weight:last.weight});
+          if(!data.setsDone)data.setsDone=[];
+          data.setsDone.push(false);
           saveState();renderSets();
         };
         setsEl.appendChild(addSetBtn);
@@ -4195,10 +4211,6 @@ function openDailyAISummary(){
     state.muscleMass?`筋肉量:${state.muscleMass}kg`:'',
   ].filter(Boolean).join(' ');
 
-  // Health
-  const sleep=state.health?.sleep||0;
-  const healthMemo=state.healthMemo||'';
-
   // Diary
   const diary=state.diary||'';
 
@@ -4227,8 +4239,6 @@ ${mealList||'記録なし'}
 栄養素: ${nutritionSummary||'記録なし'}
 
 【体】${bodyStr||'記録なし'}
-睡眠: ${sleep}h
-${healthMemo?'健康メモ: '+healthMemo:''}
 
 【日記】
 ${diary||'記録なし'}
@@ -4401,7 +4411,6 @@ async function aiSend(){
         date:key,
         score:calcScoreFor(day),
         studyMins:sm2,
-        exercise:day.health?.exercise||0,
         checkDone:Object.values(day.checks||{}).filter(Boolean).length,
         checkTotal:(day.checkItems||checkItems).length,
         hasDiary:!!(day.diary?.length),
@@ -4409,13 +4418,13 @@ async function aiSend(){
       });
     }
     const pastSummary=pastDays.length?pastDays.map(d=>
-      `${d.date}: スコア${d.score}点 勉強${Math.floor(d.studyMins/60)}h${d.studyMins%60}m 運動${d.exercise}分 チェック${d.checkDone}/${d.checkTotal}${d.weight?` 体重${d.weight}kg`:''}`
+      `${d.date}: スコア${d.score}点 勉強${Math.floor(d.studyMins/60)}h${d.studyMins%60}m チェック${d.checkDone}/${d.checkTotal}${d.weight?` 体重${d.weight}kg`:''}`
     ).join('\n'):'（過去データなし）';
 
     const systemPrompt=`あなたはASCENDというライフ最適化アプリのパーソナルAIアシスタントです。ユーザーの今日と過去14日のデータにアクセスできます。日本語で丁寧に答えてください。推移や傾向についても分析できます。
 
 【今日（${TODAY_KEY}）のデータ】
-LIFE SCORE: ${score}点 / 勉強: ${Math.floor(sm/60)}h${sm%60}m${studyDetails?`（${studyDetails}）`:''} / 目標達成率: ${Math.round(sm/(state.goalMins||360)*100)}% / チェック: ${checkDone}/${checkItems.length} / 運動: ${state.health?.exercise||0}分 / 体重: ${state.bodyWeight||'未記録'}kg / 食事: ${meals.length?meals.length+'食 '+Math.round(totalCal)+'kcal':'未記録'} / 日記: ${state.diary?'あり':'なし'}
+LIFE SCORE: ${score}点 / 勉強: ${Math.floor(sm/60)}h${sm%60}m${studyDetails?`（${studyDetails}）`:''} / 目標達成率: ${Math.round(sm/(state.goalMins||360)*100)}% / チェック: ${checkDone}/${checkItems.length} / 体重: ${state.bodyWeight||'未記録'}kg / 食事: ${meals.length?meals.length+'食 '+Math.round(totalCal)+'kcal':'未記録'} / 日記: ${state.diary?'あり':'なし'}
 科目: ${subjects.map(s=>s.name).join('、')} / 目標: ${Math.floor((state.goalMins||360)/60)}h/日
 
 【過去14日間の記録】
