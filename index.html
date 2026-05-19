@@ -926,10 +926,15 @@ function getInitialState(){
     // nutritionGoalsが空なら前日から引き継ぐ
     if(!parsed.nutritionGoals||Object.keys(parsed.nutritionGoals).length===0){
       const sortedKeys=Object.keys(allData).sort();
-      const prevKey=sortedKeys.filter(k=>k<TODAY_KEY).pop();
-      if(prevKey&&allData[prevKey]?.nutritionGoals){
-        parsed.nutritionGoals=JSON.parse(JSON.stringify(allData[prevKey].nutritionGoals));
+      const prevKey2=sortedKeys.filter(k=>k<TODAY_KEY).pop();
+      if(prevKey2&&allData[prevKey2]?.nutritionGoals){
+        parsed.nutritionGoals=JSON.parse(JSON.stringify(allData[prevKey2].nutritionGoals));
       }
+    }
+    // strengthDailyが前日から引き継がれていたらリセット
+    if(parsed.strengthDaily&&parsed.strengthDaily.length>0&&parsed.diaryDate!==TODAY_KEY){
+      parsed.strengthDaily=[];
+      parsed.strength={};
     }
     localStorage.setItem('ym4_'+TODAY_KEY,JSON.stringify(parsed));
     allData[TODAY_KEY]=parsed;
@@ -951,6 +956,16 @@ function getInitialState(){
 }
 
 let state=getInitialState();
+// 日付が変わったらリセットすべきデータをクリア
+if(state.diaryDate!==TODAY_KEY){
+  state.strengthDaily=[];
+  state.strength={};
+  state.studySessions=[];
+  state.meals=[];
+  state.healthMemo='';
+  state.checkMemo='';
+  saveState();
+}
 let editMode=false;
 let editDate=null;
 let editStateBackup=null;
