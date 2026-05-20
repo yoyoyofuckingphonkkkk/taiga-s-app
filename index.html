@@ -723,7 +723,15 @@ html,body{background:var(--black);color:var(--text);font-family:var(--sans);min-
     <button onclick="analyzeMealNutrition()" id="analyzeBtn" style="width:100%;padding:10px;border:0.5px solid var(--accent);border-radius:8px;background:transparent;color:var(--accent);font-size:13px;cursor:pointer;margin-bottom:8px;flex-shrink:0">Analyze Nutrition with AI</button>
 
     <!-- Nutrition result -->
-    <div id="mealNutritionResult" style="display:none;padding:10px 12px;border-radius:8px;background:var(--surface2);margin-bottom:12px;font-size:12px;line-height:1.8;color:var(--text2);flex-shrink:0"></div>
+    <div id="mealNutritionResult" style="display:none;padding:10px 12px;border-radius:8px;background:var(--surface2);margin-bottom:8px;font-size:12px;line-height:1.8;color:var(--text2);flex-shrink:0"></div>
+
+    <!-- 手入力トグル -->
+    <button onclick="toggleManualNutrition()" id="manualNutritionToggle" style="width:100%;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;margin-bottom:8px;flex-shrink:0;text-align:left">✏️ 栄養素を手入力する ▾</button>
+
+    <!-- 手入力パネル -->
+    <div id="manualNutritionPanel" style="display:none;margin-bottom:12px;flex-shrink:0">
+      <div id="manualNutritionInputs" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+    </div>
 
     <div style="flex:1"></div>
     <div style="display:flex;gap:8px;flex-shrink:0;padding-top:8px">
@@ -2780,6 +2788,7 @@ const NUTRITION_GOAL_FIELDS=[
   {key:'fat',label:'Fat',unit:'g'},
   {key:'fiber',label:'Fiber',unit:'g'},
   {key:'sugar',label:'Sugar',unit:'g'},
+  {key:'caffeine',label:'Caffeine',unit:'mg'},
   {key:'sodium',label:'Sodium',unit:'mg'},
   {key:'vitaminC',label:'Vit C',unit:'μg'},
   {key:'vitaminD',label:'Vit D',unit:'μg'},
@@ -2933,6 +2942,41 @@ function applyFoodPreset(p){
   setTimeout(()=>{flash.style.opacity='0';setTimeout(()=>flash.remove(),400);},1200);
 }
 
+function toggleManualNutrition(){
+  const panel=document.getElementById('manualNutritionPanel');
+  const btn=document.getElementById('manualNutritionToggle');
+  const isOpen=panel.style.display!=='none';
+  if(isOpen){
+    panel.style.display='none';
+    btn.textContent='✏️ 栄養素を手入力する ▾';
+  }else{
+    panel.style.display='block';
+    btn.textContent='✏️ 栄養素を手入力する ▴';
+    renderManualNutritionInputs();
+  }
+}
+
+function renderManualNutritionInputs(){
+  const grid=document.getElementById('manualNutritionInputs');
+  const current=mealNutritionData||{};
+  grid.innerHTML=NUTRITION_GOAL_FIELDS.map(f=>`
+    <div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:3px">${f.label} (${f.unit})</div>
+      <input type="number" id="manual_${f.key}" min="0" step="0.1" value="${current[f.key]||''}" placeholder="0"
+        style="width:100%;padding:6px 8px;border:0.5px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box"
+        oninput="syncManualNutrition()">
+    </div>`).join('');
+}
+
+function syncManualNutrition(){
+  const data={};
+  NUTRITION_GOAL_FIELDS.forEach(f=>{
+    const val=parseFloat(document.getElementById('manual_'+f.key)?.value);
+    if(!isNaN(val))data[f.key]=val;
+  });
+  mealNutritionData=data;
+}
+
 function openAddMeal(){
   document.getElementById('addMealOverlay').style.display='flex';
   document.getElementById('mealName').value='';
@@ -2942,6 +2986,11 @@ function openAddMeal(){
   mealPhotoBase64=null;
   mealNutritionData=null;
   document.body.style.overflow='hidden';
+  // 手入力パネルリセット
+  const panel=document.getElementById('manualNutritionPanel');
+  if(panel)panel.style.display='none';
+  const btn=document.getElementById('manualNutritionToggle');
+  if(btn)btn.textContent='✏️ 栄養素を手入力する ▾';
   renderFoodPresetList();
   // キーボード対応
   if(window.visualViewport){
@@ -2998,10 +3047,10 @@ ${details?'詳細・材料: '+details:''}
 - 手料理の場合は食材ごとに計算して合計すること
 - 写真がある場合は盛り付けや量も考慮すること
 - 推定の場合は多めに見積もること（少なめの見積もりは避ける）
-- 単位を厳守: calories=kcal, protein/carbs/fat/fiber/sugar=g, sodium/calcium/iron/zinc/magnesium/potassium=mg, vitaminA=μg, vitaminC=mg, vitaminD=μg, vitaminB12=μg
+- 単位を厳守: calories=kcal, protein/carbs/fat/fiber/sugar/caffeine=g (caffeineはmg), sodium/calcium/iron/zinc/magnesium/potassium=mg, vitaminA=μg, vitaminC=mg, vitaminD=μg, vitaminB12=μg
 
 以下のJSONのみ返してください（説明文・コードブロック不要）:
-{"calories":数字,"protein":数字,"carbs":数字,"fat":数字,"fiber":数字,"sugar":数字,"sodium":数字,"vitaminA":数字,"vitaminC":数字,"vitaminD":数字,"vitaminB12":数字,"calcium":数字,"iron":数字,"zinc":数字,"magnesium":数字,"potassium":数字,"summary":"データソースと精度についての一言（例：公式栄養成分表より／推定値）"}`;
+{"calories":数字,"protein":数字,"carbs":数字,"fat":数字,"fiber":数字,"sugar":数字,"caffeine":数字,"sodium":数字,"vitaminA":数字,"vitaminC":数字,"vitaminD":数字,"vitaminB12":数字,"calcium":数字,"iron":数字,"zinc":数字,"magnesium":数字,"potassium":数字,"summary":"データソースと精度についての一言（例：公式栄養成分表より／推定値）"}`;
 
     const parts=mealPhotoBase64
       ?[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:mealPhotoBase64}}]
@@ -3043,7 +3092,7 @@ ${details?'詳細・材料: '+details:''}
       </div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Vitamins & Minerals</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">
-        ${[['Vit A',r.vitaminA,'μg','#f96'],['Vit C',r.vitaminC,'mg','#f60'],['Vit D',r.vitaminD,'μg','#ff0'],['Vit B12',r.vitaminB12,'μg','#6af'],['Calcium',r.calcium,'mg','#fff'],['Iron',r.iron,'mg','#f44'],['Zinc',r.zinc,'mg','#8cf'],['Magnesium',r.magnesium,'mg','#4d8'],['Potassium',r.potassium,'mg','#a8f'],['Sodium',r.sodium,'mg','#fa8']].map(([label,val,unit,color])=>`
+        ${[['Vit A',r.vitaminA,'μg','#f96'],['Vit C',r.vitaminC,'mg','#f60'],['Vit D',r.vitaminD,'μg','#ff0'],['Vit B12',r.vitaminB12,'μg','#6af'],['Caffeine',r.caffeine,'mg','#a78'],['Calcium',r.calcium,'mg','#fff'],['Iron',r.iron,'mg','#f44'],['Zinc',r.zinc,'mg','#8cf'],['Magnesium',r.magnesium,'mg','#4d8'],['Potassium',r.potassium,'mg','#a8f'],['Sodium',r.sodium,'mg','#fa8']].map(([label,val,unit,color])=>`
           <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--surface);border-radius:6px">
             <div style="font-size:11px;color:var(--muted)">${label}</div>
             <span style="font-size:11px;color:${color};font-weight:500">${val||0}${unit}</span>
@@ -3051,7 +3100,13 @@ ${details?'詳細・材料: '+details:''}
       </div>
       <div style="color:var(--muted);font-size:11px">${r.summary||''}</div>`;
   }catch(err){alert('分析エラー: '+err.message);}
-  finally{btn.textContent='✨ Analyze Nutrition with AI';btn.disabled=false;}
+  finally{
+    btn.textContent='✨ Analyze Nutrition with AI';btn.disabled=false;
+    // 手入力パネルが開いてたら値を反映
+    if(document.getElementById('manualNutritionPanel')?.style.display!=='none'){
+      renderManualNutritionInputs();
+    }
+  }
 }
 
 function saveMeal(){
@@ -3094,7 +3149,7 @@ function renderMealList(){
     el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0">No meals logged yet</div>';
     if(sumEl)sumEl.innerHTML='';return;
   }
-  el.innerHTML=meals.map(m=>{
+  el.innerHTML=[...meals].reverse().map(m=>{
     const n=m.nutrition;
     return `<div style="border:0.5px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden">
       ${m.photoUrl||m.photo?`<img src="${m.photoUrl||m.photo}" style="width:100%;height:120px;object-fit:cover;display:block">`:''}
