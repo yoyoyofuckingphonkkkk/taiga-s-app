@@ -3195,27 +3195,11 @@ function renderMealList(){
   if(withN.length>0&&sumEl){
     const t=calcMealTotals(meals);
     const goals=state.nutritionGoals||{};
-    const allFields=[
-      {key:'calories',label:'Calories',unit:'kcal',color:'var(--accent)'},
-      {key:'protein',label:'Protein',unit:'g',color:'#4fc'},
-      {key:'carbs',label:'Carbs',unit:'g',color:'#f4a'},
-      {key:'fat',label:'Fat',unit:'g',color:'#fa4'},
-      {key:'fiber',label:'Fiber',unit:'g',color:'#8f8'},
-      {key:'sugar',label:'Sugar',unit:'g',color:'#aaa'},
-      {key:'sodium',label:'Sodium(Na)',unit:'mg',color:'#fa8'},
-      {key:'vitaminA',label:'Vit A',unit:'μg',color:'#f96'},
-      {key:'vitaminC',label:'Vit C',unit:'μg',color:'#f60'},
-      {key:'vitaminD',label:'Vit D',unit:'μg',color:'#ff0'},
-      {key:'vitaminB12',label:'Vit B12',unit:'μg',color:'#6af'},
-      {key:'calcium',label:'Calcium(Ca)',unit:'mg',color:'#fff'},
-      {key:'iron',label:'Iron(Fe)',unit:'mg',color:'#f44'},
-      {key:'zinc',label:'Zinc(Zn)',unit:'mg',color:'#8cf'},
-      {key:'magnesium',label:'Magnesium(Mg)',unit:'mg',color:'#4d8'},
-      {key:'potassium',label:'Potassium(K)',unit:'mg',color:'#a8f'},
-    ];
-    // 表示設定でフィルター（デフォルトは全表示）
     const shown=state.nutritionShown||{};
-    const visibleFields=allFields.filter(f=>shown[f.key]!==false&&((t[f.key]||0)>0||goals[f.key]>0));
+    const FIELD_COLORS={calories:'var(--accent)',protein:'#4fc',carbs:'#f4a',fat:'#fa4',fiber:'#8f8',sugar:'#aaa',caffeine:'#a78',sodium:'#fa8',vitaminA:'#f96',vitaminC:'#f60',vitaminD:'#ff0',vitaminB12:'#6af',calcium:'#fff',iron:'#f44',zinc:'#8cf',magnesium:'#4d8',potassium:'#a8f'};
+    const visibleFields=NUTRITION_GOAL_FIELDS
+      .map(f=>({...f,color:FIELD_COLORS[f.key]||'var(--text)'}))
+      .filter(f=>shown[f.key]!==false&&((t[f.key]||0)>0||goals[f.key]>0));
     sumEl.innerHTML=`<div class="health-section-label">Daily Total</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
         ${visibleFields.map(f=>{
@@ -3924,24 +3908,14 @@ function renderWeightGraph(){
     </svg>`;
 }
 function calcMealTotals(meals){
-  return meals.filter(m=>m.nutrition).reduce((a,m)=>({
-    calories:a.calories+(m.nutrition.calories||0),
-    protein:a.protein+(m.nutrition.protein||0),
-    carbs:a.carbs+(m.nutrition.carbs||0),
-    fat:a.fat+(m.nutrition.fat||0),
-    fiber:a.fiber+(m.nutrition.fiber||0),
-    sugar:a.sugar+(m.nutrition.sugar||0),
-    sodium:a.sodium+(m.nutrition.sodium||0),
-    vitaminA:a.vitaminA+(m.nutrition.vitaminA||0),
-    vitaminC:a.vitaminC+(m.nutrition.vitaminC||0),
-    vitaminD:a.vitaminD+(m.nutrition.vitaminD||0),
-    vitaminB12:a.vitaminB12+(m.nutrition.vitaminB12||0),
-    calcium:a.calcium+(m.nutrition.calcium||0),
-    iron:a.iron+(m.nutrition.iron||0),
-    zinc:a.zinc+(m.nutrition.zinc||0),
-    magnesium:a.magnesium+(m.nutrition.magnesium||0),
-    potassium:a.potassium+(m.nutrition.potassium||0),
-  }),{calories:0,protein:0,carbs:0,fat:0,fiber:0,sugar:0,sodium:0,vitaminA:0,vitaminC:0,vitaminD:0,vitaminB12:0,calcium:0,iron:0,zinc:0,magnesium:0,potassium:0});
+  return meals.filter(m=>m.nutrition).reduce((a,m)=>{
+    const n=m.nutrition;
+    NUTRITION_GOAL_FIELDS.forEach(f=>{a[f.key]=(a[f.key]||0)+(n[f.key]||0);});
+    // 後方互換（旧フィールド）
+    a.vitaminA=(a.vitaminA||0)+(n.vitaminA||0);
+    a.vitaminB12=(a.vitaminB12||0)+(n.vitaminB12||0);
+    return a;
+  },{});
 }
 
 function showRecordDetail(date){
