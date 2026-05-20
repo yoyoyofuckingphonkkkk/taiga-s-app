@@ -960,19 +960,28 @@ function getInitialState(){
   const prevGroups=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.checkGroups||[])):[];
   const prevNutritionGoals=prevKey?JSON.parse(JSON.stringify(allData[prevKey]?.nutritionGoals||{})):{};
   const inheritedGroups=tmrGroups.length>0?tmrGroups:prevGroups;
-  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null,checkMemo:'',checkGroups:inheritedGroups,nutritionGoals:prevNutritionGoals};
+  return {study:{},checks:inheritedChecks,checkItems:prevItems,goalMins:prevGoal,subjects:prevSubjects,health:{sleep:7,exercise:0,meal:3},cardio:{},strength:{},strengthDaily:[],studySessions:[],meals:[],diary:'',diaryDate:TODAY_KEY,healthMemo:'',bodyWeight:null,bodyFat:null,muscleMass:null,skeletalMuscle:null,checkMemo:'',checkGroups:inheritedGroups,nutritionGoals:prevNutritionGoals};
 }
 
 let state=getInitialState();
-// 日付が変わったらリセットすべきデータをクリア
+// 毎起動時に日別リセット項目をクリア（diaryDateに関係なく）
 if(state.diaryDate!==TODAY_KEY){
+  // 新しい日 - 全部リセット
   state.strengthDaily=[];
   state.strength={};
   state.studySessions=[];
   state.meals=[];
   state.healthMemo='';
   state.checkMemo='';
+  state.diaryDate=TODAY_KEY;
   saveState();
+} else {
+  // 同じ日でも筋トレ・タイムラインは起動時にリセット不要（今日のデータを保持）
+  // ただしstudySessionsとstrengthDailyが前日から混入してないか確認
+  let needsSave=false;
+  if(!Array.isArray(state.studySessions)){state.studySessions=[];needsSave=true;}
+  if(!Array.isArray(state.strengthDaily)){state.strengthDaily=[];state.strength={};needsSave=true;}
+  if(needsSave)saveState();
 }
 let editMode=false;
 let editDate=null;
