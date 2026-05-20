@@ -3113,12 +3113,18 @@ function saveMeal(){
   const name=document.getElementById('mealName').value.trim();
   if(!name){alert('Meal nameを入力してください');return;}
   if(!state.meals)state.meals=[];
+
+  // 手入力パネルが開いていたら値を同期
+  if(document.getElementById('manualNutritionPanel')?.style.display!=='none'){
+    syncManualNutrition();
+  }
+
   const mealId='meal_'+Date.now();
   const meal={
     id:mealId,name,
     details:document.getElementById('mealDetails').value.trim(),
     photoId:mealPhotoBase64?mealId+'_photo':null,
-    nutrition:mealNutritionData||null,
+    nutrition:mealNutritionData&&Object.keys(mealNutritionData).length>0?mealNutritionData:null,
     time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
   };
   // 写真はIndexedDBに保存（localStorageの容量節約）
